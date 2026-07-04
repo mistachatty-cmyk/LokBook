@@ -87,3 +87,23 @@ export const NAME_COLORS = [{ id: "default", name: "Default", price: 0, color: n
 export const FRAMES = [{ id: "none", name: "None", price: 0 }, { id: "double", name: "Double rule", price: 25 }, { id: "dashed", name: "Dashed ink", price: 25 }, { id: "tape", name: "Washi corners", price: 40 }, { id: "glow", name: "Neon glow", price: 60 }, { id: "photo", name: "Photo Corners", price: 30 }, { id: "stamp", name: "Stamp Edge", price: 35 }];
 export const REACTION_PACKS = [{ id: "base", name: "Ink set (splat · heart · drip)", price: 0 }, { id: "stars", name: "Stardust pack", price: 30 }, { id: "fire", name: "Hot streak pack", price: 30 }, { id: "zen", name: "Zen pack", price: 45 }, { id: "spooky", name: "Spooky Pack", price: 30 }, { id: "sweet", name: "Sweet Pack", price: 30 }];
 export const AVATAR_ACCENTS = [{ id: "none", name: "Plain", price: 0 }, { id: "ring", name: "Accent ring", price: 20 }, { id: "halo", name: "Sketch halo", price: 35 }, { id: "crown", name: "Ink crown", price: 50 }, { id: "horns", name: "Horns", price: 40 }, { id: "antenna", name: "Antenna", price: 40 }];
+
+export function blotBorderStyle(id, T) {
+  return ({
+    none: { border: `3px solid ${T.ink}` },
+    gilded: { border: "3px solid #E8B14B", boxShadow: `0 0 0 2px ${T.ink}, 3px 3px 0 ${T.shadow}` },
+    washi: { border: `3px dashed ${T.accent}` },
+    orbit: { border: `3px dotted ${T.alt}`, outline: `2px dashed ${T.ink}`, outlineOffset: 3 },
+    liquid: { border: `3px solid ${T.accent}`, boxShadow: `0 0 0 2px ${T.ink}, 0 0 16px 3px ${T.accent}` },
+    stitch: { border: `3px double ${T.ink}` },
+    marble: { border: `3px solid ${T.alt}`, boxShadow: `inset 0 0 0 2px ${T.paper}, 0 0 0 3px ${T.ink}` },
+  }[id] || { border: `3px solid ${T.ink}` });
+}
+
+export function makeQuests() { return [...QUEST_POOL].sort(() => Math.random() - .5).slice(0, 3).map(q => ({ ...q, progress: 0, done: false })); }
+
+export async function founderSignup(handle, email, save_blob) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/founder_signups`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`, Prefer: "return=minimal" }, body: JSON.stringify({ handle, email: email || null, source: "lok_alpha", save_blob }) });
+  if (!res.ok) throw new Error("signup failed " + res.status);
+  return true;
+}
