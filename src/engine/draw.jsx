@@ -48,6 +48,84 @@ export function drawNight(ctx, t, i = 0) {
   ctx.beginPath(); ctx.ellipse(bx, by + 2, 13, 19, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 }
 
+// --- extra seed styles: geometric, character, mood, nature, energy, ocean ---
+export function drawOrbit(ctx, t) {
+  ctx.strokeStyle = "rgba(35,48,107,0.3)"; ctx.lineWidth = 3; ctx.setLineDash([5, 9]); ctx.beginPath(); ctx.ellipse(240, 300, 155, 96, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  for (let s = 0; s < 14; s++) { const sx = 50 + ((s * 151.7) % 380), sy = 50 + ((s * 97.3) % 500); ctx.fillStyle = s % 3 ? ART.ink : ART.pink; ctx.globalAlpha = 0.5; ctx.fillRect(sx, sy, 4, 4); ctx.globalAlpha = 1; }
+  risoCircle(ctx, 240, 300, 66, 66);
+  ctx.strokeStyle = ART.teal; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(240, 300, 92, 26, -0.35, 0, Math.PI * 2); ctx.stroke();
+  const a = t * Math.PI * 2 - Math.PI / 2, mx = 240 + Math.cos(a) * 155, my = 300 + Math.sin(a) * 96;
+  ctx.fillStyle = ART.teal; ctx.strokeStyle = ART.ink; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(mx, my, 17, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+}
+
+export function drawWalk(ctx, t, i = 0) {
+  const g = 470; ctx.strokeStyle = ART.ink; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(30, g + 34); ctx.lineTo(W - 30, g + 34); ctx.stroke();
+  const x = 60 + t * 350, sw = Math.sin(i * 1.9), bob = Math.abs(Math.sin(i * 1.9)) * 8, y = 330 - bob;
+  ctx.lineWidth = 7; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(x, y + 40); ctx.lineTo(x + sw * 34, g + 30); ctx.stroke();            // legs
+  ctx.beginPath(); ctx.moveTo(x, y + 40); ctx.lineTo(x - sw * 34, g + 30); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y + 40); ctx.lineTo(x, y - 30); ctx.stroke();                       // body
+  ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x + sw * 28, y + 26); ctx.stroke();              // arms
+  ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x - sw * 28, y + 26); ctx.stroke();
+  risoCircle(ctx, x, y - 62, 30, 30, 3);                                                              // head
+  ctx.fillStyle = ART.ink; ctx.beginPath(); ctx.arc(x + 10, y - 66, 3.5, 0, Math.PI * 2); ctx.fill(); // eye
+}
+
+export function drawRain(ctx, t, i = 0) {
+  ctx.strokeStyle = ART.ink; ctx.lineWidth = 6; ctx.strokeRect(70, 60, 340, 420);
+  ctx.strokeStyle = "rgba(35,48,107,0.35)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(240, 60); ctx.lineTo(240, 480); ctx.moveTo(70, 270); ctx.lineTo(410, 270); ctx.stroke();
+  ctx.strokeStyle = ART.teal; ctx.lineWidth = 3.5; ctx.lineCap = "round";
+  for (let d = 0; d < 22; d++) { const dx = 84 + ((d * 89.7) % 312); const dy = 70 + (((d * 137.3) + i * 60) % 396); ctx.beginPath(); ctx.moveTo(dx, dy); ctx.lineTo(dx - 5, dy + 20); ctx.stroke(); }
+  const pw = 30 + 60 * t; ctx.strokeStyle = ART.pink; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(240, 530, pw, pw * 0.24, 0, 0, Math.PI * 2); ctx.stroke();
+  risoCircle(ctx, 150 + 40 * Math.sin(t * Math.PI * 2), 520, 16, 16, 3);
+}
+
+export function drawFish(ctx, t, i = 0) {
+  ctx.fillStyle = "rgba(47,169,160,0.14)"; ctx.fillRect(26, 26, W - 52, H - 52);
+  for (let b = 0; b < 5; b++) { const bx = 90 + b * 78, by = 520 - (((b * 120) + t * 460) % 460); ctx.strokeStyle = "rgba(35,48,107,0.4)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(bx, by, 6 + (b % 3) * 3, 0, Math.PI * 2); ctx.stroke(); }
+  const fx = 100 + t * 280, fy = 290 + Math.sin(t * Math.PI * 3) * 60, flap = Math.sin(i * 2.1) * 0.8;
+  ctx.fillStyle = ART.pink; ctx.strokeStyle = ART.ink; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.ellipse(fx, fy, 58, 34, Math.sin(t * Math.PI * 3) * 0.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(fx - 52, fy); ctx.quadraticCurveTo(fx - 96, fy - 36 * flap, fx - 100, fy - 44 * flap); ctx.quadraticCurveTo(fx - 88, fy + 4, fx - 52, fy); ctx.fillStyle = ART.teal; ctx.fill(); ctx.stroke();
+  ctx.fillStyle = ART.ink; ctx.beginPath(); ctx.arc(fx + 34, fy - 8, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = ART.teal; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(fx + 10, fy + 4, 16, -0.6, 0.9); ctx.stroke();
+}
+
+export function drawBurst(ctx, t) {
+  ctx.fillStyle = "rgba(35,48,107,0.93)"; ctx.fillRect(26, 26, W - 52, H - 52);
+  if (t < 0.4) { const ry = 520 - (t / 0.4) * 300; ctx.strokeStyle = ART.pink; ctx.lineWidth = 5; ctx.setLineDash([4, 10]); ctx.beginPath(); ctx.moveTo(240, 540); ctx.lineTo(240, ry); ctx.stroke(); ctx.setLineDash([]); risoCircle(ctx, 240, ry, 13, 13, 2); return; }
+  const k = (t - 0.4) / 0.6, R = 40 + k * 190;
+  for (let p = 0; p < 12; p++) { const a = (p / 12) * Math.PI * 2; const col = [ART.pink, ART.teal, "#E8B14B"][p % 3]; ctx.strokeStyle = col; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.globalAlpha = 1 - k * 0.55; ctx.beginPath(); ctx.moveTo(240 + Math.cos(a) * R * 0.45, 220 + Math.sin(a) * R * 0.45); ctx.lineTo(240 + Math.cos(a) * R, 220 + Math.sin(a) * R); ctx.stroke(); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(240 + Math.cos(a) * R, 220 + Math.sin(a) * R, 7 * (1 - k * 0.5), 0, Math.PI * 2); ctx.fill(); }
+  ctx.globalAlpha = 1;
+}
+
+export function drawWave(ctx, t, i = 0) {
+  const ph = t * Math.PI * 2;
+  ctx.fillStyle = "rgba(47,169,160,0.18)"; ctx.fillRect(26, 300, W - 52, 274);
+  [0.35, 0.55, 0.8].forEach((depth, wi) => {
+    const wy = 300 + depth * 200; ctx.strokeStyle = wi === 1 ? ART.teal : ART.ink; ctx.lineWidth = 6 - wi; ctx.beginPath();
+    for (let x = 26; x <= W - 26; x += 8) ctx.lineTo(x, wy + Math.sin(x / 46 + ph + wi * 2) * (16 - wi * 3));
+    ctx.stroke();
+  });
+  const bx = 200 + Math.sin(ph) * 60, by = 328 + Math.sin(bx / 46 + ph) * 14;
+  ctx.fillStyle = ART.pink; ctx.strokeStyle = ART.ink; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(bx - 44, by); ctx.lineTo(bx + 44, by); ctx.lineTo(bx + 26, by + 26); ctx.lineTo(bx - 26, by + 26); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, by - 58); ctx.stroke();
+  ctx.fillStyle = ART.teal; ctx.beginPath(); ctx.moveTo(bx, by - 58); ctx.lineTo(bx + 38 + 6 * Math.sin(i * 2), by - 40); ctx.lineTo(bx, by - 24); ctx.closePath(); ctx.fill(); ctx.stroke();
+  risoCircle(ctx, 380, 110, 34, 34, 4);
+}
+
+// Recompress a frame dataURL to JPEG on paper background — used before
+// uploading to the party feed and saving the gallery (keeps payloads small).
+export function compressFrame(dataUrl, q = 0.62) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => { try { const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d"); x.fillStyle = ART.paper; x.fillRect(0, 0, W, H); x.drawImage(img, 0, 0); res(c.toDataURL("image/jpeg", q)); } catch { res(dataUrl); } };
+    img.onerror = () => res(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 export function renderSequence(painter, n) {
   const c = document.createElement("canvas"); c.width = W; c.height = H; const ctx = c.getContext("2d");
   const out = []; for (let i = 0; i < n; i++) { ctx.clearRect(0, 0, W, H); paperBase(ctx, i); painter(ctx, n === 1 ? 1 : i / (n - 1), i); out.push(c.toDataURL("image/png")); } return out;
