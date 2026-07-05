@@ -16,7 +16,7 @@ export function LilLokBubble({ text, ink = ART.ink, paper = ART.paper }) {
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export function LilLokSprite({ phase, ink, size = 88, custom }) {
+export function LilLokSprite({ phase, ink, size = 88, custom, gear }) {
   if (custom && custom[phase === "critical" ? "decaying" : phase]) return (<img src={custom[phase === "critical" ? "decaying" : phase]} alt="lillok" width={size} height={size} style={{ width: size, height: size, objectFit: "contain", animation: phase === "stasis" || reduceMotion ? "none" : phase === "thriving" ? "lokbob 2.4s ease-in-out infinite" : "lokbob 4s ease-in-out infinite" }} />);
   const crit = phase === "critical", grey = phase === "decaying" || crit, stone = phase === "stasis";
   const body = stone ? "#9A9286" : grey ? "#8E93A8" : ART.pink;
@@ -38,10 +38,16 @@ export function LilLokSprite({ phase, ink, size = 88, custom }) {
       <text x={73} y={27} fontSize={12} fill={ART.ink} opacity={0.6} fontWeight="700">Z</text>
       <text x={81} y={16} fontSize={15} fill={ART.ink} opacity={0.85} fontWeight="700">Z</text></>}
     {phase === "thriving" && <circle cx={70} cy={30} r={5} fill={ART.teal} stroke={ART.ink} strokeWidth="2" />}
+    {gear==="hat"&&<path d="M32 42 Q33 28 48 26 Q63 28 64 42" fill={ART.pink} stroke={ART.ink} strokeWidth="3" strokeLinecap="round"/>}
+    {gear==="hat"&&<ellipse cx={48} cy={42} rx={18} ry={4} fill={ART.pink} stroke={ART.ink} strokeWidth="3"/>}
+    {gear==="glasses"&&<ellipse cx={38} cy={50} rx={9} ry={7} fill="none" stroke={ART.ink} strokeWidth="2.5"/>}
+    {gear==="glasses"&&<ellipse cx={58} cy={50} rx={9} ry={7} fill="none" stroke={ART.ink} strokeWidth="2.5"/>}
+    {gear==="glasses"&&<line x1={47} y1={49} x2={49} y2={49} stroke={ART.ink} strokeWidth="2.5"/>}
+    {gear==="bowtie"&&<path d="M38 68 L48 62 L58 68 L48 74 Z" fill={ART.accent} stroke={ART.ink} strokeWidth="2.5" strokeLinejoin="round"/>}
   </svg>);
 }
 
-export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onFeed, onFlask, onClose, say, setLillok, onPublish, onSaveCustom }) {
+export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onFeed, onFlask, onClose, say, setLillok, onPublish, onSaveCustom, gear }) {
   const T = useT();
   const [mode, setMode] = useState("care");
   const [feeding, setFeeding] = useState(false);
@@ -64,7 +70,7 @@ export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onF
     <div className="w-full rounded-t-3xl p-5 overflow-y-auto" style={{ maxWidth: 560, maxHeight: "92vh", background: T.card, border: `3px solid ${(phase === "decaying" || phase === "critical") ? "#8E93A8" : T.ink}`, animation: (phase === "decaying" || phase === "critical") && !reduceMotion ? "lokwobble 9s ease-in-out infinite" : "lokrise .25s ease" }} onClick={e => e.stopPropagation()}>
       <div className="flex items-center gap-3">
         <div className="rounded-2xl p-2 relative" style={{ background: T.paper, border: `3px solid ${T.ink}`, transform: feeding ? "scale(1.08)" : "scale(1)", transition: "transform .15s cubic-bezier(.34,1.56,.64,1)" }}>
-          <LilLokSprite phase={phase} ink={lillok.ink} size={64} custom={custom?.art} />
+          <LilLokSprite phase={phase} ink={lillok.ink} size={64} custom={custom?.art} gear={gear}/>
           {feeding && [0, 1, 2].map(i => (<div key={i} className="absolute pointer-events-none" style={{ left: `${22 + i * 24}%`, bottom: "85%", fontSize: 15, animation: `lokfloat .65s ease-out ${i * 0.1}s forwards` }}>💧</div>))}
         </div>
         <div className="flex-1"><div className="lok-display text-xl font-extrabold">{lillok.name} <span className="text-sm font-bold opacity-60">· {phase}</span></div><div className="text-xs opacity-70">Living Ink companion</div></div>

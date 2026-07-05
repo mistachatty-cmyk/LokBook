@@ -1,0 +1,30 @@
+{
+  "name": "LokBook",
+  "short_name": "LokBook",
+  "description": "A home for tiny hand-drawn animations.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F2EDE2",
+  "theme_color": "#23306B",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "share_target": {
+    "action": "/?share-target=true",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
+}

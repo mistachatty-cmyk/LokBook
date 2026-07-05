@@ -149,10 +149,12 @@ function renderAvatar(seed){
   return c.toDataURL("image/png");
 }
 
-const NAME_COLOR_MAP={default:null,pink:"#FF5DA2",teal:"#2FA9A0",gold:"#E8B14B",violet:"#7A4FBF",rainbow:"rainbow"};
+const NAME_COLOR_MAP={default:null,pink:"#FF5DA2",teal:"#2FA9A0",gold:"#E8B14B",violet:"#7A4FBF",rainbow:"rainbow",fire:"fire",ice:"ice"};
 function NameTag({name,color,className,style}){
   const c=NAME_COLOR_MAP[color];
   if(c==="rainbow")return<span className={className} style={{...style,background:"linear-gradient(90deg,#FF5DA2,#E8B14B,#2FA9A0,#7A4FBF)",WebkitBackgroundClip:"text",backgroundClip:"text",WebkitTextFillColor:"transparent"}}>{name}</span>;
+  if(c==="fire")return<span className={className} style={{...style,background:"linear-gradient(90deg, #FFD700, #FF8C00, #FF4500, #FF8C00, #FFD700)", WebkitBackgroundClip:"text",backgroundClip:"text",WebkitTextFillColor:"transparent", animation:"lokfire 2s linear infinite"}}>{name}</span>;
+  if(c==="ice")return<span className={className} style={{...style,background:"linear-gradient(90deg, #A0D2EB, #E5E5E5, #A0D2EB, #B0E0E6, #A0D2EB)", WebkitBackgroundClip:"text",backgroundClip:"text",WebkitTextFillColor:"transparent", animation:"lokice 3s linear infinite"}}>{name}</span>;
   return<span className={className} style={{...style,color:c||style?.color}}>{name}</span>;
 }
 function FramedAvatar({src,size=64,frame="none",accent="none",ink="#23306B",acc="#FF5DA2",animated=false}){
@@ -305,6 +307,8 @@ function GlobalStyle({T,pace="sweep",speed=1}){
   @keyframes loksheen{from{background-position:200% 0}to{background-position:-50% 0}}
   @keyframes inkdrop{0%{transform:scaleY(0.2) scaleX(0.8);opacity:0}40%{transform:scaleY(1.1) scaleX(0.95);opacity:1}60%{transform:scaleY(0.9) scaleX(1.05)}100%{transform:scale(1);opacity:1}}
   @keyframes chromawave{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+  @keyframes lokfire{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  @keyframes lokice{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @keyframes inkfade{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}}
   @keyframes inkpulse{0%,100%{opacity:.4}50%{opacity:1}}
   *{-webkit-tap-highlight-color:transparent}
@@ -638,6 +642,7 @@ function Studio({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt}){
   const[paceMs,setPaceMs]=useState(140);const[title,setTitle]=useState("");const[mode,setMode]=useState("A");const[style,setStyle]=useState("bold");const[pv,setPv]=useState(0);const[justCap,setJustCap]=useState(false);const[zen,setZen]=useState(false);const[promptPick,setPromptPick]=useState(null);
   const pastPrompts=useMemo(()=>{const doy=d=>Math.floor((d-new Date(d.getFullYear(),0,0))/86400000);return Array.from({length:5},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(i+1));return PROMPTS[(d.getFullYear()*366+doy(d))%PROMPTS.length];});},[]);
   const activePrompt=promptPick||dailyPrompt;
+  const[exporting,setExporting]=useState(false);
   useEffect(()=>{if(frames.length<2)return;const t=setInterval(()=>setPv(p=>(p+1)%frames.length),paceMs);return()=>clearInterval(t);},[frames.length,paceMs]);
   const onionFrames=onionOn&&frames.length>0?frames.slice(-onionCount).map((f,i)=>({src:f,color:i===0?ART.pink:ART.teal,opacity:onionOpacity/(i+1)})):[];
   const capture=()=>{const url=easel.current.composite(frames.length);setFrames(f=>[...f,url]);setFrameDurations(d=>[...d,paceMs]);setJustCap(true);setTimeout(()=>setJustCap(false),360);say(`Page ${frames.length+1} captured`);};
@@ -645,6 +650,29 @@ function Studio({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt}){
   const duplicateFrame=i=>{setFrames(f=>[...f.slice(0,i+1),f[i],...f.slice(i+1)]);setFrameDurations(d=>[...d.slice(0,i+1),d[i]??paceMs,...d.slice(i+1)]);say(`Page ${i+1} duplicated`);};
   const moveFrame=(i,d)=>{setFrames(f=>{const j=i+d;if(j<0||j>=f.length)return f;const c=[...f];[c[i],c[j]]=[c[j],c[i]];return c;});setFrameDurations(dd=>{const j=i+d;if(j<0||j>=dd.length)return dd;const c=[...dd];[c[i],c[j]]=[c[j],c[i]];return c;});};
   const ready=frames.length>=2;
+  const exportGif = () => {
+    if (exporting || !ready) return;
+    say("Building GIF...");
+    setExporting(true);
+
+    const script = document.createElement('script');
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js";
+    script.onload = () => {
+      const gif = new GIF({ workers: 2, quality: 10, workerScript: "https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js" });
+      const imagePromises = frames.map(frameData => new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.src = frameData;
+      }));
+
+      Promise.all(imagePromises).then(images => {
+        images.forEach((img, i) => gif.addFrame(img, { delay: frameDurations[i] || paceMs }));
+        gif.on('finished', blob => { setExporting(false); window.open(URL.createObjectURL(blob)); say("GIF exported!", "success"); });
+        gif.render();
+      });
+    };
+    document.body.appendChild(script);
+  };
   return(<div className="mt-4">
     <div className="flex items-center justify-between">
       <div><h2 className="lok-display text-xl font-extrabold flex items-center gap-2">Studio{ccTier&&<span className="text-xs px-1.5 py-0.5 rounded" style={{background:T.accent,color:T.onAccent}}>PRO</span>}</h2><p className="text-xs opacity-70 mt-0.5">Draw · capture · repeat · publish</p></div>
@@ -707,9 +735,14 @@ function Studio({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt}){
         <div><div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Style</div><div className="flex gap-2">{[["bold","Bold"],["series","Series"]].map(([id,l])=>(<button key={id} onClick={()=>setStyle(id)} aria-pressed={style===id} className="lok-btn flex-1 py-2 rounded-xl text-xs font-bold" style={{border:`2.5px solid ${style===id?T.accent:T.ink}`,background:style===id?T.alt:T.card,color:style===id?"#fff":T.ink}}>{l}</button>))}</div></div>
       </div>
       <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Name this flip…" aria-label="Flip title" className="mt-3 w-full px-3 py-2.5 rounded-xl font-bold" style={{border:`3px solid ${T.ink}`,background:T.card,color:T.ink}}/>
-      <button disabled={!ready} aria-label={ready?"Publish to gallery":"Need 2+ pages"} onClick={()=>{if(!ready){say("Capture at least 2 pages first");return;}onPublish({id:"p"+Date.now(),title:title.trim()||"Untitled flip",frames,frameDurations,paceMs,mode,style,weeklyPrompt:activePrompt===WEEKLY_PROMPT?WEEKLY_PROMPT:null,votes:0,voted:false,viewed:false,views:0,reactions:{splat:0,heart:0,drip:0},from:"studio"});setFrames([]);setFrameDurations([]);setTitle("");easel.current.clearAll();}} className="lok-btn lok-display mt-3 w-full py-3.5 rounded-xl text-lg font-extrabold" style={{background:ready?T.accent:T.shadow,color:ready?T.onAccent:T.ink,border:`3px solid ${T.ink}`,boxShadow:ready?`4px 4px 0 ${T.ink}`:"none",opacity:ready?1:0.6}}>
-        {ready?"Publish to gallery →":`Capture ${2-frames.length} more page${2-frames.length===1?"":"s"}`}
-      </button>
+      <div className="mt-3 flex gap-3">
+        <button disabled={!ready || exporting} aria-label={ready?"Publish to gallery":"Need 2+ pages"} onClick={()=>{if(!ready){say("Capture at least 2 pages first");return;}onPublish({id:"p"+Date.now(),title:title.trim()||"Untitled flip",frames,frameDurations,paceMs,mode,style,weeklyPrompt:activePrompt===WEEKLY_PROMPT?WEEKLY_PROMPT:null,votes:0,voted:false,viewed:false,views:0,reactions:{splat:0,heart:0,drip:0},from:"studio"});setFrames([]);setFrameDurations([]);setTitle("");easel.current.clearAll();}} className="lok-btn lok-display flex-1 py-3.5 rounded-xl text-lg font-extrabold" style={{background:ready?T.accent:T.shadow,color:ready?T.onAccent:T.ink,border:`3px solid ${T.ink}`,boxShadow:ready?`4px 4px 0 ${T.ink}`:"none",opacity:ready?1:0.6}}>
+          {ready?"Publish →":`Capture ${2-frames.length} more page${2-frames.length===1?"":"s"}`}
+        </button>
+        <button disabled={!ready || exporting} onClick={exportGif} aria-label="Export as GIF" className="lok-btn lok-display px-4 py-3.5 rounded-xl text-lg font-extrabold" style={{background:T.card,color:T.ink,border:`3px solid ${T.ink}`,opacity:ready?1:0.6}}>
+          {exporting ? "..." : "GIF"}
+        </button>
+      </div>
     </div>)}
   </div>);
 }

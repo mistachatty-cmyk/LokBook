@@ -1,0 +1,9 @@
+# Cloudflare Pages config for LokBook
+# Deploy via: npx wrangler pages deploy dist
+
+name = "lokbook"
+compatibility_date = "2025-04-01"
+
+[build]
+command = "npm run build"
+output = "dist"

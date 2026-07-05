@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ART, useT } from "./theme/theme.js";
+import { ART, SMILE_VARIANTS, useT } from "./theme/theme.js";
 import { NAME_COLOR_MAP, PACE_PRESETS } from "./constants.jsx";
 
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
@@ -33,8 +33,19 @@ export function ReactionIcon({ type, size = 24 }) {
     case "leaf": return P("M6 26 C6 12 18 6 26 6 C26 20 14 26 6 26 Z M10 22 C16 16 20 12 24 10", "#3E8E4B")(size);
     case "wave2": return (<svg width={size} height={size} viewBox="0 0 32 32"><path d="M3 12 Q8 6 13 12 T23 12 T29 12 M3 20 Q8 14 13 20 T23 20 T29 20" fill="none" stroke={ART.teal} strokeWidth="2.4" strokeLinecap="round" /></svg>);
     case "lotus": return P("M16 28 C9 24 6 18 8 12 C12 16 14 18 16 24 C18 18 20 16 24 12 C26 18 23 24 16 28 Z", "#7A4FBF")(size);
+    case "humhah": return (<svg width={size} height={size} viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="none" stroke="#E8B14B" strokeWidth="2"/><path d="M10 11 Q12 9,14 11 M18 11 Q20 9,22 11" stroke="#E8B14B" strokeWidth="2" strokeLinecap="round" fill="none"/><path d="M11 20 Q16 25,21 20" stroke="#E8B14B" strokeWidth="2" strokeLinecap="round" fill="none"/></svg>);
+    case "bomhogwah": return (<svg width={size} height={size} viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="none" stroke="#7A4FBF" strokeWidth="2"/><circle cx="11" cy="13" r="2" fill="#7A4FBF"/><circle cx="21" cy="13" r="2" fill="#7A4FBF"/><path d="M11 21 Q16 25,21 21" stroke="#7A4FBF" strokeWidth="2.2" strokeLinecap="round" fill="none"/></svg>);
     default: return (<svg width={size} height={size} viewBox="0 0 32 32"><path d="M16 5 L19 12 L27 11 L21 17 L26 24 L17 21 L13 28 L12 20 L4 19 L11 14 Z" fill={ART.pink} stroke={ART.ink} strokeWidth="1.6" strokeLinejoin="round" /><circle cx="16" cy="16" r="3" fill={ART.ink} /></svg>);
   }
+}
+
+export function SkyEffect({ sky, paper }) {
+  if (sky === "clear"||!sky) return null;
+  if (sky === "clouds") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{zIndex:1}}>{Array.from({length:12}).map((_,i)=>(<div key={i} className="absolute" style={{left:`${(i*31)%90+5}%`,top:`${20+i*6}%`,width:60+(i%3)*30,height:20+(i%2)*10,borderRadius:"50%",background:"rgba(200,200,200,.12)",animation:reduceMotion?"none":`lokdrift ${18+i*3}s linear infinite`,animationDelay:`-${i*4}s`}}/>))}</div>);
+  if (sky === "stars") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{zIndex:1}}>{Array.from({length:50}).map((_,i)=>(<div key={i} className="absolute rounded-full" style={{left:`${(i*19)%100}%`,top:`${(i*7)%100}%`,width:2+(i%3),height:2+(i%3),background:"rgba(255,255,255,.6)",animation:reduceMotion?"none":`loktwinkle ${1.5+(i%5)*0.8}s ease-in-out infinite alternate`,animationDelay:`-${i*0.3}s`}}/>))}</div>);
+  if (sky === "sunset") return (<div className="pointer-events-none fixed inset-0" style={{zIndex:1,background:`linear-gradient(180deg, #FF6B35 0%, #FF8C42 20%, #FFD700 40%, ${paper} 65%)`,opacity:0.2}}/>);
+  if (sky === "aurora_sky") return (<div className="pointer-events-none fixed inset-0" style={{zIndex:1,background:`linear-gradient(180deg, rgba(0,255,170,.08), rgba(127,90,240,.05) 50%, transparent)`,animation:reduceMotion?"none":"lokaurora 12s ease-in-out infinite alternate"}}/>);
+  return null;
 }
 
 export function PageEffect({ effect }) {
@@ -45,12 +56,18 @@ export function PageEffect({ effect }) {
   return null;
 }
 
+export function SmileDecoration({ variant = "smile1", size = 32, color = "#F39C12", stroke = "#4A3728" }) {
+  const v = SMILE_VARIANTS.find(s => s.id === variant) || SMILE_VARIANTS[0];
+  return (<svg width={size} height={size} viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill={color} stroke={stroke} strokeWidth="2" opacity=".9"/><path d={v.path} fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round"/></svg>);
+}
+
 export function GlobalStyle({ T, pace = "sweep", speed = 1 }) {
   const P = PACE_PRESETS[pace] || PACE_PRESETS.sweep;
   const m = ((P.mult || 1) / Math.max(0.25, speed)).toFixed(3);
   return (<style>{`
   @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Schibsted+Grotesk:wght@400;500;700&display=swap');
   @keyframes lokdrift{from{transform:translateX(0)}to{transform:translateX(200vw)}}
+  @keyframes loktwinkle{0%{opacity:0.2}100%{opacity:1}}
   @keyframes lokrain{from{transform:translateY(-20px)}to{transform:translateY(100vh)}}
   @keyframes lokember{from{transform:translateY(0) scale(1);opacity:.9}to{transform:translateY(-100vh) scale(.4);opacity:0}}
   @keyframes lokconf{0%{transform:translateY(-12px) rotate(0)}100%{transform:translateY(100vh) rotate(540deg)}}
@@ -70,6 +87,8 @@ export function GlobalStyle({ T, pace = "sweep", speed = 1 }) {
   @keyframes lokwobble{0%,92%,100%{transform:translate(0,0)}93%{transform:translate(-2px,1px) rotate(-.15deg)}95%{transform:translate(1.5px,-1px) rotate(.15deg)}97%{transform:translate(-1px,.5px)}}
   @keyframes loksheen{from{background-position:200% 0}to{background-position:-50% 0}}
   @keyframes inkdrop{0%{transform:scaleY(0.2) scaleX(0.8);opacity:0}40%{transform:scaleY(1.1) scaleX(0.95);opacity:1}60%{transform:scaleY(0.9) scaleX(1.05)}100%{transform:scale(1);opacity:1}}
+  @keyframes fireanim{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+  @keyframes iceanim{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
   @keyframes inkfade{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}}
   @keyframes inkpulse{0%,100%{opacity:.4}50%{opacity:1}}
   *{-webkit-tap-highlight-color:transparent}
@@ -87,6 +106,7 @@ export function GlobalStyle({ T, pace = "sweep", speed = 1 }) {
   .lok-tabin{animation-duration:calc(.32s * ${m})}
   .lok-btn{transition-duration:calc(.14s * ${m})}
   ${P.kill ? `.lok-tabin,.lok-count{animation:none!important}.lok-btn{transition:none!important}` : ``}
+  .lok-compact .px-4{padding-left:12px!important;padding-right:12px!important}.lok-compact .gap-3{gap:8px!important}.lok-compact .p-3{padding:8px!important}.lok-compact .py-2{padding-top:6px!important;padding-bottom:6px!important}.lok-compact .px-2\\.5{padding-left:8px!important;padding-right:8px!important}.lok-compact .text-sm{font-size:12px!important}.lok-compact .text-xs{font-size:10px!important}.lok-compact .gap-2{gap:6px!important}.lok-compact .mt-3{margin-top:8px!important}.lok-compact .mt-2{margin-top:6px!important}.lok-compact .mb-2{margin-bottom:6px!important}
   @supports(-webkit-touch-callout:none){input,textarea,select{font-size:16px!important}}
   @media(prefers-reduced-motion:reduce){*,.lok-btn{animation-duration:.001ms!important;transition-duration:.05ms!important}html{scroll-behavior:auto}}
 `}</style>);

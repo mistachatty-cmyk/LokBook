@@ -115,6 +115,87 @@ export function drawWave(ctx, t, i = 0) {
   risoCircle(ctx, 380, 110, 34, 34, 4);
 }
 
+export function drawSpiral(ctx, t, i = 0) {
+  const cx = 240, cy = 300, maxR = 200, turns = 4;
+  const progress = Math.min(1, t * 1.2);
+  ctx.strokeStyle = ART.pink; ctx.lineWidth = 5; ctx.lineCap = "round";
+  ctx.beginPath();
+  for (let k = 0; k <= 60 * progress; k++) {
+    const a = (k / 60) * turns * Math.PI * 2 + i * 0.08;
+    const r = 16 + (k / 60) * maxR;
+    const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+    k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = ART.teal; ctx.strokeStyle = ART.ink; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+}
+
+export function drawPulse(ctx, t, i = 0) {
+  const cx = 240, cy = 300;
+  ctx.strokeStyle = ART.ink; ctx.lineWidth = 3;
+  for (let r = 0; r < 5; r++) {
+    const phase = (i * 0.12 + r * 0.2) % 1;
+    const rad = 30 + phase * 170;
+    const alpha = 0.5 * (1 - phase);
+    ctx.globalAlpha = alpha;
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  const sz = 20 + 14 * Math.sin(i * 0.25);
+  ctx.fillStyle = ART.pink; ctx.strokeStyle = ART.teal; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(cx, cy, sz, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+}
+
+export function drawFirework(ctx, t) {
+  ctx.fillStyle = "rgba(35,48,107,0.93)"; ctx.fillRect(26, 26, W - 52, H - 52);
+  if (t < 0.15) return;
+  const k = (t - 0.15) / 0.85;
+  const cx = 240, cy = 200, R = 30 + k * 170;
+  for (let p = 0; p < 16; p++) {
+    const a = (p / 16) * Math.PI * 2 + k * 0.5;
+    const col = [ART.pink, ART.teal, "#E8B14B"][p % 3];
+    const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
+    ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.globalAlpha = 1 - k * 0.6;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, y); ctx.stroke();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  risoCircle(ctx, cx, cy, 16, 16, 3);
+  if (t > 0.7) {
+    const fall = (t - 0.7) / 0.3;
+    ctx.fillStyle = "#E8B14B"; ctx.globalAlpha = 0.3 * (1 - fall);
+    for (let s = 0; s < 8; s++) {
+      const sa = s * Math.PI * 0.25;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(sa) * 100, cy + 40 + fall * 300, 4, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+export function drawMorph(ctx, t, i = 0) {
+  const cx = 240, cy = 300, R = 140;
+  const morph = Math.min(1, t * 1.5);
+  const sides = 3 + Math.floor(morph * 4);
+  ctx.strokeStyle = ART.teal; ctx.lineWidth = 5; ctx.lineJoin = "round";
+  ctx.beginPath();
+  for (let k = 0; k <= sides; k++) {
+    const a = (k / sides) * Math.PI * 2 - Math.PI / 2;
+    const r = k % sides === 0 ? R : morph > 0.8 ? R * (0.6 + 0.4 * (1 - (morph - 0.8) / 0.2)) : R;
+    const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+    k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.strokeStyle = ART.pink; ctx.lineWidth = 3;
+  for (let k = 0; k < sides; k++) {
+    const a = (k / sides) * Math.PI * 2 - Math.PI / 2 + morph * 0.3;
+    const r = R * 0.55 + 20 * Math.sin(i * 0.3 + k);
+    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 12, 0, Math.PI * 2); ctx.stroke();
+  }
+  risoCircle(ctx, cx, cy, 18, 18, 3);
+}
+
 // Recompress a frame dataURL to JPEG on paper background — used before
 // uploading to the party feed and saving the gallery (keeps payloads small).
 export function compressFrame(dataUrl, q = 0.62) {
@@ -176,7 +257,7 @@ export function traceShape(kind) {
 
 export const MiniDraw = forwardRef(function MiniDraw({ color = ART.pink, width = 12, bg = ART.paper }, ref) {
   const cRef = useRef(null); const drawing = useRef(false); const last = useRef(null); const strokes = useRef(0);
-  useImperativeHandle(ref, () => ({ snapshot() { const tmp = document.createElement("canvas"); tmp.width = W; tmp.height = H; const x = tmp.getContext("2d"); paperBase(x, null); x.drawImage(cRef.current, 0, 0); return tmp.toDataURL("image/png"); }, clear() { cRef.current.getContext("2d").clearRect(0, 0, W, H); strokes.current = 0; }, strokes: () => strokes.current }));
+  useImperativeHandle(ref, () => ({ snapshot() { const tmp = document.createElement("canvas"); tmp.width = W; tmp.height = H; const x = tmp.getContext("2d"); paperBase(x, null); x.drawImage(cRef.current, 0, 0); return tmp.toDataURL("image/jpeg", 0.72); }, clear() { cRef.current.getContext("2d").clearRect(0, 0, W, H); strokes.current = 0; }, strokes: () => strokes.current }));
   const pos = e => { const r = cRef.current.getBoundingClientRect(); return [(e.clientX - r.left) * (W / r.width), (e.clientY - r.top) * (H / r.height)]; };
   const dn = e => { e.preventDefault(); cRef.current.setPointerCapture(e.pointerId); drawing.current = true; last.current = pos(e); strokes.current++; };
   const mv = e => { if (!drawing.current) return; const ctx = cRef.current.getContext("2d"); const p = pos(e); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.beginPath(); ctx.moveTo(...(last.current || p)); ctx.lineTo(...p); ctx.stroke(); last.current = p; };
