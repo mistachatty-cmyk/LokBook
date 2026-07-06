@@ -6,7 +6,7 @@ import { REACTION_SETS, PX_PER_FRAME } from "../constants.jsx";
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export default function Viewer({posts,index,bookmarks,cosmetics={},onBookmark,onClose,onNav,onVote,onReact,onViewed,onEcho,onDelete,onRename,onBoost,myName=""}){
+export default function Viewer({posts,index,bookmarks,cosmetics={},onBookmark,onClose,onNav,onVote,onReact,onViewed,onEcho,onDelete,onRename,onBoost,onArtist,myName=""}){
   const T=useT();const post=posts[index];const n=post.frames.length;const isB=post.mode==="B";const series=post.style==="series";
   const scrollRef=useRef(null);const[fi,setFi]=useState(0);const[playing,setPlaying]=useState(false);const[floats,setFloats]=useState([]);const[editT,setEditT]=useState(false);const[tDraft,setTDraft]=useState(post.title);const playRef=useRef(null);const touch=useRef(null);const marked=bookmarks.includes(post.id);const own=post.from!=="seed"&&!post.id?.startsWith("seed")&&!post.remote;
   useEffect(()=>{if(typeof playRef.current!=="number")clearInterval(playRef.current);playRef.current=null;setFi(0);setPlaying(false);setEditT(false);setTDraft(post.title);if(scrollRef.current)scrollRef.current.scrollTop=0;},[index]);
@@ -33,7 +33,7 @@ export default function Viewer({posts,index,bookmarks,cosmetics={},onBookmark,on
       <div className="min-w-0 flex-1">{editT
         ?<input value={tDraft} onChange={e=>setTDraft(e.target.value)} onBlur={saveT} onKeyDown={e=>{if(e.key==="Enter")saveT();if(e.key==="Escape"){setTDraft(post.title);setEditT(false);}}} autoFocus aria-label="Rename this flip" className="lok-display font-extrabold leading-tight w-full" style={{background:"transparent",border:"none",borderBottom:`2px solid ${T.accent}`,color:series?T.ink:T.paper,outline:"none",fontSize:"inherit"}}/>
         :<div className="lok-display font-extrabold leading-tight truncate" onClick={()=>own&&setEditT(true)} style={{cursor:own?"text":"default"}} title={own?"Tap to rename":undefined}>{post.title}{own&&<span style={{opacity:0.4,fontSize:11,marginLeft:6}}>✎</span>}</div>}
-        <div className="text-xs opacity-75">{post.author||"moss.ink"} · {index+1}/{posts.length} · {isB?"page-flip":"scrub"}</div></div>
+        <div className="text-xs opacity-75"><button onClick={()=>onArtist&&onArtist(post.author||"moss.ink")} aria-label={`View ${post.author||"moss.ink"}'s page`} style={{background:"transparent",border:"none",padding:0,color:"inherit",textDecoration:"underline",cursor:"pointer",font:"inherit"}}>{post.author||"moss.ink"}</button> · {index+1}/{posts.length} · {isB?"page-flip":"scrub"}</div></div>
       <button onClick={()=>onBookmark(post.id)} aria-label={marked?"Remove bookmark":"Lok in this piece"} className="lok-btn ml-auto px-2.5 py-1 rounded-lg text-sm font-bold" style={{background:marked?T.accent:"transparent",color:marked?T.onAccent:(series?T.ink:T.paper),border:`2.5px solid ${marked?T.accent:(series?T.ink:T.paper)}`}}>{marked?"Lok'd ✓":"Lok in ▾"}</button>
     </div>
     <div className="relative flex-1 min-h-0" onTouchStart={e=>(touch.current=e.touches[0].clientX)} onTouchEnd={e=>{if(touch.current==null)return;const dx=e.changedTouches[0].clientX-touch.current;if(Math.abs(dx)>60)onNav(dx<0?1:-1);touch.current=null;}}>

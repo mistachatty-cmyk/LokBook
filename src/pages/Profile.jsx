@@ -10,6 +10,7 @@ import { W, H, GAME_MANUAL_PAGES, BADGES, BADGE_CATEGORIES, PROMPTS, KID_PROMPTS
 import { encodeGIF } from "../engine/gif.js";
 import { makeRushRivals, rushScore, recordRush } from "../engine/bots.js";
 import { isReservedName } from "../identity.js";
+import { lokApi, fromDbPost } from "../constants.jsx";
 
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -128,12 +129,22 @@ const ARTIST_BIO={
   "tinta":"Riso printer by day, animator by night. Two colors is all you need.",
   "mooncrayon":"Crayon textures and soft colors. Never grew up, and I'm okay with that.",
   "pixel.pluto":"Pixel art meets ink. 8-bit emotions in a hand-drawn world.",
+  "doodlebug":"No plan. Best plan. Chaos gardens daily.",
+  "nib.ninja":"Three strokes. Maybe four. Never five.",
+  "grafite":"Pressure builds the line. Value studies and patient shading.",
+  "blot.bot":"ARTIST PROTOCOL ENGAGED. glitches are a feature.",
 };
-function ArtistPage({name,posts,following,onLok,onOpen,onClose}){
-  const T=useT();const theirs=posts.filter(p=>(p.author||"moss.ink")===name);const loked=following.includes(name);
+function ArtistPage({name,posts,following,onLok,onOpen,onOpenPost,onClose}){
+  const T=useT();const[remote,setRemote]=useState([]);
+  useEffect(()=>{let on=true;setRemote([]);if(!isReservedName(name))lokApi.fetchAuthorPosts(name).then(rows=>{if(on)setRemote((rows||[]).map(fromDbPost));}).catch(()=>{});return()=>{on=false;};},[name]);
+  const local=posts.filter(p=>(p.author||"moss.ink")===name);
+  const localIds=new Set(local.map(p=>p.id));
+  const theirs=[...local,...remote.filter(r=>!localIds.has(r.id))];
+  const loked=following.includes(name);
   const avatar=useMemo(()=>renderAvatar(name.length*31),[name]);
   const bio=ARTIST_BIO[name]||"";
-  const followers=theirs.reduce((a,p)=>a+(p.votes||0),0)||Math.floor(Math.random()*400)+50;
+  const followers=theirs.reduce((a,p)=>a+(p.votes||0),0)||((name.length*137)%400)+50;
+  const open=id=>{if(localIds.has(id))onOpen(id);else{const r=theirs.find(x=>x.id===id);r&&onOpenPost&&onOpenPost(r);}};
   return(<div className="fixed inset-0 z-40 overflow-y-auto" style={{background:T.paper,color:T.ink,animation:"lokrise .25s ease"}}>
     <div className="mx-auto w-full px-4 pb-24" style={{maxWidth:560}}>
       <div className="sticky top-0 z-10 flex items-center gap-3 py-3" style={{background:T.paper,borderBottom:`3px solid ${T.ink}`}}>
@@ -143,7 +154,7 @@ function ArtistPage({name,posts,following,onLok,onOpen,onClose}){
         <button onClick={()=>onLok(name)} aria-label={loked?"Unfollow":`Lok ${name}`} className="lok-btn px-3 py-1.5 rounded-full text-xs font-extrabold shrink-0" style={{background:loked?T.card:T.accent,color:loked?T.ink:T.onAccent,border:`2.5px solid ${T.ink}`}}>{loked?"Following ✓":"Lok"}</button>
       </div>
       {bio&&<p className="mt-3 text-sm leading-snug px-1">{bio}</p>}
-      {theirs.length?<div className="mt-3 grid grid-cols-2 gap-3">{theirs.map(p=><PostCard key={p.id} p={p} onOpen={onOpen}/>)}</div>:<EmptyState icon="feed" title="Nothing yet" subtitle={`${name} hasn't published a flip yet.`}/>}
+      {theirs.length?<div className="mt-3 grid grid-cols-2 gap-3">{theirs.map(p=><PostCard key={p.id} p={p} onOpen={open}/>)}</div>:<EmptyState icon="feed" title="Nothing yet" subtitle={`${name} hasn't published a flip yet.`}/>}
     </div>
   </div>);
 }
