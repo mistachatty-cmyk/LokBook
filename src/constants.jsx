@@ -356,4 +356,32 @@ export const lokApi = {
   async votePost(id, votes) {
     try { await fetch(`${SUPA_URL}/rest/v1/lok_posts?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify({ votes }) }); } catch {}
   },
+  async recordBattle(data) {
+    try {
+      await fetch(`${SUPA_URL}/rest/v1/lok_battles`, {
+        method: "POST", headers: { ...getHeaders(), Prefer: "return=minimal" },
+        body: JSON.stringify(data),
+      });
+    } catch {}
+  },
+  async fetchLeaderboard(weekStart) {
+    try {
+      const res = await fetch(
+        `${SUPA_URL}/rest/v1/lok_battles?week_start=eq.${encodeURIComponent(weekStart)}&select=author,won,score,featured&limit=500`,
+        { headers: getHeaders() }
+      );
+      if (!res.ok) return [];
+      const rows = await res.json();
+      const agg = {};
+      for (const r of rows) {
+        if (!agg[r.author]) agg[r.author] = { author: r.author, score: 0, battles: 0, wins: 0 };
+        agg[r.author].score += r.score;
+        agg[r.author].battles++;
+        if (r.won) agg[r.author].wins++;
+      }
+      return Object.values(agg).sort((a, b) => b.score - a.score).slice(0, 50);
+    } catch {
+      return [];
+    }
+  },
 };

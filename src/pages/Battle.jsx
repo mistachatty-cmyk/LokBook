@@ -2,17 +2,19 @@ import { useState, useEffect, useRef } from "react";
 import { useT } from "../theme/theme.js";
 import Easel from "../Easel.jsx";
 import InterventionFX from "../InterventionFX.jsx";
-import { getModuleLayers, hasModule, FORMATS, PROMPTS, KID_PROMPTS, INTERVENTIONS } from "../constants.jsx";
+import { getModuleLayers, hasModule, FORMATS, PROMPTS, KID_PROMPTS, INTERVENTIONS, lokApi } from "../constants.jsx";
 import { renderDoodle } from "../engine/draw.jsx";
 import { makeMatchBots, botProgress, botFinalT, botLine, judgeBattle, recordBattle } from "../engine/bots.js";
 
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-function Battle({modules=[],wins,bigBattleOwned,kids,phase,lillok,customLilLok,onResult,onUnlockBig,onPublish,onLine,blip,hap,say}){
+function Battle({modules=[],wins,bigBattleOwned,kids,phase,lillok,customLilLok,onResult,onUnlockBig,onPublish,onLine,blip,hap,say,profile}){
   const T=useT();
   const[pstate,setPstate]=useState("lobby");const[format,setFormat]=useState(FORMATS[0]);const[duration,setDuration]=useState(60);const[tier,setTier]=useState(getModuleLayers(modules));const[prompt,setPrompt]=useState(PROMPTS[0]);const[count,setCount]=useState(3);const[timeLeft,setTimeLeft]=useState(0);const[bots,setBots]=useState([]);const[botThumbs,setBotThumbs]=useState([]);const[entries,setEntries]=useState([]);const[results,setResults]=useState(null);const[shake,setShake]=useState(false);const[splat,setSplat]=useState(null);const[block,setBlock]=useState(null);const[blocked,setBlocked]=useState(0);const[myArt,setMyArt]=useState(null);const[bFrames,setBFrames]=useState([]);const[featured,setFeatured]=useState(false);
   const easel=useRef(null);const strokes=useRef(0);const tickRef=useRef(null);const matchT=useRef(0);
+  const[lbOpen,setLbOpen]=useState(false);const[lbData,setLbData]=useState([]);const[lbLoading,setLbLoading]=useState(false);
+  const openLeaderboard=async()=>{setLbOpen(true);setLbLoading(true);const now=new Date();const day=now.getDay();const diff=now.getDate()-day+(day===0?-6:1);const monday=new Date(now.setDate(diff)).toISOString().slice(0,10);const data=await lokApi.fetchLeaderboard(monday);setLbData(data);setLbLoading(false);};
   const promptPool=kids?KID_PROMPTS:PROMPTS;const bigUnlocked=bigBattleOwned||wins>=1;
   const startMatch=()=>{const n=format.players-1;const nb=makeMatchBots(n,{kids,wins});setBots(nb);setBotThumbs(nb.map(b=>renderDoodle(b.seed,0)));setPrompt(promptPool[Math.floor(Math.random()*promptPool.length)]);strokes.current=0;setResults(null);setBlocked(0);setMyArt(null);setBFrames([]);setCount(3);setPstate("count");};
   const captureBattle=()=>{if(!easel.current)return;if(bFrames.length>=14){say("Max 14 pages");return;}const url=easel.current.composite(bFrames.length);setBFrames(f=>[...f,url]);blip&&blip("D5");say(`Page ${bFrames.length+1} captured`);};
@@ -20,10 +22,10 @@ function Battle({modules=[],wins,bigBattleOwned,kids,phase,lillok,customLilLok,o
   useEffect(()=>{if(pstate!=="draw")return;tickRef.current=setInterval(()=>{matchT.current+=1;setTimeLeft(t=>Math.max(0,t-1));if(matchT.current%2===0)setBotThumbs(bots.map(b=>renderDoodle(b.seed,botProgress(b,matchT.current/duration))));if(!kids&&matchT.current===5&&bots.length){const l=botLine(bots[Math.floor(Math.random()*bots.length)],"start");if(l)say(l);}if(!kids&&matchT.current===Math.floor(duration*0.6)&&bots.length){const l=botLine(bots[Math.floor(Math.random()*bots.length)],"mid");if(l)say(l);}if(!kids&&matchT.current>3&&matchT.current%(phase==="stasis"?4:7)===0)fireIntervention();},1000);return()=>clearInterval(tickRef.current);},[pstate,bots,duration,kids,phase]);
   const fireIntervention=()=>{const decay=phase==="decaying";const kind=INTERVENTIONS[Math.floor(Math.random()*INTERVENTIONS.length)];const id=Math.random();setBlock({id,kind});setTimeout(()=>{setBlock(b=>{if(b&&b.id===id){if(kind==="shake"){setShake(true);setTimeout(()=>setShake(false),900);}else{setSplat({k:kind,seed:Math.floor(Math.random()*9999)});setTimeout(()=>setSplat(null),1500);}if(decay)say(`${lillok.name} fumbled!`);else if(bots.length)say(`${bots[Math.floor(Math.random()*bots.length)].name} hit you with a ${kind}!`);return null;}return b;});},1400);};
   const doBlock=()=>{if(!block)return;setBlocked(b=>b+1);setBlock(null);blip&&blip("G5");hap&&hap([100,50,100]);say(phase==="thriving"?`${lillok.name} deflected it!`:"Blocked!");};
-  useEffect(()=>{if(pstate==="draw"&&timeLeft===0){clearInterval(tickRef.current);setBlock(null);setSplat(null);setShake(false);const final=easel.current?easel.current.composite():renderDoodle(1,0);const allFrames=[...bFrames,final];setBFrames(allFrames);setMyArt(final);if(format.coop||kids){setPstate("done");onResult(true,featured?3:1);return;}setEntries([{name:"You",art:final,isMe:true},...bots.map(b=>({name:b.name,art:renderDoodle(b.seed,botFinalT(b)),isMe:false}))]);setPstate("vote");}},[timeLeft,pstate]);
-  const castVotes=pickIdx=>{const{tally,winnerIdx:wi,won}=judgeBattle(entries,bots,pickIdx,{strokes:strokes.current,blocked,pages:bFrames.length,phase,wins});recordBattle(won);onResult(won,featured?3:1);onLine&&onLine(won?"win":"loss");const speaker=won?bots[Math.floor(Math.random()*bots.length)]:bots[wi-1];const l=speaker&&botLine(speaker,won?"lose":"win");if(l)setTimeout(()=>say(l),900);setResults({tally,winnerIdx:wi,won});setPstate("results");};
+  useEffect(()=>{if(pstate==="draw"&&timeLeft===0){clearInterval(tickRef.current);setBlock(null);setSplat(null);setShake(false);const final=easel.current?easel.current.composite():renderDoodle(1,0);const allFrames=[...bFrames,final];setBFrames(allFrames);setMyArt(final);if(format.coop||kids){setPstate("done");onResult({won:true,mult:featured?3:1,prompt,format:format.id,pages:bFrames.length,strokes:strokes.current,blocked});return;}setEntries([{name:"You",art:final,isMe:true},...bots.map(b=>({name:b.name,art:renderDoodle(b.seed,botFinalT(b)),isMe:false}))]);setPstate("vote");}},[timeLeft,pstate]);
+  const castVotes=pickIdx=>{const{tally,winnerIdx:wi,won}=judgeBattle(entries,bots,pickIdx,{strokes:strokes.current,blocked,pages:bFrames.length,phase,wins});recordBattle(won);onResult({won,mult:featured?3:1,prompt,format:format.id,pages:bFrames.length,strokes:strokes.current,blocked});onLine&&onLine(won?"win":"loss");const speaker=won?bots[Math.floor(Math.random()*bots.length)]:bots[wi-1];const l=speaker&&botLine(speaker,won?"lose":"win");if(l)setTimeout(()=>say(l),900);setResults({tally,winnerIdx:wi,won});setPstate("results");};
   const publishMine=()=>{const fr=bFrames.length>=2?bFrames:[myArt];onPublish({id:"b"+Date.now(),title:`"${prompt}" — battle`,frames:fr,paceMs:220,mode:"A",style:"bold",loop:fr.length>=2,votes:results?.won?1:0,voted:false,viewed:false,views:0,reactions:{splat:0,heart:0,drip:0,humhah:0,bomhogwah:0},echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null,from:"battle"});say(fr.length>=2?"Battle animation published":"Battle piece published");};
-  if(pstate==="lobby")return(<div className="mt-4">
+  if(pstate==="lobby")return(<><div className="mt-4">
     <h2 className="lok-display text-lg font-extrabold">{kids?"Draw Together":"Lok N Slide — Battle"}</h2>
     <p className="text-sm opacity-70 mt-0.5">{kids?"Same prompt, draw with your buddies, everyone wins!":"Same prompt, same clock, layered canvases. Competitors vote — never for themselves."}</p>
     {!kids&&(<button onClick={()=>setFeatured(f=>!f)} aria-pressed={featured} aria-label="Featured match: 3× Loks" className="lok-btn mt-3 w-full p-3.5 rounded-2xl text-left relative overflow-hidden" style={{border:`3px solid ${T.ink}`,background:featured?T.ink:T.card,color:featured?T.paper:T.ink,boxShadow:featured?`6px 6px 0 ${T.accent}`:`5px 5px 0 #E8B14B`}}>
@@ -39,7 +41,27 @@ function Battle({modules=[],wins,bigBattleOwned,kids,phase,lillok,customLilLok,o
     <div className="mt-3 text-xs font-bold uppercase tracking-widest opacity-60">Clock</div>
     <div className="mt-1.5 flex gap-2">{[30,60,90].map(s=>(<button key={s} onClick={()=>setDuration(s)} className="lok-btn flex-1 py-1.5 rounded-full text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:duration===s?T.accent:T.card,color:duration===s?T.onAccent:T.ink}}>{s}s</button>))}</div>
     <button onClick={startMatch} className="lok-btn lok-display mt-4 w-full py-3.5 rounded-xl text-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,boxShadow:`5px 5px 0 ${T.ink}`,animation:reduceMotion?"none":"lokpulse 2.4s ease-in-out infinite"}}>{kids?"Start drawing!":"Find a match"}</button>
-  </div>);
+    <button onClick={openLeaderboard} className="lok-btn mt-2 w-full py-2.5 rounded-xl text-sm font-bold" style={{border:`2.5px dashed ${T.ink}`,color:T.ink}}>🏆 Leaderboard</button>
+  </div>
+  {lbOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:"rgba(0,0,0,.45)"}} onClick={e=>e.target===e.currentTarget&&setLbOpen(false)}>
+    <div className="w-full max-w-sm mx-4 rounded-2xl overflow-hidden" style={{background:T.paper,border:`3px solid ${T.ink}`,boxShadow:`8px 8px 0 ${T.ink}`}}>
+      <div className="flex items-center justify-between px-4 py-3" style={{borderBottom:`2px solid ${T.ink}`}}>
+        <h3 className="lok-display font-extrabold text-lg">🏆 Leaderboard</h3>
+        <button onClick={()=>setLbOpen(false)} className="lok-btn w-8 h-8 rounded-full font-bold flex items-center justify-center" style={{border:`2.5px solid ${T.ink}`}}>✕</button>
+      </div>
+      <div className="max-h-96 overflow-y-auto p-3">
+        {lbLoading?<div className="text-center py-6 text-sm opacity-50">Loading…</div>:
+         !lbData.length?<div className="text-center py-6 text-sm opacity-50">No battles this week yet</div>:
+         lbData.map((e,i)=>(<div key={e.author} className="flex items-center gap-3 py-2 px-2 rounded-xl" style={{background:e.author===profile?.name?T.alt:T.card,marginBottom:4}}>
+           <span className="lok-display font-extrabold w-6 text-center shrink-0">{i+1}</span>
+           <div className="font-bold flex-1 truncate">{e.author}{e.author===profile?.name&&<span className="text-xs ml-1 opacity-60">(you)</span>}</div>
+           <div className="text-xs opacity-70 shrink-0">{e.wins}/{e.battles}</div>
+           <div className="lok-display font-extrabold shrink-0">{e.score}</div>
+         </div>))}
+      </div>
+    </div>
+  </div>}
+</>);
   if(pstate==="count")return(<div className="mt-12 text-center">
     <div className="text-sm font-bold uppercase tracking-widest opacity-60">Your prompt</div>
     <div className="lok-display text-2xl font-extrabold mt-2 mx-auto px-4 py-3 rounded-2xl" style={{maxWidth:360,border:`3px solid ${T.ink}`,background:T.card,boxShadow:`5px 5px 0 ${T.shadow}`}}>"{prompt}"</div>

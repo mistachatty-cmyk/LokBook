@@ -115,6 +115,21 @@ export function drawWave(ctx, t, i = 0) {
   risoCircle(ctx, 380, 110, 34, 34, 4);
 }
 
+export function drawNautilus(ctx, t, i = 0) {
+  const cx = 240, cy = 300, turns = 2.6, grow = 0.2 + 0.8 * t;
+  ctx.strokeStyle = ART.ink; ctx.lineWidth = 6; ctx.lineCap = "round";
+  ctx.beginPath();
+  for (let k = 0; k <= 120 * grow; k++) { const a = (k / 120) * Math.PI * 2 * turns; const R = 14 + k * 1.55; const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R * 0.86; k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+  ctx.stroke();
+  // chamber walls appear behind the leading edge
+  ctx.strokeStyle = ART.teal; ctx.lineWidth = 3.5;
+  const walls = Math.floor(9 * grow);
+  for (let w = 1; w <= walls; w++) { const a = (w / 9) * Math.PI * 2 * turns; const R1 = 14 + (w / 9) * 120 * 1.55; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * R1 * 0.42, cy + Math.sin(a) * R1 * 0.36); ctx.lineTo(cx + Math.cos(a) * R1, cy + Math.sin(a) * R1 * 0.86); ctx.stroke(); }
+  risoCircle(ctx, cx, cy, 12, 12, 3);
+  // drifting bubbles
+  for (let b = 0; b < 4; b++) { const by = 520 - (((b * 130) + t * 470) % 470); ctx.strokeStyle = "rgba(255,93,162,0.5)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(70 + b * 24 + Math.sin(i + b) * 8, by, 5 + b * 2, 0, Math.PI * 2); ctx.stroke(); }
+}
+
 export function drawSpiral(ctx, t, i = 0) {
   const cx = 240, cy = 300, maxR = 200, turns = 4;
   const progress = Math.min(1, t * 1.2);
@@ -198,10 +213,10 @@ export function drawMorph(ctx, t, i = 0) {
 
 // Recompress a frame dataURL to JPEG on paper background — used before
 // uploading to the party feed and saving the gallery (keeps payloads small).
-export function compressFrame(dataUrl, q = 0.62) {
+export function compressFrame(dataUrl, q = 0.72) {
   return new Promise(res => {
     const img = new Image();
-    img.onload = () => { try { const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d"); x.fillStyle = ART.paper; x.fillRect(0, 0, W, H); x.drawImage(img, 0, 0); res(c.toDataURL("image/jpeg", q)); } catch { res(dataUrl); } };
+    img.onload = () => { try { const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d"); x.fillStyle = ART.paper; x.fillRect(0, 0, W, H); x.drawImage(img, 0, 0); res(c.toDataURL("image/webp", q)); } catch { res(dataUrl); } };
     img.onerror = () => res(dataUrl);
     img.src = dataUrl;
   });
@@ -257,7 +272,7 @@ export function traceShape(kind) {
 
 export const MiniDraw = forwardRef(function MiniDraw({ color = ART.pink, width = 12, bg = ART.paper }, ref) {
   const cRef = useRef(null); const drawing = useRef(false); const last = useRef(null); const strokes = useRef(0);
-  useImperativeHandle(ref, () => ({ snapshot() { const tmp = document.createElement("canvas"); tmp.width = W; tmp.height = H; const x = tmp.getContext("2d"); paperBase(x, null); x.drawImage(cRef.current, 0, 0); return tmp.toDataURL("image/jpeg", 0.72); }, clear() { cRef.current.getContext("2d").clearRect(0, 0, W, H); strokes.current = 0; }, strokes: () => strokes.current }));
+  useImperativeHandle(ref, () => ({ snapshot() { const tmp = document.createElement("canvas"); tmp.width = W; tmp.height = H; const x = tmp.getContext("2d"); paperBase(x, null); x.drawImage(cRef.current, 0, 0); return tmp.toDataURL("image/webp", 0.72); }, clear() { cRef.current.getContext("2d").clearRect(0, 0, W, H); strokes.current = 0; }, strokes: () => strokes.current }));
   const pos = e => { const r = cRef.current.getBoundingClientRect(); return [(e.clientX - r.left) * (W / r.width), (e.clientY - r.top) * (H / r.height)]; };
   const dn = e => { e.preventDefault(); cRef.current.setPointerCapture(e.pointerId); drawing.current = true; last.current = pos(e); strokes.current++; };
   const mv = e => { if (!drawing.current) return; const ctx = cRef.current.getContext("2d"); const p = pos(e); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.beginPath(); ctx.moveTo(...(last.current || p)); ctx.lineTo(...p); ctx.stroke(); last.current = p; };
