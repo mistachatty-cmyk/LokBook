@@ -328,18 +328,30 @@ export const lokApi = {
       return rows.length ? rows[0].save_blob : null;
     } catch { return null; }
   },
-  async pushSave(handle, blob) {
-    try { await fetch(`${SUPA_URL}/rest/v1/lok_accounts?handle=eq.${encodeURIComponent(handle)}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify({ save_blob: blob, updated_at: new Date().toISOString() }) }); } catch {}
+  async pushSave(handle, blob, userId) {
+    if (userId) {
+      try { await fetch(`${SUPA_URL}/rest/v1/auth_saves`, { method: "POST", headers: { ...getHeaders(), Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ user_id: userId, save_blob: blob, updated_at: new Date().toISOString() }) }); } catch {}
+    } else {
+      try { await fetch(`${SUPA_URL}/rest/v1/lok_accounts?handle=eq.${encodeURIComponent(handle)}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify({ save_blob: blob, updated_at: new Date().toISOString() }) }); } catch {}
+    }
+  },
+  async fetchAuthSave(userId) {
+    try { const r = await fetch(`${SUPA_URL}/rest/v1/auth_saves?user_id=eq.${userId}&select=save_blob`, { headers: getHeaders() }); if (!r.ok) return null; const rows = await r.json(); return rows[0]?.save_blob || null; } catch { return null; }
   },
   async publishPost(dbPost) {
     try { const r = await fetch(`${SUPA_URL}/rest/v1/lok_posts`, { method: "POST", headers: { ...getHeaders(), Prefer: "resolution=merge-duplicates" }, body: JSON.stringify(dbPost) }); return r.ok; } catch { return false; }
   },
-  async fetchPosts(limit = 60, before = null) {
+  async fetchPosts(limit = 60, before = null, search = null, author = null) {
     let url = `${SUPA_URL}/rest/v1/lok_posts?select=*&order=created_at.desc&limit=${limit}`;
     if (before) url += `&created_at.lt.${encodeURIComponent(before)}`;
-    const r = await fetch(url, { headers: sbHeaders });
+    if (search) url += `&title.ilike.*${encodeURIComponent(search)}*`;
+    if (author) url += `&author.eq.${encodeURIComponent(author)}`;
+    const r = await fetch(url, { headers: getHeaders() });
     if (!r.ok) return [];
     return r.json();
+  },
+  async fetchAuthorPosts(author) {
+    return this.fetchPosts(60, null, null, author);
   },
   async votePost(id, votes) {
     try { await fetch(`${SUPA_URL}/rest/v1/lok_posts?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify({ votes }) }); } catch {}

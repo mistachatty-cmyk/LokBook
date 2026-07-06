@@ -83,6 +83,22 @@ CREATE POLICY "Allow post update"
   TO anon
   USING (true);
 
+-- 5. Auth saves table — cloud saves for Supabase Auth users (keyed by user UUID)
+CREATE TABLE IF NOT EXISTS auth_saves (
+  user_id     UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  save_blob   JSONB,
+  updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE auth_saves ENABLE ROW LEVEL SECURITY;
+
+-- Users can read and upsert their own saves
+CREATE POLICY "Users manage own saves"
+  ON auth_saves
+  FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
 -- 4. LokPass purchases table — tracks Stripe payments
 CREATE TABLE IF NOT EXISTS lok_pass_purchases (
   id                SERIAL PRIMARY KEY,

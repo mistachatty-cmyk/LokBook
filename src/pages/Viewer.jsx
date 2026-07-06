@@ -1,0 +1,63 @@
+import { useState, useEffect, useRef } from "react";
+import { useT } from "../theme/theme.js";
+import { ReactionIcon } from "../art.jsx";
+import { REACTION_SETS, PX_PER_FRAME } from "../constants.jsx";
+
+const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+export default function Viewer({posts,index,bookmarks,cosmetics={},onBookmark,onClose,onNav,onVote,onReact,onViewed,onEcho,onDelete,onRename,onBoost,myName=""}){
+  const T=useT();const post=posts[index];const n=post.frames.length;const isB=post.mode==="B";const series=post.style==="series";
+  const scrollRef=useRef(null);const[fi,setFi]=useState(0);const[playing,setPlaying]=useState(false);const[floats,setFloats]=useState([]);const[editT,setEditT]=useState(false);const[tDraft,setTDraft]=useState(post.title);const playRef=useRef(null);const touch=useRef(null);const marked=bookmarks.includes(post.id);const own=post.from!=="seed"&&!post.id?.startsWith("seed")&&!post.remote;
+  useEffect(()=>{if(typeof playRef.current!=="number")clearInterval(playRef.current);playRef.current=null;setFi(0);setPlaying(false);setEditT(false);setTDraft(post.title);if(scrollRef.current)scrollRef.current.scrollTop=0;},[index]);
+  useEffect(()=>{const h=e=>{if(e.key==="Escape"){e.preventDefault();onClose();}else if(e.key==="ArrowLeft"){e.preventDefault();onNav(-1);}else if(e.key==="ArrowRight"){e.preventDefault();onNav(1);}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
+  const saveT=()=>{if(onRename&&tDraft.trim())onRename(post.id,tDraft.trim());setEditT(false);};
+  const replay=()=>{if(n<2||playing)return;const seq=[...Array(n).keys()].reverse().concat([...Array(n).keys()]);let k=0;const t=setInterval(()=>{setFi(seq[k]);k++;if(k>=seq.length)clearInterval(t);},55);};
+  const onScroll=()=>{const el=scrollRef.current;if(!el)return;const max=el.scrollHeight-el.clientHeight;const p=max>0?el.scrollTop/max:1;const idx=Math.min(n-1,Math.floor(p*n));setFi(idx);if(idx>=n-1)onViewed(post.id);};
+  const togglePlay=()=>{
+    if(isB){if(playing){playRef.current=null;setPlaying(false);return;}setPlaying(true);const el=scrollRef.current;if(!el)return;const max=el.scrollHeight-el.clientHeight;const dur=Math.max(400,n*post.paceMs);let t0=performance.now();const myRun=Math.random();playRef.current=myRun;const step=now=>{if(playRef.current!==myRun)return;const k=Math.min(1,(now-t0)/dur);el.scrollTop=k*max;if(k<1)requestAnimationFrame(step);else if(post.loop){onViewed(post.id);t0=performance.now();el.scrollTop=0;requestAnimationFrame(step);}else{playRef.current=null;setPlaying(false);onViewed(post.id);}};requestAnimationFrame(step);return;}
+    if(playing){clearTimeout(playRef.current);setPlaying(false);return;}if(n<2){onViewed(post.id);return;}
+    setPlaying(true);const durOf=i=>post.frameDurations?.[i]??post.paceMs??140;
+    const step=i=>{setFi(i);const el=scrollRef.current;if(el)el.scrollTop=(i/(n-1))*(el.scrollHeight-el.clientHeight);
+      const next=i+1;
+      if(next>=n){if(post.loop){onViewed(post.id);playRef.current=setTimeout(()=>step(0),durOf(i));}else{playRef.current=setTimeout(()=>{setPlaying(false);onViewed(post.id);},durOf(i));}}
+      else playRef.current=setTimeout(()=>step(next),durOf(i));};
+    step(fi>=n-1?0:fi+1);
+  };
+  useEffect(()=>()=>{if(typeof playRef.current==="number")playRef.current=null;else clearInterval(playRef.current);playRef.current=null;},[]);
+  const react=type=>{onReact(post.id,type);const id=Math.random();const pack=REACTION_SETS[cosmetics.reactionPack]||REACTION_SETS.base;const icon=pack[["splat","heart","drip"].indexOf(type)]||type;setFloats(f=>[...f,{id,type:icon,x:14+Math.random()*60}]);setTimeout(()=>setFloats(f=>f.filter(x=>x.id!==id)),950);};
+  if(!post.frames||post.frames.length===0)return(<div className="fixed inset-0 z-50 flex flex-col items-center justify-center" style={{background:T.ink,color:T.paper}}><div className="lok-display text-xl font-extrabold">Rendering…</div><button onClick={onClose} className="mt-6 lok-btn px-4 py-2 rounded-xl font-bold" style={{border:`2px solid ${T.paper}`}} aria-label="Close viewer">Close</button></div>);
+  return(<div className="fixed inset-0 z-50 flex flex-col" style={{background:series?T.paper:T.ink}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+    <div className="flex items-center gap-3 px-3 py-2.5" style={{color:series?T.ink:T.paper}}>
+      <button onClick={onClose} aria-label="Close viewer" className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${series?T.ink:T.paper}`}}>✕</button>
+      <div className="min-w-0 flex-1">{editT
+        ?<input value={tDraft} onChange={e=>setTDraft(e.target.value)} onBlur={saveT} onKeyDown={e=>{if(e.key==="Enter")saveT();if(e.key==="Escape"){setTDraft(post.title);setEditT(false);}}} autoFocus aria-label="Rename this flip" className="lok-display font-extrabold leading-tight w-full" style={{background:"transparent",border:"none",borderBottom:`2px solid ${T.accent}`,color:series?T.ink:T.paper,outline:"none",fontSize:"inherit"}}/>
+        :<div className="lok-display font-extrabold leading-tight truncate" onClick={()=>own&&setEditT(true)} style={{cursor:own?"text":"default"}} title={own?"Tap to rename":undefined}>{post.title}{own&&<span style={{opacity:0.4,fontSize:11,marginLeft:6}}>✎</span>}</div>}
+        <div className="text-xs opacity-75">{post.author||"moss.ink"} · {index+1}/{posts.length} · {isB?"page-flip":"scrub"}</div></div>
+      <button onClick={()=>onBookmark(post.id)} aria-label={marked?"Remove bookmark":"Lok in this piece"} className="lok-btn ml-auto px-2.5 py-1 rounded-lg text-sm font-bold" style={{background:marked?T.accent:"transparent",color:marked?T.onAccent:(series?T.ink:T.paper),border:`2.5px solid ${marked?T.accent:(series?T.ink:T.paper)}`}}>{marked?"Lok'd ✓":"Lok in ▾"}</button>
+    </div>
+    <div className="relative flex-1 min-h-0" onTouchStart={e=>(touch.current=e.touches[0].clientX)} onTouchEnd={e=>{if(touch.current==null)return;const dx=e.changedTouches[0].clientX-touch.current;if(Math.abs(dx)>60)onNav(dx<0?1:-1);touch.current=null;}}>
+      <div ref={scrollRef} onScroll={isB?undefined:onScroll} className="absolute inset-0 overflow-y-scroll">
+        {isB?(<div className="px-3 py-4 flex flex-col items-center gap-3">{post.frames.map((f,k)=>(<div key={k} className="relative w-full" style={{maxWidth:360}}><img src={f} alt={`page ${k+1}`} className="block w-full rounded-xl" style={{border:`4px solid ${series?T.ink:T.paper}`,boxShadow:series?"none":"0 8px 28px rgba(0,0,0,.4)"}}/><div className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-xs font-bold" style={{background:series?T.ink:T.accent,color:"#fff"}}>{String(k+1).padStart(2,"0")}</div></div>))}<div className="text-xs font-bold opacity-60 py-2" style={{color:series?T.ink:T.paper}}>↑ scroll the whole page ↑</div></div>):(
+          <><div className="sticky top-0 flex items-center justify-center p-3" style={{height:"100%"}}><div className="relative" style={{maxHeight:"100%",aspectRatio:"4 / 5"}}>
+            <img src={post.frames[fi]} alt={`frame ${fi+1}`} className="block h-full w-auto max-w-full rounded-xl" style={{border:`4px solid ${series?T.ink:T.paper}`,boxShadow:series?"none":"0 12px 40px rgba(0,0,0,.45)"}}/>
+            <div className="absolute top-0 bottom-0 flex flex-col justify-between py-2" style={{right:-14}}>{Array.from({length:n}).map((_,k)=>(<div key={k} style={{width:k===fi?16:8,height:k===fi?4:3,borderRadius:2,background:k<=fi?T.accent:"rgba(150,150,150,.35)",transition:"all .18s cubic-bezier(.34,1.56,.64,1)"}}/>))}</div>
+            <div className="absolute top-2 left-2 lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:series?T.ink:"rgba(0,0,0,.5)",color:"#fff",backdropFilter:"blur(4px)"}}>{String(fi+1).padStart(2,"0")} / {String(n).padStart(2,"0")}</div>
+            {fi===0&&!playing&&n>1&&(<div className="absolute inset-x-0 bottom-3 text-center text-sm font-bold" style={{color:series?T.ink:"#F2EDE2",textShadow:series?"none":"0 2px 6px rgba(0,0,0,.6)",animation:reduceMotion?"none":"loknudge 1.6s ease-in-out infinite"}}>▾ slide down to flip ▾</div>)}
+          </div></div><div style={{height:Math.max(1,n)*PX_PER_FRAME}}/></>)}
+      </div>
+      {index>0&&<button onClick={()=>onNav(-1)} aria-label="Previous post" className="lok-btn absolute left-1.5 top-1/2 w-9 h-9 rounded-full font-extrabold" style={{transform:"translateY(-50%)",background:T.paper,color:T.ink,border:`3px solid ${T.accent}`}}>‹</button>}
+      {index<posts.length-1&&<button onClick={()=>onNav(1)} aria-label="Next post" className="lok-btn absolute right-1.5 top-1/2 w-9 h-9 rounded-full font-extrabold" style={{transform:"translateY(-50%)",background:T.paper,color:T.ink,border:`3px solid ${T.accent}`}}>›</button>}
+      {floats.map(f=>(<div key={f.id} className="absolute bottom-20 pointer-events-none" style={{left:`${f.x}%`,animation:"lokfloat .95s ease-out forwards"}}><ReactionIcon type={f.type} size={34}/></div>))}
+    </div>
+    <div className="flex items-center gap-2 px-3 py-2.5" style={{background:series?T.card:T.ink,borderTop:`2px solid ${series?T.ink:"rgba(242,237,226,.25)"}`}}>
+      <button onClick={togglePlay} aria-label={playing?"Pause":"Play"} className="lok-btn px-3 py-2 rounded-xl font-extrabold lok-display" style={{background:T.alt,color:"#fff",border:`3px solid ${series?T.ink:T.paper}`}}>{playing?"Pause":`Play`}</button>
+      {!isB&&n>=2&&<button onClick={replay} aria-label="Replay drawing" title="Watch it drawn" className="lok-btn px-2.5 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${series?T.ink:"rgba(242,237,226,.5)"}`,color:series?T.ink:T.paper,background:"transparent"}}>↺</button>}
+      <button onClick={()=>onVote(post.id)} aria-label={`Vote — ${post.votes}`} className="lok-btn px-3 py-2 rounded-xl font-extrabold lok-display" style={{background:post.voted?"transparent":T.accent,color:post.voted?(series?T.ink:T.paper):T.onAccent,border:`3px solid ${post.voted?(series?T.ink:"rgba(242,237,226,.5)"):(series?T.ink:T.paper)}`}}>{post.voted?`Voted · ${post.votes}`:`Vote · ${post.votes}`}</button>
+      {onEcho&&<button onClick={()=>onEcho(post)} aria-label="Echo this flip" className="lok-btn px-2.5 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${series?T.ink:"rgba(242,237,226,.5)"}`,color:series?T.ink:T.paper,background:"transparent"}}>↻ Echo{post.echoCount?` (${post.echoCount})`:""}</button>}
+      {post.from!=="seed"&&!post.remote&&myName&&onDelete&&<button onClick={()=>{if(window.confirm(`Delete "${post.title}"?`))onDelete(post.id);}} aria-label="Delete" className="lok-btn px-2 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${series?T.ink:"rgba(242,237,226,.4)"}`,color:series?T.ink:"rgba(242,237,226,.7)",background:"transparent"}}>🗑</button>}
+      {post.from!=="seed"&&!post.remote&&myName&&!post.boostedAt&&onBoost&&<button onClick={()=>onBoost(post.id,post.title)} aria-label="Boost post" className="lok-btn px-2 py-2 rounded-xl font-bold text-[11px]" style={{border:`2.5px solid ${T.accent}`,color:series?T.ink:T.paper,background:series?"transparent":T.accent}}>🚀 Boost 20</button>}
+      <div className="ml-auto flex items-center gap-1.5">{(()=>{const slots=["splat","heart","drip"];const pack=REACTION_SETS[cosmetics.reactionPack]||REACTION_SETS.base;return[...slots.map((slot,k)=>(<button key={slot} onClick={()=>react(slot)} aria-label={`React ${pack[k]}`} className="lok-btn flex items-center gap-1 px-2 py-1.5 rounded-xl" style={{background:series?T.paper:"rgba(242,237,226,.12)",border:`2px solid ${series?T.ink:"rgba(242,237,226,.4)"}`,color:series?T.ink:T.paper}}><ReactionIcon type={pack[k]} size={20}/><span className="text-xs font-bold">{post.reactions[slot]}</span></button>)),<button key="humhah" onClick={()=>react("humhah")} aria-label="React HumHah" className="lok-btn flex items-center gap-1 px-2 py-1.5 rounded-xl" style={{background:series?T.paper:"rgba(242,237,226,.12)",border:`2px solid ${series?T.ink:"rgba(242,237,226,.4)"}`,color:series?T.ink:T.paper}}><span>😄</span><span className="text-xs font-bold">{post.reactions.humhah||0}</span></button>,<button key="bomhogwah" onClick={()=>react("bomhogwah")} aria-label="React BomHogWah" className="lok-btn flex items-center gap-1 px-2 py-1.5 rounded-xl" style={{background:series?T.paper:"rgba(242,237,226,.12)",border:`2px solid ${series?T.ink:"rgba(242,237,226,.4)"}`,color:series?T.ink:T.paper}}><span>😮</span><span className="text-xs font-bold">{post.reactions.bomhogwah||0}</span></button>];})()}</div>
+    </div>
+  </div>);
+}

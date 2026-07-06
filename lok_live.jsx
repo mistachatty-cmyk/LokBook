@@ -214,6 +214,39 @@ function getLilLokLine(phase="thriving",ctx=""){
   const pool=(ctx&&LILLOK_SPEECH[ctx])?LILLOK_SPEECH[ctx]:(LILLOK_SPEECH[phase]||LILLOK_SPEECH.thriving);
   return pool[Math.floor(Math.random()*pool.length)];
 }
+
+const recentLines = [];
+const remember = line => { recentLines.push(line); if (recentLines.length > 4) recentLines.shift(); };
+
+const SMART = {
+  win: [
+    s => s.wins >= 2 ? `Win #${s.wins}. I keep count.` : null,
+    s => s.wins >= 5 ? `${s.wins} wins. They should study us.` : null,
+    () => "That jury had taste.",
+  ],
+  loss: [
+    s => s.wins >= 1 ? `We've won ${s.wins === 1 ? "before" : s.wins + " times"}. We'll win again.` : null,
+    () => "I saw what you were going for. Next round they will too.",
+  ],
+  thriving: [
+    s => s.bond >= 70 ? "Our bond is basically waterproof now." : null,
+    s => s.loks >= 200 ? `${s.loks} Loks?? Buy yourself something nice.` : null,
+  ],
+  decaying: [
+    s => s.bond >= 60 ? "The bond's holding me together. Barely. Ink please." : null,
+    s => s.loks >= 10 ? "You can afford a flask, you know. Just saying." : null,
+  ],
+  critical: [
+    s => s.name ? `${s.name} is not a name for a grey puddle. Ink. Now.` : null,
+  ],
+  battle_start: [
+    s => s.wins >= 1 ? `They don't know about the ${s.wins} ${s.wins === 1 ? "win" : "wins"}. Show them.` : null,
+  ],
+};
+
+const pick = pool => pool[Math.floor(Math.random() * pool.length)];
+
+function getLilLokLine(phase = "thriving", ctx = "", state = null) { if (!ctx) { const h = new Date().getHours(); if (phase === "thriving" && h >= 5 && h < 10) ctx = "morning"; if (phase === "thriving" && h >= 21) ctx = "evening"; } const timePool = { morning: ["Good morning. First lines of the day.", "Morning ink hits different.", "Fresh paper. Fresh start."], evening: ["Late-night drawing session?", "Best lines come after dark.", "Stars and sketches."] }[ctx]; const candidates = []; if (state) { const smart = (SMART[ctx] || SMART[phase] || []).map(fn => fn(state)).filter(Boolean); if (smart.length && Math.random() < 0.45) candidates.push(...smart); } if (!candidates.length) { const pool = timePool || (ctx && LILLOK_SPEECH[ctx]) || LILLOK_SPEECH[phase] || LILLOK_SPEECH.thriving; candidates.push(...pool); } const fresh = candidates.filter(l => !recentLines.includes(l)); const line = pick(fresh.length ? fresh : candidates); remember(line); return line; }
 function lilLokPhase(s){if(s.stasis)return"stasis";if(s.ink<15)return"critical";if(s.ink<35)return"decaying";return"thriving";}
 function LilLokBubble({text,ink=ART.ink,paper=ART.paper}){
   if(!text)return null;
@@ -1051,6 +1084,7 @@ export default function LokApp(){
   const pushNotif=useCallback((msg,type="info")=>{setNotifications(ns=>[...ns.slice(-49),{id:Date.now(),msg,type,ts:Date.now()}]);setNotifUnread(n=>n+1);},[]);
   const say=useCallback((m,type="default")=>{const id=Date.now()+Math.random();setToasts(t=>[...t.slice(-2),{id,msg:m,type}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),2600);},[]);
   const showLine=useCallback((ctx="")=>{setFabBubble(getLilLokLine(lilLokPhase(lillok),ctx));setTimeout(()=>setFabBubble(""),3500);},[lillok]);
+  const showLine=useCallback((ctx="")=>{const s={name:lillok.name,wins,loks,ink:lillok.ink,bond:lillok.bond};setFabBubble(getLilLokLine(lilLokPhase(lillok),ctx,s));setTimeout(()=>setFabBubble(""),3500);},[lillok,wins,loks]);
   const gainXp=useCallback(n=>setXp(x=>{const before=Math.floor(x/100);const nx=x+n;if(Math.floor(nx/100)>before){setTimeout(()=>say(`Level ${Math.floor(nx/100)+1}! New flair unlocked`),300);}return nx;}),[say]);
   const questTick=useCallback((track,amt=1)=>{setQuests(q=>{if(!q)return q;let paid=0,msg=null,doneCount=0;const items=q.items.map(it=>{if(it.track!==track||it.done)return it;const progress=Math.min(it.goal,it.progress+amt);const done=progress>=it.goal;if(done){paid+=it.reward;doneCount++;msg=`Quest done: ${it.label} · +${it.reward}`;}return{...it,progress,done};});if(paid){setLoks(l=>l+paid);setTotalEarned(t=>t+paid);gainXp(paid);setTimeout(()=>say(msg,"success"),250);
     setQuestsCompleted(c=>{const nc=c+doneCount;const m=[10,25,50,100].find(x=>c<x&&nc>=x);if(m){const bonus=m*2;setLoks(l=>l+bonus);setTotalEarned(t=>t+bonus);setTimeout(()=>{say(`🎖 ${m} quests done · +${bonus} bonus Loks`,"success");hap([200,100,200,100,200]);},700);}return nc;});}return{...q,items};});},[gainXp,say,hap]);
