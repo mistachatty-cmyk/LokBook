@@ -6,6 +6,9 @@ import { getModuleLayers, hasModule, FORMATS, PROMPTS, KID_PROMPTS, INTERVENTION
 import { renderDoodle } from "../engine/draw.jsx";
 import { makeMatchBots, botProgress, botFinalT, botLine, judgeBattle, recordBattle } from "../engine/bots.js";
 
+const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 function Battle({modules=[],wins,bigBattleOwned,kids,phase,lillok,customLilLok,onResult,onUnlockBig,onPublish,onLine,blip,hap,say}){
   const T=useT();
   const[pstate,setPstate]=useState("lobby");const[format,setFormat]=useState(FORMATS[0]);const[duration,setDuration]=useState(60);const[tier,setTier]=useState(getModuleLayers(modules));const[prompt,setPrompt]=useState(PROMPTS[0]);const[count,setCount]=useState(3);const[timeLeft,setTimeLeft]=useState(0);const[bots,setBots]=useState([]);const[botThumbs,setBotThumbs]=useState([]);const[entries,setEntries]=useState([]);const[results,setResults]=useState(null);const[shake,setShake]=useState(false);const[splat,setSplat]=useState(null);const[block,setBlock]=useState(null);const[blocked,setBlocked]=useState(0);const[myArt,setMyArt]=useState(null);const[bFrames,setBFrames]=useState([]);const[featured,setFeatured]=useState(false);
