@@ -11,3 +11,4 @@ build/
 
 .vercel
 supabase/.temp/
+.smoke-bundle.cjs
