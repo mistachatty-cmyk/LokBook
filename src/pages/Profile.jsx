@@ -9,6 +9,7 @@ import * as auth from "../auth/auth.js";
 import { W, H, GAME_MANUAL_PAGES, BADGES, BADGE_CATEGORIES, PROMPTS, KID_PROMPTS, MODES, FRONT_NAMES, WAGERS, INTERVENTIONS, makeQuests, LILLOK_GEAR, blotBorderStyle, WEEKLY_PROMPT, PACE_PRESETS } from "../constants.jsx";
 import { encodeGIF } from "../engine/gif.js";
 import { makeRushRivals, rushScore, recordRush } from "../engine/bots.js";
+import { isReservedName } from "../identity.js";
 
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -36,18 +37,18 @@ const store = {
 };
 const SAVE_KEY = "lok:save:v2";
 
-function Onboard({onDone,onName}){
-  const T=useT();const[step,setStep]=useState(0);const[name,setName]=useState("");
-  const steps=[{t:"What should we call you?",d:"This is your artist name on LokBook. You can change it later in You → Edit."},{t:"Welcome to LokBook",d:"A home for tiny hand-drawn animations. Slide down any post to flip through its pages."},{t:"Lok what you love",d:"Lok artists to follow them, vote on pieces, and bookmark favorites — creators earn Loks from your attention. Tap any artist's name to visit their page."},{t:"It's a party feed",d:"Everyone here shares one Discover feed — publish a flip and the whole room sees it. Want to keep your stuff? Make a Lok account in You → ⚙ (handle + PIN, 10 seconds)."},{t:"Draw, battle, earn",d:"Make flips in Studio, go head-to-head in Battle, grab prompts in Rush. Turn on sound 🎵 for best experience."},{t:"Meet your LilLok",d:"A living-ink buddy that grows with you. Here are 50 Loks to begin — have fun."}];
-  const s=steps[step];
+function Onboard({onDone,onName,defaultName=""}){
+  const T=useT();const[step,setStep]=useState(0);const[name,setName]=useState(defaultName);
+  const steps=[{t:"Welcome to LokBook",d:"A home for tiny hand-drawn animations. Slide down any post to flip through its pages."},{t:"Meet moss.ink",d:"The first artist you'll see in the feed — study their loops, then tap any artist's name to visit their page. Lok artists to follow them; vote and bookmark what you love."},{t:"It's a living feed",d:"Everyone here shares one Discover feed — publish a flip and the whole room sees it. Resident artists post fresh work daily too."},{t:"Draw, battle, earn",d:"Make flips in Studio, go head-to-head in Battle, grab prompts in Rush. Turn on sound 🎵 for best experience."},{t:"Meet your LilLok",d:"A living-ink buddy that grows with you. Feed it ink, and it helps you in battles."},{t:"Make it yours",d:"This is your artist name — keep it or change it. No sign-in needed to play; when you're ready, back everything up in You → ⚙. Here are 50 Loks to begin."}];
+  const s=steps[step];const last=step===steps.length-1;
   return(<div className="fixed inset-0 z-[60] flex items-center justify-center p-5" style={{background:"rgba(0,0,0,.55)"}}>
     <div className="w-full rounded-3xl p-6 text-center" style={{maxWidth:420,background:T.card,border:`3px solid ${T.ink}`,boxShadow:`8px 8px 0 ${T.accent}`,animation:"lokrise .3s ease"}}>
       <div className="lok-display text-2xl font-extrabold mb-2" style={{color:T.accent}}>{s.t}</div>
       <p className="text-sm leading-snug">{s.d}</p>
-      {step===0&&<input value={name} onChange={e=>setName(e.target.value)} placeholder="Your artist name" aria-label="Artist name" autoFocus className="mt-3 w-full px-4 py-2.5 rounded-xl text-center font-bold text-sm" style={{border:`3px solid ${T.ink}`,background:T.paper,color:T.ink}} onKeyDown={e=>e.key==="Enter"&&setStep(1)}/>}
+      {last&&<input value={name} onChange={e=>setName(e.target.value)} placeholder="Your artist name" aria-label="Artist name" className="mt-3 w-full px-4 py-2.5 rounded-xl text-center font-bold text-sm" style={{border:`3px solid ${T.ink}`,background:T.paper,color:T.ink}} onKeyDown={e=>{if(e.key==="Enter"){onName&&onName(name);onDone();}}}/>}
       <div className="flex justify-center gap-1.5 my-4">{steps.map((_,i)=>(<div key={i} style={{width:i===step?22:8,height:6,borderRadius:4,background:i<=step?T.accent:T.shadow,transition:"width .2s"}}/>))}</div>
-      <button onClick={()=>{if(step===0){onName&&onName(name||"Artist");}step<steps.length-1?setStep(step+1):onDone();}} className="lok-btn lok-display w-full py-3 rounded-xl text-lg font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}}>{step===0?"Set name →":step<steps.length-1?"Next":"Claim 50 Loks & start"}</button>
-      {step<steps.length-1&&<button onClick={onDone} className="mt-2 text-xs font-bold underline opacity-60">skip</button>}
+      <button onClick={()=>{if(last){onName&&onName(name);onDone();}else setStep(step+1);}} className="lok-btn lok-display w-full py-3 rounded-xl text-lg font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}}>{last?"Claim 50 Loks & start":"Next"}</button>
+      {!last&&<button onClick={onDone} className="mt-2 text-xs font-bold underline opacity-60">skip</button>}
     </div>
   </div>);
 }
@@ -313,7 +314,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
         <div className="flex items-center gap-3 mb-3"><img src={renderAvatar(draft.avatarSeed)} alt="" className="w-16 h-16 rounded-full" style={{border:`3px solid ${T.ink}`}}/><button onClick={()=>setDraft(d=>({...d,avatarSeed:Math.floor(Math.random()*9999)}))} className="lok-btn px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`}} aria-label="Re-roll avatar">Re-roll avatar</button></div>
         <input value={draft.name} onChange={e=>setDraft(d=>({...d,name:e.target.value}))} placeholder="Handle" aria-label="Display name" className="w-full px-3 py-2.5 rounded-xl font-bold mb-2" style={{border:`3px solid ${T.ink}`,background:T.paper,color:T.ink}}/>
         <textarea value={draft.bio} onChange={e=>setDraft(d=>({...d,bio:e.target.value}))} placeholder="What's your gallery about?" rows={3} aria-label="Bio" className="w-full px-3 py-2.5 rounded-xl text-sm mb-3" style={{border:`3px solid ${T.ink}`,background:T.paper,color:T.ink}}/>
-        <button onClick={()=>{setProfile(draft);setEditing(false);say("Profile saved");}} className="lok-btn lok-display w-full py-3 rounded-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}} aria-label="Save profile">Save</button>
+        <button onClick={()=>{if(isReservedName(draft.name)){say(`"${draft.name.trim()}" is a resident Lok artist — pick another name`,"error");return;}setProfile({...draft,name:draft.name.trim()||profile.name});setEditing(false);say("Profile saved");}} className="lok-btn lok-display w-full py-3 rounded-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}} aria-label="Save profile">Save</button>
       </div>
     </div>)}
     {view!=="gallery"?(<div className="mt-5">
