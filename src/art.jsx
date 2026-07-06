@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ART, SMILE_VARIANTS, useT } from "./theme/theme.js";
+import { ART, SMILE_VARIANTS, useT, themeVars } from "./theme/theme.js";
 import { NAME_COLOR_MAP, PACE_PRESETS } from "./constants.jsx";
 
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
@@ -89,8 +89,11 @@ export function SmileDecoration({ variant = "smile1", size = 32, color = "#F39C1
 export function GlobalStyle({ T, pace = "sweep", speed = 1 }) {
   const P = PACE_PRESETS[pace] || PACE_PRESETS.sweep;
   const m = ((P.mult || 1) / Math.max(0.25, speed)).toFixed(3);
+  const vars = Object.entries(themeVars(T)).map(([k, v]) => `${k}:${v}`).join(";");
   return (<style>{`
   @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Schibsted+Grotesk:wght@400;500;700&display=swap');
+  :root{${vars}}
+  ::selection{background:${T.accent};color:${T.onAccent}}
   @keyframes lokdrift{from{transform:translateX(0)}to{transform:translateX(200vw)}}
   @keyframes loktwinkle{0%{opacity:0.2}100%{opacity:1}}
   @keyframes lokrain{from{transform:translateY(-20px)}to{transform:translateY(100vh)}}

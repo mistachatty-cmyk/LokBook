@@ -49,3 +49,17 @@ export const SMILE_VARIANTS = [
   { id:"smile15", path:"M7 11 Q16 4 25 11 M11 18 Q16 22 21 18", label:"Fresh" },
   { id:"smile16", path:"M8 12 Q16 6 24 12 M10 21 Q16 25 22 21", label:"Happy" },
 ];
+
+// Theme System 2.0 — CSS custom properties layer. Every token has a fallback,
+// so old saves and themes without the new optional fields (font/gradient/glow)
+// are unaffected. New components can style via var(--lok-*) without prop drilling.
+export function themeVars(T) {
+  return {
+    "--lok-paper": T.paper, "--lok-ink": T.ink, "--lok-accent": T.accent,
+    "--lok-alt": T.alt, "--lok-shadow": T.shadow, "--lok-card": T.card,
+    "--lok-on-accent": T.onAccent,
+    "--lok-font-display": T.font || "'Bricolage Grotesque', sans-serif",
+    "--lok-gradient": T.gradient || `linear-gradient(135deg, ${T.accent}, ${T.alt})`,
+    "--lok-glow": T.glow || "transparent",
+  };
+}

@@ -37,6 +37,7 @@ const Viewer = lazy(() => import("./pages/Viewer.jsx"));
 import Profile, { Onboard, ArtistPage, OpenFront } from "./pages/Profile.jsx";
 import { starterHandle, isReservedName, suggestHandle } from "./identity.js";
 import { BOT_STYLES, generateBotPost, pickAmbientPosts } from "./engine/botArt.js";
+import ThemeBackdrop from "./theme/ThemeBackdrop.jsx";
 
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -244,7 +245,7 @@ function LokApp(){
   </div>);
   return(<ErrorBoundary><ThemeCtx.Provider value={T}>
     <div className={"min-h-screen w-full"+(compactDensity?" lok-compact":"")} style={{background:T.paper,color:T.ink,fontFamily:"'Schibsted Grotesk',system-ui,sans-serif",animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none"}}>
-      <GlobalStyle T={T} pace={pace} speed={speed}/><SkyEffect sky={sky} paper={T.paper}/><PageEffect effect={effect}/>
+      <GlobalStyle T={T} pace={pace} speed={speed}/><ThemeBackdrop themeId={uiTheme} pace={pace}/><SkyEffect sky={sky} paper={T.paper}/><PageEffect effect={effect}/>
       <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3" style={{background:T.paper,borderBottom:`3px solid ${T.ink}`}}>
         <button onClick={()=>setTab("feed")} aria-label="Go to feed" className="lok-btn lok-display relative text-2xl font-extrabold tracking-tight select-none" style={{background:"transparent",border:"none",padding:0}}>
           <span className="absolute" style={{color:T.accent,left:3,top:2}}>Lok{kids?" Juniors":tab==="battle"?" N Slide":"Book"}</span>
