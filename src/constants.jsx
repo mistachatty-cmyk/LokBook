@@ -384,4 +384,40 @@ export const lokApi = {
       return [];
     }
   },
+  async follow(follower, followee) {
+    try {
+      await fetch(`${SUPA_URL}/rest/v1/lok_follows`, { method: "POST", headers: { ...getHeaders(), Prefer: "return=minimal" }, body: JSON.stringify({ follower, followee }) });
+      await fetch(`${SUPA_URL}/rest/v1/lok_accounts?handle=eq.${encodeURIComponent(follower)}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify({ following: null }) });
+    } catch {}
+  },
+  async unfollow(follower, followee) {
+    try {
+      await fetch(`${SUPA_URL}/rest/v1/lok_follows?follower=eq.${encodeURIComponent(follower)}&followee=eq.${encodeURIComponent(followee)}`, { method: "DELETE", headers: getHeaders() });
+    } catch {}
+  },
+  async fetchFollowing(handle) {
+    try { const r = await fetch(`${SUPA_URL}/rest/v1/lok_follows?follower=eq.${encodeURIComponent(handle)}&select=followee`, { headers: getHeaders() }); if (!r.ok) return []; return r.json(); } catch { return []; }
+  },
+  async bookmark(handle, postId) {
+    try {
+      await fetch(`${SUPA_URL}/rest/v1/lok_bookmarks`, { method: "POST", headers: { ...getHeaders(), Prefer: "return=minimal" }, body: JSON.stringify({ handle, post_id: postId }) });
+      await fetch(`${SUPA_URL}/rest/v1/lok_accounts?handle=eq.${encodeURIComponent(handle)}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify({ bookmarks: null }) });
+    } catch {}
+  },
+  async unbookmark(handle, postId) {
+    try {
+      await fetch(`${SUPA_URL}/rest/v1/lok_bookmarks?handle=eq.${encodeURIComponent(handle)}&post_id=eq.${encodeURIComponent(postId)}`, { method: "DELETE", headers: getHeaders() });
+    } catch {}
+  },
+  async fetchBookmarks(handle) {
+    try { const r = await fetch(`${SUPA_URL}/rest/v1/lok_bookmarks?handle=eq.${encodeURIComponent(handle)}&select=post_id`, { headers: getHeaders() }); if (!r.ok) return []; return r.json(); } catch { return []; }
+  },
+  async react(handle, postId, type) {
+    try {
+      await fetch(`${SUPA_URL}/rest/v1/lok_reactions`, { method: "POST", headers: { ...getHeaders(), Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ handle, post_id: postId, type }) });
+    } catch {}
+  },
+  async fetchPostReactions(postId) {
+    try { const r = await fetch(`${SUPA_URL}/rest/v1/lok_reactions?post_id=eq.${encodeURIComponent(postId)}&select=handle,type`, { headers: getHeaders() }); if (!r.ok) return []; return r.json(); } catch { return []; }
+  },
 };

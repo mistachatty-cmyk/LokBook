@@ -134,6 +134,34 @@ const ARTIST_BIO={
   "grafite":"Pressure builds the line. Value studies and patient shading.",
   "blot.bot":"ARTIST PROTOCOL ENGAGED. glitches are a feature.",
 };
+export function JournalShelf({owner,T,compact=false}){
+  const[journals,setJournals]=useState([]);const[openJ,setOpenJ]=useState(null);const[pg,setPg]=useState(0);
+  useEffect(()=>{let on=true;setJournals([]);import("../rooms/api.js").then(({roomsApi})=>roomsApi.fetchJournals(owner)).then(js=>{if(on)setJournals(js.filter(j=>j.pages?.length));}).catch(()=>{});return()=>{on=false;};},[owner]);
+  if(!journals.length)return null;
+  return(<>
+    <div className="lok-display font-extrabold mt-4 mb-1.5 text-sm">📔 Journals</div>
+    <div className="flex gap-3 overflow-x-auto pb-2">{journals.map(j=>(<button key={j.id} onClick={()=>{setOpenJ(j);setPg(0);}} className="lok-btn shrink-0 relative rounded-xl p-1.5 pb-3 text-left" style={{width:96,background:j.style?.cover||T.accent,border:`3px solid ${T.ink}`,boxShadow:`3px 3px 0 ${T.shadow}`}} aria-label={`Open journal ${j.title}`}>
+      <img src={j.pages[0]} alt="" className="rounded w-full" style={{border:`2px solid ${T.ink}`,aspectRatio:"4/5",objectFit:"cover"}}/>
+      <div className="absolute top-0 bottom-0" style={{right:10,width:7,background:j.style?.ribbon||"#E8B14B",border:`1.5px solid ${T.ink}`,borderTop:"none",borderBottom:"none"}}/>
+      {j.style?.sticker&&<div className="absolute -top-1.5 -left-1.5 text-base" aria-hidden="true">{j.style.sticker}</div>}
+      <div className="text-[9px] font-extrabold truncate mt-1" style={{color:"#fff",textShadow:"0 1px 2px rgba(0,0,0,.4)"}}>{j.title}</div>
+      <div className="text-[8px] font-bold" style={{color:"rgba(255,255,255,.75)"}}>{j.pages.length} {j.pages.length===1?"page":"pages"}</div>
+    </button>))}</div>
+    {openJ&&(<div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,.6)"}} onClick={()=>setOpenJ(null)}>
+      <div className="w-full rounded-3xl p-4 text-center" style={{maxWidth:400,background:openJ.style?.cover||T.accent,border:`3px solid ${T.ink}`,boxShadow:`8px 8px 0 rgba(0,0,0,.3)`,animation:"lokrise .25s ease"}} onClick={e=>e.stopPropagation()}>
+        <div className="lok-display font-extrabold text-lg" style={{color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,.4)"}}>{openJ.style?.sticker||"📔"} {openJ.title}</div>
+        <img key={pg} src={openJ.pages[pg]} alt={`page ${pg+1}`} className="mt-2 rounded-xl w-full" style={{border:`3px solid ${T.ink}`,animation:"lokrise .3s ease"}}/>
+        <div className="mt-2 flex items-center justify-center gap-3">
+          <button onClick={()=>setPg(p=>Math.max(0,p-1))} disabled={pg===0} className="lok-btn px-3 py-1.5 rounded-xl font-extrabold" style={{background:T.paper,color:T.ink,border:`2.5px solid ${T.ink}`,opacity:pg===0?0.4:1}}>‹</button>
+          <span className="lok-display font-extrabold text-sm" style={{color:"#fff"}}>{pg+1} / {openJ.pages.length}</span>
+          <button onClick={()=>setPg(p=>Math.min(openJ.pages.length-1,p+1))} disabled={pg>=openJ.pages.length-1} className="lok-btn px-3 py-1.5 rounded-xl font-extrabold" style={{background:T.paper,color:T.ink,border:`2.5px solid ${T.ink}`,opacity:pg>=openJ.pages.length-1?0.4:1}}>›</button>
+        </div>
+        <button onClick={()=>setOpenJ(null)} className="mt-2 text-xs font-bold underline" style={{color:"rgba(255,255,255,.85)"}}>close</button>
+      </div>
+    </div>)}
+  </>);
+}
+
 function ArtistPage({name,posts,following,onLok,onOpen,onOpenPost,onClose}){
   const T=useT();const[remote,setRemote]=useState([]);
   useEffect(()=>{let on=true;setRemote([]);if(!isReservedName(name))lokApi.fetchAuthorPosts(name).then(rows=>{if(on)setRemote((rows||[]).map(fromDbPost));}).catch(()=>{});return()=>{on=false;};},[name]);
@@ -154,6 +182,7 @@ function ArtistPage({name,posts,following,onLok,onOpen,onOpenPost,onClose}){
         <button onClick={()=>onLok(name)} aria-label={loked?"Unfollow":`Lok ${name}`} className="lok-btn px-3 py-1.5 rounded-full text-xs font-extrabold shrink-0" style={{background:loked?T.card:T.accent,color:loked?T.ink:T.onAccent,border:`2.5px solid ${T.ink}`}}>{loked?"Following ✓":"Lok"}</button>
       </div>
       {bio&&<p className="mt-3 text-sm leading-snug px-1">{bio}</p>}
+      <JournalShelf owner={name} T={T}/>
       {theirs.length?<div className="mt-3 grid grid-cols-2 gap-3">{theirs.map(p=><PostCard key={p.id} p={p} onOpen={open}/>)}</div>:<EmptyState icon="feed" title="Nothing yet" subtitle={`${name} hasn't published a flip yet.`}/>}
     </div>
   </div>);
@@ -332,6 +361,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
       <h2 className="lok-display text-lg font-extrabold mb-2 capitalize">{view==="lokdin"?"Lok'd in with you":view==="lokd"?"You Lok'd":"Your bookmarks"}</h2>
       {view==="bookmarks"?(<><div className="flex gap-1.5 mb-2">{[["add","Newest"],["votes","Most Lok'd"],["views","Most viewed"]].map(([id,l])=>(<button key={id} onClick={()=>setBSort(id)} className="lok-btn shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold" style={{border:`2.5px solid ${T.ink}`,background:bSort===id?T.ink:T.card,color:bSort===id?T.paper:T.ink}}>{l}</button>))}</div><input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search bookmarks…" aria-label="Search bookmarks" className="w-full mb-2 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/>{sortedBookmarks.length?<div className="grid grid-cols-2 gap-3">{sortedBookmarks.map(p=><PostCard key={p.id} p={p} onOpen={onOpen} onDelete={onDelete}/>)}</div>:<EmptyState icon="bookmarks" title={searchQ?"No bookmarks match":"No bookmarks yet"} subtitle={searchQ?"Try different words":"Lok in to pieces from the viewer to save them here."}/>}</>):view==="lokd"?(following.length?following.map(n=><PersonRow key={n} name={n}/>):<EmptyState icon="follow" title="No one Lok'd yet" subtitle="Lok artists you love and they'll show here."/>):["pixel.pluto","inkwell_iz","doodlebug"].map(n=><PersonRow key={n} name={n} note="Lok'd in"/>)}
     </div>):(<>
+      <JournalShelf owner={profile.name} T={T}/>
       <div className="mt-5 flex items-center gap-2 overflow-x-auto pb-1">
         <h2 className="lok-display text-lg font-extrabold mr-1">Gallery</h2>
         {[["newest","Newest"],["loks","Most Lok'd"],["views","Most viewed"],["battle","Battles"],["series","Series"],["weekly","This week"]].map(([id,label])=>(<button key={id} onClick={()=>setFilter(id)} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${T.ink}`,background:filter===id?T.ink:T.card,color:filter===id?T.paper:T.ink}}>{label}</button>))}
