@@ -229,8 +229,8 @@ function GameManual({onClose}){
   </div>);
 }
 
-function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,xp,quests,following,lokdInCount,bookmarks,notifications=[],notifUnread=0,loks=0,totalEarned=0,questsCompleted=0,canInstall=false,onInstall,onClearNotifs,onOpen,onDelete,onRename,say,account=null,pace="sweep",setPace,speed=1,setSpeed,soundLab=false,onUnlockSoundLab,soundQueue=[],setSoundQueue,founder=false,onFounderJoin,animatedToken=false,badges,showBadges,setShowBadges,unlockedCount,compactDensity,setCompactDensity,onClearData}){
-  const T=useT();const[filter,setFilter]=useState("newest");const[view,setView]=useState("gallery");const[editing,setEditing]=useState(false);const[draft,setDraft]=useState(profile);const[showNotifs,setShowNotifs]=useState(false);const[searchQ,setSearchQ]=useState("");const[showSettings,setShowSettings]=useState(false);const[showManual,setShowManual]=useState(false);const[bSort,setBSort]=useState("add");
+function Profile({posts,profile,setProfile,onCheat,wins,lokPass,kids,cosmetics={},level,xp,quests,following,lokdInCount,bookmarks,notifications=[],notifUnread=0,loks=0,totalEarned=0,questsCompleted=0,canInstall=false,onInstall,onClearNotifs,onOpen,onDelete,onRename,say,account=null,pace="sweep",setPace,speed=1,setSpeed,soundLab=false,onUnlockSoundLab,soundQueue=[],setSoundQueue,founder=false,onFounderJoin,animatedToken=false,badges,showBadges,setShowBadges,unlockedCount,compactDensity,setCompactDensity,onClearData}){
+  const T=useT();const[filter,setFilter]=useState("newest");const[view,setView]=useState("gallery");const[editing,setEditing]=useState(false);const[draft,setDraft]=useState(profile);const[showNotifs,setShowNotifs]=useState(false);const[searchQ,setSearchQ]=useState("");const[showSettings,setShowSettings]=useState(false);const[showManual,setShowManual]=useState(false);const[bSort,setBSort]=useState("add");const[bleepCode,setBleepCode]=useState("");
   const tapCount=useRef(0);const tapTimer=useRef(null);const audioRef=useRef(null);const[slUrl,setSlUrl]=useState("");const[slPlaying,setSlPlaying]=useState(null);const[fHandle,setFHandle]=useState(profile.name||"");const[fEmail,setFEmail]=useState("");const[fBusy,setFBusy]=useState(false);
   const[emailAddr,setEmailAddr]=useState("");const[authBusy,setAuthBusy]=useState(false);
   const sendMagicLink=async()=>{const e=emailAddr.trim();if(!e||!e.includes("@")){say("Enter a valid email","error");return;}setAuthBusy(true);try{await auth.signInWithEmail(e);say("Magic link sent! Check your inbox","success");}catch{ say("Couldn't send — try again","error");}setAuthBusy(false);};
@@ -346,6 +346,14 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
           <div className="font-bold text-sm">About</div>
           <div className="text-xs opacity-70 mt-0.5 leading-snug select-none" onClick={versionTap} style={{cursor:"default"}}>LokBook + Lok N Slide · <span style={{fontWeight:700}}>alpha v1.2</span> · Your gallery and LilLok save automatically on this device. Lok Juniors mode is in the Shop.</div>
         </div>
+        {onCheat&&(<div className="p-3 rounded-2xl mt-2" style={{border:`2px dashed ${T.shadow}`,background:T.paper,opacity:0.85}}>
+          <div className="font-bold text-sm">🫧 BadBleep Box</div>
+          <div className="text-[10px] opacity-50 mt-0.5">whisper something the ink might recognize</div>
+          <div className="mt-1.5 flex gap-1.5">
+            <input value={bleepCode} onChange={e=>setBleepCode(e.target.value)} placeholder="…" aria-label="BadBleep code" className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2px solid ${T.shadow}`,background:T.card,color:T.ink}} onKeyDown={e=>{if(e.key==="Enter"){onCheat(bleepCode);setBleepCode("");}}}/>
+            <button onClick={()=>{onCheat(bleepCode);setBleepCode("");}} className="lok-btn px-3 py-2 rounded-xl font-extrabold text-sm shrink-0" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}>bleep</button>
+          </div>
+        </div>)}
       </div>
     </div>)}
     {editing&&(<div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,.35)"}} onClick={()=>setEditing(false)}>

@@ -10,7 +10,7 @@ export default function Feed({posts,bookmarks,following,feedMode,setFeedMode,cos
   const[searchQ,setSearchQ]=useState("");const[searchResults,setSearchResults]=useState(null);const[searching,setSearching]=useState(false);
   const list=(feedMode==="following"?posts.filter(p=>following.includes(p.author)):posts).sort((a,b)=>(b.boostedAt||0)-(a.boostedAt||0));
   const streakCol=streak>=30?"#E8B14B":streak>=7?T.accent:streak>=3?T.alt:T.ink;
-  const onScroll=()=>{const el=wrapRef.current;if(!el)return;const i=Math.round(el.scrollTop/el.clientHeight);if(i!==active){setActive(i);if(Math.random()<0.22&&onLine)onLine("feed_scroll");}};
+  const onScroll=()=>{const el=wrapRef.current;if(!el)return;const i=Math.round(el.scrollTop/el.clientHeight);if(i!==active){setActive(i);if(Math.random()<0.22&&onLine){onLine("feed_scroll");say("New post in view!");}}};
   const doSearch=useRef(null);useEffect(()=>{if(!searchQ.trim()){setSearchResults(null);return;}setSearching(true);clearTimeout(doSearch.current);doSearch.current=setTimeout(async()=>{try{const rows=await lokApi.fetchPosts(20,null,searchQ);setSearchResults(rows.map(fromDbPost));}catch{}setSearching(false);},300);return()=>clearTimeout(doSearch.current);},[searchQ]);
   return(<div>
     {flipOfDay&&feedMode==="discover"&&(<button onClick={()=>onOpen(flipOfDay.id)} aria-label={`Flip of the Day: ${flipOfDay.title}`} className="lok-btn mt-3 w-full flex items-center gap-3 p-2.5 rounded-2xl text-left" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:"5px 5px 0 #E8B14B"}}>
