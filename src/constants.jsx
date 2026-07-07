@@ -92,6 +92,7 @@ export const getActiveEvent = () => { const n=new Date().toISOString().slice(0,1
 export const PX_PER_FRAME = 150;
 
 export const BLENDS = ["source-over", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion", "hue", "saturation", "color", "luminosity"];
+export const TIERS=[{layers:10,label:"10 · Sketch",price:0},{layers:25,label:"25 · Studio",price:40},{layers:50,label:"50 · Pro",price:80},{layers:100,label:"100 · Marathon",price:150}];
 
 export const STUDIO_MODULES = [
   { id: "layers_10", type: "layers", name: "Layer Pack S", desc: "Up to 10 layers", price: 0, layers: 10 },
@@ -127,6 +128,16 @@ export const STUDIO_MODULES = [
   { id: "feat_symmetry", type: "feature", name: "Symmetry Tools", desc: "Mirror & radial symmetry guides", price: 50 },
   { id: "canvas_sizes", type: "canvas", name: "Canvas Sizes", desc: "Story, square & wide aspect ratios", price: 100 },
   { id: "module_uber", type: "feature", name: "Studio UBER", desc: "Ultimate module — unlocks all brushes, tools, layers, features & canvas sizes", price: 999 },
+  { id: "brush_calligraphy", type: "brush", name: "Calligraphy", desc: "Variable-width calligraphy nib", price: 150 },
+  { id: "brush_neon", type: "brush", name: "Neon Tube", desc: "Glowing neon tube stroke", price: 180 },
+  { id: "brush_sparkle", type: "brush", name: "Sparkle Tip", desc: "Every dot sparkles on contact", price: 200 },
+  { id: "brush_crayon", type: "brush", name: "Crayon Wax", desc: "Thick textured wax crayon", price: 120 },
+  { id: "brush_wash", type: "brush", name: "Ink Wash", desc: "Broad semi-transparent wash", price: 160 },
+  { id: "brush_galaxy", type: "brush", name: "Galaxy Brush", desc: "Star field colors in every stroke", price: 500 },
+  { id: "canvas_infinite", type: "canvas", name: "Infinite Scroll", desc: "Vertical endless canvas", price: 300 },
+  { id: "canvas_circular", type: "canvas", name: "Circular Canvas", desc: "Draw in a circular format", price: 250 },
+  { id: "canvas_panorama", type: "canvas", name: "Panorama", desc: "Extra-wide cinematic ratio", price: 280 },
+  { id: "canvas_xl", type: "canvas", name: "Canvas XL", desc: "Double resolution canvas", price: 350 },
   { id: "achieve_onion", type: "achievement", name: "Onion Skinning", desc: "Multi-frame onion skin preview", price: 0, unlock: "Studio Master badge" },
   { id: "achieve_persp", type: "achievement", name: "Perspective Grid", desc: "3-point perspective grid overlay", price: 0, unlock: "3 battle streak" },
   { id: "achieve_swatch", type: "achievement", name: "Custom Swatches", desc: "Save custom color swatches", price: 0, unlock: "25 published flips" },
@@ -188,7 +199,19 @@ export const FRAMES = [{ id: "none", name: "None", price: 0 }, { id: "double", n
 export const REACTION_PACKS = [{ id: "base", name: "Ink set (splat · heart · drip)", price: 0 }, { id: "stars", name: "Stardust pack", price: 30 }, { id: "fire", name: "Hot streak pack", price: 30 }, { id: "zen", name: "Zen pack", price: 45 }, { id: "spooky", name: "Spooky Pack", price: 30 }, { id: "sweet", name: "Sweet Pack", price: 30 }];
 export const PAPERS = [{ id:"plain", name:"Plain paper", price:0 }, { id:"grid", name:"Grid guide", price:25 }, { id:"dots", name:"Dot grid", price:25 }, { id:"storyboard", name:"Storyboard · 3 panels", price:40 }, { id:"graphite", name:"Graphite texture", price:50 }];
 export const LILLOK_GEAR = [{ id:"none", name:"None", price:0 }, { id:"hat", name:"Tiny hat", price:25 }, { id:"glasses", name:"Round glasses", price:25 }, { id:"bowtie", name:"Bow tie", price:20 }];
+export const LILLOK_SKINS = [{ id:"none", name:"Default", price:0 }, { id:"galaxy", name:"Galaxy skin", price:300 }, { id:"gold", name:"Gold leaf", price:250 }];
+export const LILLOK_AURAS = [{ id:"none", name:"No aura", price:0 }, { id:"glow", name:"Aura glow", price:200 }];
+export const LILLOK_PETS = [{ id:"none", name:"No pet", price:0 }, { id:"mini", name:"Mini LilLok", price:400 }];
+export const VOICE_PACKS = [{ id:"default", name:"Default voice", price:0 }, { id:"whisper", name:"Whisper pack", price:150 }, { id:"echo", name:"Echo pack", price:200 }, { id:"robot", name:"Robot pack", price:250 }];
 export const AVATAR_ACCENTS = [{ id: "none", name: "Plain", price: 0 }, { id: "ring", name: "Accent ring", price: 20 }, { id: "halo", name: "Sketch halo", price: 35 }, { id: "crown", name: "Ink crown", price: 50 }, { id: "horns", name: "Horns", price: 40 }, { id: "antenna", name: "Antenna", price: 40 }];
+export const PROFILE_UPGRADES = [{ id:"none", name:"No banner", price:0 }, { id:"banner_wave", name:"Wave banner", price:250 }, { id:"banner_ink", name:"Ink splash banner", price:200 }, { id:"bg_warm", name:"Warm background", price:180 }, { id:"bg_cool", name:"Cool background", price:180 }, { id:"bg_dark", name:"Dark background", price:180 }, { id:"avatar_animate", name:"Animated avatar", price:200 }, { id:"pin_post", name:"Pin a post", price:150 }];
+export const SOCIAL_POWER = [{ id:"mass_echo", name:"Mass Echo", desc:"Your echo reaches the full feed", price:450 }, { id:"super_boost", name:"Super Boost", desc:"Boosted post stays top for 48h", price:400 }, { id:"custom_tag", name:"Custom Tag", desc:"Create your own profile tagline", price:350 }];
+export const ANIMATION_FX = [{ id:"none", name:"No FX", price:0 }, { id:"sparkle_trail", name:"Sparkle Trail", desc:"Lines leave glittering sparkles", price:200 }, { id:"neon_pulse", name:"Neon Pulse", desc:"Every stroke pulses with neon", price:250 }, { id:"ink_splatter", name:"Ink Splatter", desc:"Brush tips splatter occasionally", price:180 }, { id:"smoke_rise", name:"Smoke Rise", desc:"Drawn lines emit rising smoke", price:220 }, { id:"fire_embers", name:"Fire Embers", desc:"Strokes glow with floating embers", price:300 }, { id:"water_ripple", name:"Water Ripple", desc:"Strokes ripple outward", price:280 }, { id:"galaxy_swirl", name:"Galaxy Swirl", desc:"Lines reveal star field", price:400 }];
+export const CURSORS = [{ id:"default", name:"Default cursor", price:0 }, { id:"inkdrop", name:"Ink Drop", price:25 }, { id:"pencil", name:"Pencil Tip", price:20 }, { id:"brush_cross", name:"Brush Cross", price:30 }, { id:"target", name:"Target Ring", price:20 }, { id:"heart_aim", name:"Heart Aim", price:35 }, { id:"star_glow", name:"Star Glow", price:40 }, { id:"spray_nozzle", name:"Spray Nozzle", price:45 }, { id:"calligraphy", name:"Calligraphy Nib", price:50 }, { id:"neon_ring", name:"Neon Ring", price:60 }, { id:"ruler", name:"Ruler Cross", price:25 }, { id:"laser_dot", name:"Laser Dot", price:30 }];
+export const FONT_PACKS = [{ id:"default", name:"System font", price:0, font:"inherit" }, { id:"mono", name:"Mono Ink", desc:"Monospace typewriter", price:25, font:"'Courier New',monospace" }, { id:"rounded", name:"Soft Round", desc:"Rounded sans-serif", price:30, font:"'Nunito',sans-serif" }, { id:"hand", name:"Handwritten", desc:"Loose pen script", price:35, font:"'Patrick Hand',cursive" }, { id:"pixel", name:"Pixel Bit", desc:"8-bit pixel font", price:45, font:"'Press Start 2P',cursive" }, { id:"zine", name:"Zine Bold", desc:"Chunky headline", price:30, font:"'Bebas Neue',sans-serif" }, { id:"serif", name:"Editorial Serif", desc:"Elegant classic", price:40, font:"'Playfair Display',serif" }, { id:"marker", name:"Marker Felt", desc:"Permanent marker look", price:35, font:"'Permanent Marker',cursive" }, { id:"code", name:"Fira Code", desc:"Developer coding font", price:20, font:"'Fira Code',monospace" }, { id:"vintage", name:"Vintage Ink", desc:"Rough-printed text", price:50, font:"'Abril Fatface',cursive" }];
+export const MUSIC_PACKS = [{ id:"none", name:"No music", price:0 }, { id:"lo-fi", name:"Lo-Fi Study", price:100 }, { id:"synth", name:"Synth Wave", price:120 }, { id:"rain", name:"Rain Ambience", price:80 }, { id:"jazz", name:"Coffee Jazz", price:110 }, { id:"nature", name:"Forest Nature", price:90 }, { id:"retro", name:"Retro Arcade", price:130 }, { id:"piano", name:"Piano Moods", price:95 }];
+export const STICKER_PACKS = [{ id:"emoji", name:"Emoji Pack", price:0, stickers:["😎","🔥","🎨","💀","👾","✨","🌈","🍕"] }, { id:"nature", name:"Nature Pack", price:30, stickers:["🌸","🌿","🦋","🍀","🌻","🐚","🍄","🌙"] }, { id:"food", name:"Snack Pack", price:25, stickers:["🍕","🍔","🌮","🍩","🍦","🥨","🧋","🍪"] }, { id:"animals", name:"Animal Pack", price:35, stickers:["🐱","🐶","🦊","🐸","🐼","🐧","🦉","🐝"] }, { id:"space", name:"Space Pack", price:40, stickers:["🚀","🛸","🌍","⭐","🌑","☄️","👽","🪐"] }, { id:"retro", name:"Retro Pack", price:30, stickers:["📟","📼","🕹️","💾","📺","📻","🎮","📸"] }, { id:"magic", name:"Magic Pack", price:45, stickers:["🔮","🪄","🧙","🐉","🦄","🧚","⚡","🌟"] }, { id:"music", name:"Music Pack", price:25, stickers:["🎵","🎸","🥁","🎹","🎤","🎧","🎼","🎷"] }];
+export const POST_EXPORTS = [{ id:"png", name:"PNG frames", desc:"Export frames as transparent PNGs", price:0 }, { id:"gif", name:"Animated GIF", desc:"Export as looping GIF", price:80 }, { id:"webp", name:"WebP anim", desc:"Export as animated WebP", price:50 }, { id:"spritesheet", name:"Spritesheet", desc:"All frames in one grid", price:60 }, { id:"apng", name:"APNG", desc:"Animated PNG format", price:100 }, { id:"pdf", name:"PDF flip", desc:"Export as PDF flipbook", price:120 }, { id:"mp4", name:"MP4 video", desc:"Export as MP4 (soon)", price:150, soon:true }];
 
 export const STUDIO_UPGRADES = [
   { id:"gifExport", name:"GIF Export", price:200, desc:"Export animation as animated GIF" },
@@ -344,7 +367,7 @@ export const lokApi = {
   async fetchPosts(limit = 60, before = null, search = null, author = null) {
     let url = `${SUPA_URL}/rest/v1/lok_posts?select=*&order=created_at.desc&limit=${limit}`;
     if (before) url += `&created_at.lt.${encodeURIComponent(before)}`;
-    if (search) url += `&title.ilike.*${encodeURIComponent(search)}*`;
+    if (search) url += `&or=(title.ilike.*${encodeURIComponent(search)}*,author.ilike.*${encodeURIComponent(search)}*)`;
     if (author) url += `&author.eq.${encodeURIComponent(author)}`;
     const r = await fetch(url, { headers: getHeaders() });
     if (!r.ok) return [];
@@ -352,6 +375,14 @@ export const lokApi = {
   },
   async fetchAuthorPosts(author) {
     return this.fetchPosts(60, null, null, author);
+  },
+  async fetchProfile(handle) {
+    try {
+      const r = await fetch(`${SUPA_URL}/rest/v1/lok_accounts?handle=eq.${encodeURIComponent(handle)}&select=save_blob`, { headers: getHeaders() });
+      if (!r.ok) return null;
+      const rows = await r.json();
+      return rows.length ? rows[0].save_blob?.profile || null : null;
+    } catch { return null; }
   },
   async votePost(id, votes) {
     try { await fetch(`${SUPA_URL}/rest/v1/lok_posts?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify({ votes }) }); } catch {}

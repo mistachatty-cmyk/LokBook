@@ -208,7 +208,8 @@ const LILLOK_SPEECH={
   battle_start:["Let's go. Draw fast.","I'm watching your lines","Make every stroke count"],
   feed_scroll:["Good art in the feed today","Something in here will spark you","This is where the ideas live"],
   quest_done:["Quest complete!","You did what you said you would","Keep drawing, keep earning"],
-};function getLilLokLine(phase="thriving",ctx=""){
+};
+function getLilLokLine(phase="thriving",ctx=""){
   if(!ctx){const h=new Date().getHours();if(phase==="thriving"&&h>=5&&h<10)return"Good morning. First lines of the day.";if(phase==="thriving"&&h>=21)return"Late-night drawing session?";}
   const pool=(ctx&&LILLOK_SPEECH[ctx])?LILLOK_SPEECH[ctx]:(LILLOK_SPEECH[phase]||LILLOK_SPEECH.thriving);
   return pool[Math.floor(Math.random()*pool.length)];

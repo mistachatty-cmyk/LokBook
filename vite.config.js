@@ -4,6 +4,10 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: { output: { manualChunks: { vendor: ['react'], app: ['src/App.jsx'] } } },
+  },
   plugins: [
     react(),
     tailwindcss(),

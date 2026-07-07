@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "checkJs": false,
+    "moduleResolution": "bundler",
+    "target": "ES2020"
+  },
+  "include": ["src"],
+  "exclude": ["lok_live.jsx", "node_modules", "dist"]
+}

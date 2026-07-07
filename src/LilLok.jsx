@@ -16,38 +16,42 @@ export function LilLokBubble({ text, ink = ART.ink, paper = ART.paper }) {
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export function LilLokSprite({ phase, ink, size = 88, custom, gear }) {
+export function LilLokSprite({ phase, ink, size = 88, custom, gear, skin, aura, pet }) {
   if (custom && custom[phase === "critical" ? "decaying" : phase]) return (<img src={custom[phase === "critical" ? "decaying" : phase]} alt="lillok" width={size} height={size} style={{ width: size, height: size, objectFit: "contain", animation: phase === "stasis" || reduceMotion ? "none" : phase === "thriving" ? "lokbob 2.4s ease-in-out infinite" : "lokbob 4s ease-in-out infinite" }} />);
   const crit = phase === "critical", grey = phase === "decaying" || crit, stone = phase === "stasis";
-  const body = stone ? "#9A9286" : grey ? "#8E93A8" : ART.pink;
+  const body = stone ? "#9A9286" : grey ? "#8E93A8" : skin==="gold"?"#E8B14B":skin==="galaxy"?"#4A2F7A":ART.pink;
+  const outlineCol = stone ? "#9A9286" : grey ? "#6E80B0" : skin==="gold"?"#B8860B":skin==="galaxy"?"#2F1A5E":ART.ink;
+  const inkFill = grey ? "#6E80B0" : skin==="gold"?"#B8860B":skin==="galaxy"?"#7A4FBF":ART.teal;
   const eyeY = grey ? 54 : 50; const inkPct = Math.max(0, Math.min(100, ink || 0)); const cid = `blotClip${size}`;
-  return (<svg width={size} height={size} viewBox="0 0 100 100" style={{ animation: stone || reduceMotion ? "none" : phase === "thriving" ? "lokbob 2.4s ease-in-out infinite" : "lokbob 4s ease-in-out infinite" }}>
-    <defs><clipPath id={cid}><ellipse cx={48} cy={48} rx={28} ry={30} /></clipPath></defs>
-    {!stone && <ellipse cx={52} cy={48} rx={30} ry={32} fill={body} opacity={0.9} />}
-    <ellipse cx={48} cy={48} rx={30} ry={32} fill="none" stroke={ART.ink} strokeWidth="5" />
+  return (<svg width={size} height={size} viewBox="0 0 100 100" style={{ animation: stone || reduceMotion ? "none" : phase === "thriving" ? "lokbob 2.4s ease-in-out infinite" : "lokbob 4s ease-in-out infinite", ...(aura==="glow"?{filter:"drop-shadow(0 0 6px rgba(47,169,160,.5))"}:{}) }}>
+    <defs><clipPath id={cid}><ellipse cx={48} cy={48} rx={28} ry={30} /></clipPath>
+    {skin==="galaxy"&&<radialGradient id="gal">{[0,0.3,0.6,1].map((o,i)=>[<stop key={i} offset={`${o*100}%`} stopColor={["#7A4FBF","#2FA9A0","#FF5DA2","#E8B14B"][i]}/>])}</radialGradient>}
+    </defs>
+    {skin==="galaxy"?<><ellipse cx={52} cy={48} rx={30} ry={32} fill="url(#gal)" opacity={0.8}/>{Array.from({length:8}).map((_,i)=>(<circle key={i} cx={30+Math.random()*40} cy={25+Math.random()*45} r={1+Math.random()*2} fill="#fff" opacity={0.5+Math.random()*0.5}/>))}</>:!stone&&<ellipse cx={52} cy={48} rx={30} ry={32} fill={body} opacity={0.9}/>}
+    <ellipse cx={48} cy={48} rx={30} ry={32} fill="none" stroke={outlineCol} strokeWidth="5" />
     {stone && <ellipse cx={48} cy={48} rx={30} ry={32} fill={body} />}
-    {!stone && <rect clipPath={`url(#${cid})`} x={20} y={48 + 30 * (1 - inkPct / 100)} width={58} height={62} fill={grey ? "#6E80B0" : ART.teal} opacity={0.3} />}
-    {!stone && <><circle cx={38} cy={eyeY} r={grey ? 3.5 : 5} fill={ART.ink} /><circle cx={58} cy={eyeY} r={grey ? 3.5 : 5} fill={ART.ink} /></>}
+    {!stone && <rect clipPath={`url(#${cid})`} x={20} y={48 + 30 * (1 - inkPct / 100)} width={58} height={62} fill={inkFill} opacity={0.3} />}
+    {!stone && <><circle cx={38} cy={eyeY} r={grey ? 3.5 : 5} fill={outlineCol} /><circle cx={58} cy={eyeY} r={grey ? 3.5 : 5} fill={outlineCol} /></>}
     {phase === "thriving" && <><circle cx={40} cy={eyeY - 2} r={1.5} fill="#fff" opacity={0.85} /><circle cx={60} cy={eyeY - 2} r={1.5} fill="#fff" opacity={0.85} /></>}
-    {stone && <><path d="M33 50 Q38 46 43 50" fill="none" stroke={ART.ink} strokeWidth="3" strokeLinecap="round" /><path d="M53 50 Q58 46 63 50" fill="none" stroke={ART.ink} strokeWidth="3" strokeLinecap="round" /></>}
-    {phase === "thriving" && <path d="M38 62 Q48 72 60 62" fill="none" stroke={ART.ink} strokeWidth="4" strokeLinecap="round" />}
-    {phase === "decaying" && <path d="M40 66 Q48 60 58 66" fill="none" stroke={ART.ink} strokeWidth="4" strokeLinecap="round" />}
-    {crit && <path d="M39 66 Q48 63 59 66" fill="none" stroke={ART.ink} strokeWidth="3.5" strokeLinecap="round" />}
-    {stone && <><path d="M40 64 L58 64" stroke={ART.ink} strokeWidth="4" strokeLinecap="round" />
-      <text x={66} y={37} fontSize={9} fill={ART.ink} opacity={0.35} fontWeight="700">z</text>
-      <text x={73} y={27} fontSize={12} fill={ART.ink} opacity={0.6} fontWeight="700">Z</text>
-      <text x={81} y={16} fontSize={15} fill={ART.ink} opacity={0.85} fontWeight="700">Z</text></>}
-    {phase === "thriving" && <circle cx={70} cy={30} r={5} fill={ART.teal} stroke={ART.ink} strokeWidth="2" />}
-    {gear==="hat"&&<path d="M32 42 Q33 28 48 26 Q63 28 64 42" fill={ART.pink} stroke={ART.ink} strokeWidth="3" strokeLinecap="round"/>}
-    {gear==="hat"&&<ellipse cx={48} cy={42} rx={18} ry={4} fill={ART.pink} stroke={ART.ink} strokeWidth="3"/>}
-    {gear==="glasses"&&<ellipse cx={38} cy={50} rx={9} ry={7} fill="none" stroke={ART.ink} strokeWidth="2.5"/>}
-    {gear==="glasses"&&<ellipse cx={58} cy={50} rx={9} ry={7} fill="none" stroke={ART.ink} strokeWidth="2.5"/>}
-    {gear==="glasses"&&<line x1={47} y1={49} x2={49} y2={49} stroke={ART.ink} strokeWidth="2.5"/>}
-    {gear==="bowtie"&&<path d="M38 68 L48 62 L58 68 L48 74 Z" fill={ART.accent} stroke={ART.ink} strokeWidth="2.5" strokeLinejoin="round"/>}
+    {stone && <><path d="M33 50 Q38 46 43 50" fill="none" stroke={outlineCol} strokeWidth="3" strokeLinecap="round" /><path d="M53 50 Q58 46 63 50" fill="none" stroke={outlineCol} strokeWidth="3" strokeLinecap="round" /></>}
+    {phase === "thriving" && <path d="M38 62 Q48 72 60 62" fill="none" stroke={outlineCol} strokeWidth="4" strokeLinecap="round" />}
+    {phase === "decaying" && <path d="M40 66 Q48 60 58 66" fill="none" stroke={outlineCol} strokeWidth="4" strokeLinecap="round" />}
+    {crit && <path d="M39 66 Q48 63 59 66" fill="none" stroke={outlineCol} strokeWidth="3.5" strokeLinecap="round" />}
+    {stone && <><path d="M40 64 L58 64" stroke={outlineCol} strokeWidth="4" strokeLinecap="round" />
+      <text x={66} y={37} fontSize={9} fill={outlineCol} opacity={0.35} fontWeight="700">z</text>
+      <text x={73} y={27} fontSize={12} fill={outlineCol} opacity={0.6} fontWeight="700">Z</text>
+      <text x={81} y={16} fontSize={15} fill={outlineCol} opacity={0.85} fontWeight="700">Z</text></>}
+    {phase === "thriving" && <circle cx={70} cy={30} r={5} fill={skin==="gold"?"#FFD700":skin==="galaxy"?"#E8B14B":ART.teal} stroke={outlineCol} strokeWidth="2" />}
+    {gear==="hat"&&<path d="M32 42 Q33 28 48 26 Q63 28 64 42" fill={ART.pink} stroke={outlineCol} strokeWidth="3" strokeLinecap="round"/>}
+    {gear==="hat"&&<ellipse cx={48} cy={42} rx={18} ry={4} fill={ART.pink} stroke={outlineCol} strokeWidth="3"/>}
+    {gear==="glasses"&&<ellipse cx={38} cy={50} rx={9} ry={7} fill="none" stroke={outlineCol} strokeWidth="2.5"/>}
+    {gear==="glasses"&&<ellipse cx={58} cy={50} rx={9} ry={7} fill="none" stroke={outlineCol} strokeWidth="2.5"/>}
+    {gear==="glasses"&&<line x1={47} y1={49} x2={49} y2={49} stroke={outlineCol} strokeWidth="2.5"/>}
+    {gear==="bowtie"&&<path d="M38 68 L48 62 L58 68 L48 74 Z" fill={ART.accent} stroke={outlineCol} strokeWidth="2.5" strokeLinejoin="round"/>}
   </svg>);
 }
 
-export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onFeed, onFlask, onClose, say, setLillok, onPublish, onSaveCustom, gear }) {
+export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onFeed, onFlask, onClose, say, setLillok, onPublish, onSaveCustom, gear, skin="none", aura="none", pet="none" }) {
   const T = useT();
   const [mode, setMode] = useState("care");
   const [feeding, setFeeding] = useState(false);
@@ -70,7 +74,7 @@ export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onF
     <div className="w-full rounded-t-3xl p-5 overflow-y-auto" style={{ maxWidth: 560, maxHeight: "92vh", background: T.card, border: `3px solid ${(phase === "decaying" || phase === "critical") ? "#8E93A8" : T.ink}`, animation: (phase === "decaying" || phase === "critical") && !reduceMotion ? "lokwobble 9s ease-in-out infinite" : "lokrise .25s ease" }} onClick={e => e.stopPropagation()}>
       <div className="flex items-center gap-3">
         <div className="rounded-2xl p-2 relative" style={{ background: T.paper, border: `3px solid ${T.ink}`, transform: feeding ? "scale(1.08)" : "scale(1)", transition: "transform .15s cubic-bezier(.34,1.56,.64,1)" }}>
-          <LilLokSprite phase={phase} ink={lillok.ink} size={64} custom={custom?.art} gear={gear}/>
+          <LilLokSprite phase={phase} ink={lillok.ink} size={64} custom={custom?.art} gear={gear} skin={skin} aura={aura} pet={pet}/>
           {feeding && [0, 1, 2].map(i => (<div key={i} className="absolute pointer-events-none" style={{ left: `${22 + i * 24}%`, bottom: "85%", fontSize: 15, animation: `lokfloat .65s ease-out ${i * 0.1}s forwards` }}>💧</div>))}
         </div>
         <div className="flex-1"><div className="lok-display text-xl font-extrabold">{lillok.name} <span className="text-sm font-bold opacity-60">· {phase}</span></div><div className="text-xs opacity-70">Living Ink companion</div></div>

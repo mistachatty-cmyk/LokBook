@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useT } from "../theme/theme.js";
 import { PACE_PRESETS } from "../constants.js";
 
-export default function SettingsPanel({ show, onClose, say, isIOS, canInstall, onInstall, founder, onFounderJoin, pace, setPace, speed, setSpeed, soundLab, onUnlockSoundLab, soundQueue, setSoundQueue, focusMode, setFocusMode }) {
+export default function SettingsPanel({ show, onClose, say, isIOS, canInstall, onInstall, founder, onFounderJoin, pace, setPace, speed, setSpeed, soundLab, onUnlockSoundLab, soundQueue, setSoundQueue, focusMode, setFocusMode, featureFlags, onSetFlag, versionTap, hapticGrammar, setHapticGrammar, fourthWall, setFourthWall }) {
   const T = useT();
   const tapCount = useRef(0);
   const tapTimer = useRef(null);
@@ -12,9 +12,6 @@ export default function SettingsPanel({ show, onClose, say, isIOS, canInstall, o
   const [fHandle, setFHandle] = useState("");
   const [fEmail, setFEmail] = useState("");
   const [fBusy, setFBusy] = useState(false);
-  const [synesthesia, setSynesthesia] = useState(false);
-  const [hapticGrammar, setHapticGrammar] = useState("default");
-  const [fourthWall, setFourthWall] = useState(100);
 
   const versionTap = () => { if (soundLab) return; tapCount.current++; clearTimeout(tapTimer.current); tapTimer.current = setTimeout(() => { tapCount.current = 0; }, 1200); if (tapCount.current >= 7) { tapCount.current = 0; onUnlockSoundLab && onUnlockSoundLab(); say("🔊 Sound Lab unlocked", "success"); } };
   const ytId = u => { const m = u.match(/(?:youtu\.be\/|v=|shorts\/)([\w-]{11})/); return m ? m[1] : null; };
@@ -45,14 +42,14 @@ export default function SettingsPanel({ show, onClose, say, isIOS, canInstall, o
           </>)}
         </div>
         <div className="p-3 rounded-2xl mb-2" style={{ border: `2px solid ${T.shadow}`, background: T.paper }}>
-          <div className="font-bold text-sm">Feed pacing</div>
+        <div className="font-bold text-sm">Animation</div>
           <div className="mt-1.5 grid grid-cols-4 gap-1.5">{Object.entries(PACE_PRESETS).map(([id, p]) => (
             <button key={id} onClick={() => { setPace && setPace(id); say(`${p.name} pacing`); }} aria-pressed={pace === id} title={p.desc} className="lok-btn py-1.5 rounded-xl text-[10px] font-extrabold" style={{ border: `2.5px solid ${pace === id ? T.accent : T.ink}`, background: pace === id ? T.ink : T.card, color: pace === id ? T.paper : T.ink }}>{p.name}</button>))}</div>
           <label className="mt-2 flex items-center gap-2 text-xs font-bold" style={{ color: T.ink }}>Speed {speed.toFixed(1)}×<input type="range" min="0.5" max="2" step="0.1" value={speed} onChange={e => setSpeed && setSpeed(+e.target.value)} className="flex-1" style={{ accentColor: T.accent }} aria-label="Animation speed" /></label>
         </div>
         <div className="p-3 rounded-2xl mb-2" style={{ border: `2px solid ${T.shadow}`, background: T.paper }}>
           <div className="font-bold text-sm">Sensory & Metaphysics</div>
-          <div className="mt-2 flex items-center justify-between"><label htmlFor="synesthesia-toggle" className="text-xs font-bold" style={{ color: T.ink }}>Synesthesia Mode</label><button id="synesthesia-toggle" onClick={() => setSynesthesia(s => !s)} className="lok-btn px-3 py-1 rounded-full text-xs font-bold" style={{ border: `2px solid ${synesthesia ? T.accent : T.ink}`, background: synesthesia ? T.ink : T.card, color: synesthesia ? T.paper : T.ink }}>{synesthesia ? "On" : "Off"}</button></div>
+        <div className="mt-2 flex items-center justify-between"><label htmlFor="synesthesia-toggle" className="text-xs font-bold" style={{ color: T.ink }}>Synesthesia Mode</label><button id="synesthesia-toggle" onClick={() => say("Coming soon!")} className="lok-btn px-3 py-1 rounded-full text-xs font-bold" style={{ border: `2px solid ${T.shadow}`, background: T.card, color: T.ink, opacity: 0.6 }}>Off</button></div>
           <div className="mt-2 flex items-center justify-between"><label htmlFor="haptic-select" className="text-xs font-bold" style={{ color: T.ink }}>Haptic Grammar</label><select id="haptic-select" value={hapticGrammar} onChange={e => setHapticGrammar(e.target.value)} className="lok-btn px-2 py-1 rounded-full text-[11px] font-bold" style={{ border: `2px solid ${T.ink}`, background: T.card, color: T.ink }}><option value="default">Default</option><option value="expressive">Expressive</option><option value="quiet">Quiet</option></select></div>
           <div className="mt-2">
             <div className="flex items-center justify-between text-xs font-bold" style={{ color: T.ink }}><label htmlFor="fourth-wall-slider">Fourth Wall Integrity</label><span>{fourthWall}%</span></div>

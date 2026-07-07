@@ -1,63 +1,28 @@
 import {
-  useState, useEffect, useRef, useCallback, useMemo, createContext, useContext,
-  forwardRef, useImperativeHandle, lazy, Suspense
+  useState, useEffect, useRef, useCallback, useMemo,
+  forwardRef, useImperativeHandle,
 } from "react";
 
 import { THEMES, SKIN_WAVE_GATE, SKIN_WAVE_3_GATE, SKIN_WAVE_4_GATE, ThemeCtx, useT, ART } from "./theme/theme.js";
+import { useFeedback } from "./hooks/useFeedback.js";
 import {
   W, H, PROMPTS, WEEKLY_PROMPT, SUPA_URL, SUPA_KEY, PACE_PRESETS,
-  BLOT_BORDERS, FOD_WINDOW_DAYS, ANIMATED_AVATAR_SPEND, ADS, QUEST_POOL,
-  NAME_COLOR_MAP, REACTION_SETS, LILLOK_SPEECH, EMPTY_ICONS, REVIVAL_MAX,
-  PX_PER_FRAME, BLENDS, FORMATS, KID_PROMPTS, BOT_NAMES, INTERVENTIONS,
-  MODES, WAGERS, FRONT_NAMES, EFFECTS, NAME_COLORS, FRAMES, REACTION_PACKS,
-  AVATAR_ACCENTS, PAPERS, LILLOK_GEAR, STUDIO_MODULES, getModuleLayers, hasModule, getModule, getModuleTypes, blotBorderStyle, makeQuests, founderSignup, OFFLINE_BONUS_HOURS, OFFLINE_BONUS_LOKS, SKIES,
-  lokApi, toDbPost, fromDbPost, supabase, BADGES, BADGE_CATEGORIES, GAME_MANUAL_PAGES, ECHO_EXPIRY_HOURS, ECHO_SHARE_TEXT, TIDE_CANDIDATE_COUNT, EVENTS, getActiveEvent, STRIPE_PK
+  BLOT_BORDERS, FOD_WINDOW_DAYS, ANIMATED_AVATAR_SPEND, ADS, QUEST_POOL, REACTION_SETS, LILLOK_SPEECH,
+  PX_PER_FRAME, TIERS, FORMATS, KID_PROMPTS, BOT_NAMES, INTERVENTIONS,
+  MODES, FRONT_NAMES, EFFECTS, NAME_COLORS, FRAMES, REACTION_PACKS, AVATAR_ACCENTS, PAPERS, LILLOK_GEAR,
+  SKIES, ANIMATION_FX, CURSORS, FONT_PACKS, MUSIC_PACKS, STICKER_PACKS, POST_EXPORTS, LILLOK_SKINS, LILLOK_AURAS, LILLOK_PETS, VOICE_PACKS, STUDIO_MODULES, BLENDS
 } from "./constants.jsx";
-import * as auth from "./auth/auth.js";
-import { paperBase, risoCircle, drawBounce, drawBloom, drawNight, drawOrbit, drawWalk, drawRain, drawFish, drawBurst, drawWave, drawSpiral, drawPulse, drawFirework, drawMorph, drawNautilus, compressFrame, renderSequence, makeRng, makeDoodlePainter, renderDoodle, renderAvatar, polyPts, starPts, ellipsePts, linePts, traceShape, MiniDraw } from "./engine/draw.jsx";
-import { lilLokPhase, getLilLokLine } from "./engine/lillok.js";
-import { encodeGIF } from "./engine/gif.js";
-import { makeMatchBots, botProgress, botFinalT, botLine, judgeBattle, recordBattle, makeRushRivals, rushScore, recordRush } from "./engine/bots.js";
+import { paperBase, drawBounce, drawBloom, drawNight, renderSequence, renderDoodle, renderAvatar, traceShape } from "./engine/draw.jsx";
 import NameTag from "./NameTag.jsx";
-import { FramedAvatar, ReactionIcon, PageEffect, GlobalStyle, SkyEffect } from "./art.jsx";
+import { FramedAvatar, ReactionIcon, PageEffect, GlobalStyle } from "./art.jsx";
 import LilLokPanel, { LilLokBubble, LilLokSprite } from "./LilLok.jsx";
 import InterventionFX from "./InterventionFX.jsx";
-import EmptyState, { Empty } from "./EmptyState.jsx";
-import ErrorBoundary from "./ErrorBoundary.jsx";
-import { AD_PROVIDER, ETHICALADS_PUBLISHER, CUSTOM_AD_HTML } from "./ads.js";
-import { useFeedback } from "./hooks/useFeedback.js";
-import { AuthProvider, useAuth } from "./auth/AuthContext.jsx";
-import { AuthGate } from "./auth/AuthGate.jsx";
-
-const Shop = lazy(() => import("./pages/Shop.jsx"));
-const Feed = lazy(() => import("./pages/Feed.jsx"));
-const Studio = lazy(() => import("./pages/Studio.jsx"));
-const Battle = lazy(() => import("./pages/Battle.jsx"));
-const Viewer = lazy(() => import("./pages/Viewer.jsx"));
-const Rooms = lazy(() => import("./pages/Rooms.jsx"));
-import Profile, { Onboard, ArtistPage, OpenFront } from "./pages/Profile.jsx";
-import { starterHandle, isReservedName, suggestHandle } from "./identity.js";
-import { BOT_STYLES, generateBotPost, pickAmbientPosts } from "./engine/botArt.js";
-import ThemeBackdrop from "./theme/ThemeBackdrop.jsx";
-import { resolveCheat } from "./engine/bleepbox.js";
+import EmptyState from "./EmptyState.jsx";
 
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const getWeekStart = d => {
-  const dt = new Date(d);
-  const day = dt.getDay();
-  const diff = dt.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(dt.setDate(diff)).toISOString().slice(0, 10);
-};
-
 const mem = new Map();
-if(typeof window!=="undefined"&&!window.storage){
-  window.storage={
-    async get(k){try{const r=localStorage.getItem(k);return r?{value:r}:null;}catch{return null;}},
-    async set(k,v){try{localStorage.setItem(k,v);return true;}catch{return false;}},
-  };
-}
 const store = {
   async get(k) {
     try { if (typeof window !== "undefined" && window.storage) { const r = await window.storage.get(k); return r ? JSON.parse(r.value) : null; } } catch {}
@@ -67,195 +32,776 @@ const store = {
     mem.set(k, v);
     try { if (typeof window !== "undefined" && window.storage) await window.storage.set(k, JSON.stringify(v)); return true; } catch { return false; }
   },
-  async remove(k) {
-    mem.delete(k);
-    try { if (typeof window !== "undefined" && window.storage) localStorage.removeItem(k); } catch {}
-  },
 };
 const SAVE_KEY = "lok:save:v2"; const GALLERY_KEY = "lok:gallery:v2";
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-export default function App(){
-  return<AuthProvider><LokApp /></AuthProvider>;
+// ---- V2: LokServices backend (Supabase) — founder signups keep data long-term ----
+async function founderSignup(handle,email,save_blob){
+  const res=await fetch(`${SUPA_URL}/rest/v1/founder_signups`,{method:"POST",headers:{"Content-Type":"application/json",apikey:SUPA_KEY,Authorization:`Bearer ${SUPA_KEY}`,Prefer:"return=minimal"},body:JSON.stringify({handle,email:email||null,source:"lok_alpha",save_blob})});
+  if(!res.ok)throw new Error("signup failed "+res.status);
+  return true;
 }
-function LokApp(){
-  const { session, loading: authLoading, onInit } = useAuth();
-  const[ready,setReady]=useState(false);const[tab,setTab]=useState("feed");const[openIdx,setOpenIdx]=useState(null);const[posts,setPosts]=useState([]);const[toasts,setToasts]=useState([]);const[voteCount,setVoteCount]=useState(0);
+const blotBorderStyle=(id,T)=>({
+  none:  {border:`3px solid ${T.ink}`},
+  gilded:{border:"3px solid #E8B14B",boxShadow:`0 0 0 2px ${T.ink}, 3px 3px 0 ${T.shadow}`},
+  washi: {border:`3px dashed ${T.accent}`},
+  orbit: {border:`3px dotted ${T.alt}`,outline:`2px dashed ${T.ink}`,outlineOffset:3},
+  liquid:{border:`3px solid ${T.accent}`,boxShadow:`0 0 0 2px ${T.ink}, 0 0 16px 3px ${T.accent}`},
+}[id]||{border:`3px solid ${T.ink}`});
+function makeQuests(){return [...QUEST_POOL].sort(()=>Math.random()-.5).slice(0,3).map(q=>({...q,progress:0,done:false}));}
+
+
+function Onboard({onDone}){
+  const T=useT();const[step,setStep]=useState(0);
+  const steps=[{t:"Welcome to LokBook",d:"A home for tiny hand-drawn animations. Slide down any post to flip through its pages."},{t:"Lok what you love",d:"Lok artists to follow them, vote on pieces, and bookmark favorites — creators earn Loks from your attention."},{t:"Draw, battle, earn",d:"Make flips in Studio, go head-to-head in Battle, grab prompts in Rush. Turn on sound 🎵 for best experience."},{t:"Meet your LilLok",d:"A living-ink buddy that grows with you. Here are 50 Loks to begin — have fun."}];
+  const s=steps[step];
+  return(<div className="fixed inset-0 z-[60] flex items-center justify-center p-5" style={{background:"rgba(0,0,0,.55)"}}>
+    <div className="w-full rounded-3xl p-6 text-center" style={{maxWidth:420,background:T.card,border:`3px solid ${T.ink}`,boxShadow:`8px 8px 0 ${T.accent}`,animation:"lokrise .3s ease"}}>
+      <div className="lok-display text-2xl font-extrabold mb-2" style={{color:T.accent}}>{s.t}</div>
+      <p className="text-sm leading-snug">{s.d}</p>
+      <div className="flex justify-center gap-1.5 my-4">{steps.map((_,i)=>(<div key={i} style={{width:i===step?22:8,height:6,borderRadius:4,background:i<=step?T.accent:T.shadow,transition:"width .2s"}}/>))}</div>
+      <button onClick={()=>step<steps.length-1?setStep(step+1):onDone()} className="lok-btn lok-display w-full py-3 rounded-xl text-lg font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}}>{step<steps.length-1?"Next":"Claim 50 Loks & start"}</button>
+      {step<steps.length-1&&<button onClick={onDone} className="mt-2 text-xs font-bold underline opacity-60">skip</button>}
+    </div>
+  </div>);
+}
+
+const ALL_MOODS=["","calm","wild","moody","playful","dreamy","chaos","cozy","spooky"];
+function Feed({posts,bookmarks,following,feedMode,setFeedMode,cosmetics={},daily,streak,dailyClaimed,flipOfDay,onLine,onClaimDaily,onOpen,onVote,onLok,onBookmark,say,moodFilter,setMoodFilter,moodTags,reportedPosts,onReport}){
+  const T=useT();const[active,setActive]=useState(0);const wrapRef=useRef(null);
+  const loked=following.includes("moss.ink");
+  const hidden=new Set(reportedPosts||[]);
+  const base=(feedMode==="following"?(loked?posts:[]):posts).filter(p=>!hidden.has(p.id));
+  const list=moodFilter==="all"?base:base.filter(p=>(moodTags[p.id]||"")===moodFilter);
+  const moodEmojis={calm:"🌊",wild:"🔥",moody:"🌙",playful:"🎈",dreamy:"✨",chaos:"🌀",cozy:"☕",spooky:"👻",_clear:"✕"};
+  const streakCol=streak>=30?"#E8B14B":streak>=7?T.accent:streak>=3?T.alt:T.ink;
+  const onScroll=()=>{const el=wrapRef.current;if(!el)return;const i=Math.round(el.scrollTop/el.clientHeight);if(i!==active){setActive(i);if(Math.random()<0.22&&onLine)onLine("feed_scroll");}};
+  return(<div>
+    {flipOfDay&&feedMode==="discover"&&(<button onClick={()=>onOpen(flipOfDay.id)} aria-label={`Flip of the Day: ${flipOfDay.title}`} className="lok-btn mt-3 w-full flex items-center gap-3 p-2.5 rounded-2xl text-left" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:"5px 5px 0 #E8B14B"}}>
+      {flipOfDay.frames?.[0]&&<img src={flipOfDay.frames[Math.floor(flipOfDay.frames.length/2)]} alt="" className="rounded-lg shrink-0" style={{width:46,aspectRatio:"4/5",objectFit:"cover",border:`2px solid ${T.ink}`}}/>}
+      <div className="min-w-0 flex-1"><div className="text-[10px] font-extrabold uppercase tracking-widest" style={{color:"#B8860B"}}>✦ Flip of the Day</div><div className="lok-display font-extrabold text-sm truncate">{flipOfDay.title}</div></div>
+      <span className="lok-display font-extrabold text-sm shrink-0" style={{color:T.accent}}>{flipOfDay.votes} ▲</span>
+    </button>)}
+    <div className="mt-3 flex items-center gap-2 p-2.5 rounded-2xl" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`4px 4px 0 ${T.shadow}`}}>
+      <div className="flex items-center justify-center rounded-xl shrink-0" style={{width:44,height:44,background:streakCol,color:"#fff",border:`2.5px solid ${T.ink}`,transition:"background .3s ease"}}><span className="lok-display font-extrabold text-lg">{streak}</span></div>
+      <div className="flex-1 min-w-0"><div className="font-bold text-sm leading-tight">Daily streak · {streak} {streak===1?"day":"days"}</div><div className="text-xs opacity-70 truncate">Today: "{daily.prompt}"</div></div>
+      <button onClick={onClaimDaily} disabled={dailyClaimed} aria-label={dailyClaimed?"Daily already claimed":"Claim daily bonus"} className="lok-btn shrink-0 lok-display px-3 py-2 rounded-xl text-sm font-extrabold" style={{background:dailyClaimed?"transparent":T.ink,color:dailyClaimed?T.ink:T.paper,border:`2.5px solid ${T.ink}`,opacity:dailyClaimed?0.55:1}}>{dailyClaimed?"Claimed ✓":"Claim"}</button>
+    </div>
+    <div className="mt-3 flex gap-2">{[["discover","Discover"],["following","Following"]].map(([id,l])=>(<button key={id} onClick={()=>setFeedMode(id)} className="lok-btn flex-1 py-2 rounded-full text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:feedMode===id?T.ink:T.card,color:feedMode===id?T.paper:T.ink}}>{l}</button>))}</div>
+    <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1" style={{scrollbarWidth:"none"}}>
+      <button onClick={()=>setMoodFilter("all")} className="lok-btn shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${moodFilter==="all"?T.accent:T.ink}`,background:moodFilter==="all"?T.ink:T.card,color:moodFilter==="all"?T.paper:T.ink}}>All</button>
+      {ALL_MOODS.filter(Boolean).map(m=>(<button key={m} onClick={()=>setMoodFilter(moodFilter===m?"all":m)} className="lok-btn shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${moodFilter===m?T.accent:T.ink}`,background:moodFilter===m?T.ink:T.card,color:moodFilter===m?T.paper:T.ink,opacity:moodFilter==="all"||moodFilter===m?1:0.5}}><span>{moodEmojis[m]||"🎨"}</span>{m}</button>))}
+    </div>
+    {list.length===0?(
+      feedMode==="following"
+        ?<EmptyState icon="follow" title="No one yet" subtitle="Lok artists you love and their flips show up here." action="Discover artists →" onAction={()=>setFeedMode("discover")}/>
+        :<EmptyState icon="feed" title="No art yet" subtitle="Be the first to publish a flip!"/>
+    ):(
+      <div ref={wrapRef} onScroll={onScroll} className="mt-3 -mx-4" style={{height:"calc(100dvh - 300px)",minHeight:360,overflowY:"scroll",scrollSnapType:"y mandatory"}}>
+        {list.map((p,i)=>(<FeedCard key={p.id} p={p} live={i===active} marked={bookmarks.includes(p.id)} loked={loked} cosmetics={cosmetics} onOpen={onOpen} onVote={onVote} onLok={onLok} onBookmark={onBookmark} moodTags={moodTags} onReport={onReport}/>))}
+      </div>
+    )}
+  </div>);
+}
+
+function FeedCard({p,live,marked,loked,cosmetics={},onOpen,onVote,onLok,onBookmark,moodTags,onReport}){
+  const T=useT();const[fi,setFi]=useState(0);const[pop,setPop]=useState(false);
+  const mood=moodTags?.[p.id];const moodEmojis={calm:"🌊",wild:"🔥",moody:"🌙",playful:"🎈",dreamy:"✨",chaos:"🌀",cozy:"☕",spooky:"👻"};
+  useEffect(()=>{if(!live||p.frames.length<2){setFi(0);return;}const t=setInterval(()=>setFi(f=>(f+1)%p.frames.length),p.paceMs||160);return()=>clearInterval(t);},[live,p.id,p.paceMs,p.frames.length]);
+  const doVote=()=>{onVote(p.id);if(!p.voted){setPop(true);setTimeout(()=>setPop(false),320);}};
+  if(!p.frames||p.frames.length===0)return(<div className="px-4 flex flex-col justify-center" style={{height:"100%",scrollSnapAlign:"start"}}><div className="relative mx-auto rounded-2xl overflow-hidden flex items-center justify-center" style={{width:"100%",maxWidth:360,border:`3px solid ${T.ink}`,background:T.card,aspectRatio:"4/5"}}><div className="text-center opacity-40"><div className="lok-display font-extrabold text-lg">{p.title}</div><div className="text-sm mt-1">Rendering…</div></div></div></div>);
+  return(<div className="px-4 flex flex-col justify-center" style={{height:"100%",scrollSnapAlign:"start"}}>
+    <div className="relative mx-auto rounded-2xl overflow-hidden" style={{width:"100%",maxWidth:360,border:`3px solid ${T.ink}`,boxShadow:live?`7px 7px 0 ${T.accent}`:`6px 6px 0 ${T.shadow}`,transform:live?"scale(1)":"scale(.97)",transition:"transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s ease"}}>
+      <button onClick={()=>onOpen(p.id)} className="block w-full" aria-label={`Open ${p.title}`}><img src={p.frames[fi]} alt={p.title} className="block w-full" style={{aspectRatio:"4/5",objectFit:"cover"}}/></button>
+      {mood&&<div className="absolute top-2 right-2 text-xs z-10" style={{filter:"drop-shadow(0 1px 2px rgba(0,0,0,.4))"}} aria-label={`mood: ${mood}`}>{moodEmojis[mood]}</div>}
+      {p.frames.length>1&&<div className="absolute top-0 left-0 right-0 h-1" style={{background:"rgba(0,0,0,.15)"}}><div style={{width:`${((fi+1)/p.frames.length)*100}%`,height:"100%",background:T.accent,transition:"width .12s linear"}}/></div>}
+      <div className="absolute left-0 right-0 bottom-0 p-3 flex items-end gap-2" style={{background:"linear-gradient(transparent, rgba(0,0,0,.6))"}}>
+        <div className="flex-1 text-white min-w-0"><div className="lok-display font-extrabold leading-tight truncate">{p.title}</div><div className="text-xs opacity-90"><NameTag name="moss.ink" color={cosmetics.nameColor} style={{color:"#fff"}}/> · {p.from==="revival"?"revival loop":p.from==="battle"?"battle piece":p.mode==="B"?"page-flip":"flipbook"}</div></div>
+        <button onClick={()=>onLok("moss.ink")} aria-label={loked?"Already Lok'd":"Lok this artist"} className="lok-btn shrink-0 px-2.5 py-1 rounded-full text-xs font-extrabold" style={{background:loked?"rgba(255,255,255,.92)":T.accent,color:loked?T.ink:T.onAccent,border:"2px solid #fff"}}>{loked?"Lok'd ✓":"Lok"}</button>
+      </div>
+      <div className="absolute right-2 bottom-16 flex flex-col gap-1 items-center">
+        <button onClick={doVote} aria-label={`Vote — ${p.votes} votes`} className="lok-btn w-11 h-11 rounded-full flex items-center justify-center font-extrabold" style={{background:p.voted?T.accent:"rgba(255,255,255,.92)",color:p.voted?T.onAccent:T.ink,border:`2.5px solid ${T.ink}`,animation:pop?"lokpop .32s ease":"none"}}>▲</button>
+        <span className="text-white text-xs font-bold lok-count" key={p.votes} style={{textShadow:"0 1px 3px #000"}}>{p.votes}</span>
+        <button onClick={()=>onBookmark(p.id)} aria-label={marked?"Remove bookmark":"Bookmark this flip"} className="lok-btn w-11 h-11 rounded-full flex items-center justify-center" style={{background:marked?T.accent:"rgba(255,255,255,.92)",border:`2.5px solid ${T.ink}`}}><ReactionIcon type="heart" size={22}/></button>
+        <button onClick={()=>onOpen(p.id)} aria-label="Open full viewer" className="lok-btn w-11 h-11 rounded-full flex items-center justify-center font-bold" style={{background:"rgba(255,255,255,.92)",color:T.ink,border:`2.5px solid ${T.ink}`}}>▾</button>
+        {onReport&&<button onClick={()=>onReport(p.id)} aria-label="Report/hide this post" className="lok-btn w-7 h-7 flex items-center justify-center text-xs opacity-60 hover:opacity-100" style={{border:`1.5px solid rgba(255,255,255,.3)`,color:"#fff",background:"rgba(0,0,0,.3)",borderRadius:"50%",marginTop:2}}>!</button>}
+      </div>
+    </div>
+    <div className="text-center text-xs opacity-50 mt-2">scroll for more · tap ▾ to slide through</div>
+  </div>);
+}
+
+function Viewer({posts,index,bookmarks,cosmetics={},onBookmark,onClose,onNav,onVote,onReact,onViewed,onShare,onDelete,onRename,myName="",onRemix}){
+  const mentionTitle=(post,own)=>post.title.replace(/@(\w+)/g,`<span style="color:${T.accent};font-weight:700">@$1</span>`)+(own?`<span style="opacity:0.4;font-size:11px;margin-left:6px">✎</span>`:"");
+  const T=useT();const post=posts[index];const n=post.frames.length;const isB=post.mode==="B";const series=post.style==="series";
+  const scrollRef=useRef(null);const[fi,setFi]=useState(0);const[playing,setPlaying]=useState(false);const[floats,setFloats]=useState([]);const[editT,setEditT]=useState(false);const[tDraft,setTDraft]=useState(post.title);const playRef=useRef(null);const touch=useRef(null);const marked=bookmarks.includes(post.id);const own=post.from!=="seed"&&!post.id?.startsWith("seed");
+  useEffect(()=>{if(typeof playRef.current==="number")clearInterval(playRef.current);playRef.current=null;setFi(0);setPlaying(false);setEditT(false);setTDraft(post.title);if(scrollRef.current)scrollRef.current.scrollTop=0;},[index]);
+  const saveT=()=>{if(onRename&&tDraft.trim())onRename(post.id,tDraft.trim());setEditT(false);};
+  const replay=()=>{if(n<2||playing)return;const seq=[...Array(n).keys()].reverse().concat([...Array(n).keys()]);let k=0;const t=setInterval(()=>{setFi(seq[k]);k++;if(k>=seq.length)clearInterval(t);},55);};
+  const onScroll=()=>{const el=scrollRef.current;if(!el)return;const max=el.scrollHeight-el.clientHeight;const p=max>0?el.scrollTop/max:1;const idx=Math.min(n-1,Math.floor(p*n));setFi(idx);if(idx>=n-1)onViewed(post.id);};
+  const togglePlay=()=>{
+    if(isB){if(playing){playRef.current=null;setPlaying(false);return;}setPlaying(true);const el=scrollRef.current;if(!el)return;const max=el.scrollHeight-el.clientHeight;const dur=Math.max(400,n*post.paceMs);let t0=performance.now();const myRun=Math.random();playRef.current=myRun;const step=now=>{if(playRef.current!==myRun)return;const k=Math.min(1,(now-t0)/dur);el.scrollTop=k*max;if(k<1)requestAnimationFrame(step);else if(post.loop){onViewed(post.id);t0=performance.now();el.scrollTop=0;requestAnimationFrame(step);}else{playRef.current=null;setPlaying(false);onViewed(post.id);}};requestAnimationFrame(step);return;}
+    if(playing){clearTimeout(playRef.current);setPlaying(false);return;}if(n<2){onViewed(post.id);return;}
+    setPlaying(true);const durOf=i=>post.frameDurations?.[i]??post.paceMs??140;
+    const step=i=>{setFi(i);const el=scrollRef.current;if(el)el.scrollTop=(i/(n-1))*(el.scrollHeight-el.clientHeight);
+      const next=i+1;
+      if(next>=n){if(post.loop){onViewed(post.id);playRef.current=setTimeout(()=>step(0),durOf(i));}else{playRef.current=setTimeout(()=>{setPlaying(false);onViewed(post.id);},durOf(i));}}
+      else playRef.current=setTimeout(()=>step(next),durOf(i));};
+    step(fi>=n-1?0:fi+1);
+  };
+  useEffect(()=>()=>{if(typeof playRef.current==="number")clearInterval(playRef.current);playRef.current=null;},[]);
+  const react=type=>{onReact(post.id,type);const id=Math.random();const pack=REACTION_SETS[cosmetics.reactionPack]||REACTION_SETS.base;const icon=pack[["splat","heart","drip"].indexOf(type)]||type;const newCount=(post.reactions[type]||0)+1;setFloats(f=>[...f,{id,type:icon,x:14+Math.random()*60}]);setTimeout(()=>setFloats(f=>f.filter(x=>x.id!==id)),950);if(newCount>=5&&newCount%3===0){for(let s=0;s<6;s++){setTimeout(()=>{const sid=Math.random();setFloats(ff=>[...ff,{id:sid,type:icon,x:10+Math.random()*80}]);setTimeout(()=>setFloats(ff=>ff.filter(x=>x.id!==sid)),1200);},s*80);}}};
+  if(!post.frames||post.frames.length===0)return(<div className="fixed inset-0 z-50 flex flex-col items-center justify-center" style={{background:T.ink,color:T.paper}}><div className="lok-display text-xl font-extrabold">Rendering…</div><button onClick={onClose} className="mt-6 lok-btn px-4 py-2 rounded-xl font-bold" style={{border:`2px solid ${T.paper}`}} aria-label="Close viewer">Close</button></div>);
+  return(<div className="fixed inset-0 z-50 flex flex-col" style={{background:series?T.paper:T.ink}}>
+    <div className="flex items-center gap-3 px-3 py-2.5" style={{color:series?T.ink:T.paper}}>
+      <button onClick={onClose} aria-label="Close viewer" className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${series?T.ink:T.paper}`}}>✕</button>
+      <div className="min-w-0 flex-1">{editT
+        ?<input value={tDraft} onChange={e=>setTDraft(e.target.value)} onBlur={saveT} onKeyDown={e=>{if(e.key==="Enter")saveT();if(e.key==="Escape"){setTDraft(post.title);setEditT(false);}}} autoFocus aria-label="Rename this flip" className="lok-display font-extrabold leading-tight w-full" style={{background:"transparent",border:"none",borderBottom:`2px solid ${T.accent}`,color:series?T.ink:T.paper,outline:"none",fontSize:"inherit"}}/>
+        :<div className="lok-display font-extrabold leading-tight truncate" onClick={()=>own&&setEditT(true)} style={{cursor:own?"text":"default"}} title={own?"Tap to rename":undefined} dangerouslySetInnerHTML={{__html:mentionTitle(post,own)}}/>}
+        <div className="text-xs opacity-75">moss.ink · {index+1}/{posts.length} · {isB?"page-flip":"scrub"}</div></div>
+      <button onClick={()=>onBookmark(post.id)} aria-label={marked?"Remove bookmark":"Lok in this piece"} className="lok-btn ml-auto px-2.5 py-1 rounded-lg text-sm font-bold" style={{background:marked?T.accent:"transparent",color:marked?T.onAccent:(series?T.ink:T.paper),border:`2.5px solid ${marked?T.accent:(series?T.ink:T.paper)}`}}>{marked?"Lok'd ✓":"Lok in ▾"}</button>
+    </div>
+    <div className="relative flex-1 min-h-0" onTouchStart={e=>(touch.current=e.touches[0].clientX)} onTouchEnd={e=>{if(touch.current==null)return;const dx=e.changedTouches[0].clientX-touch.current;if(Math.abs(dx)>60)onNav(dx<0?1:-1);touch.current=null;}}>
+      <div ref={scrollRef} onScroll={isB?undefined:onScroll} className="absolute inset-0 overflow-y-scroll">
+        {isB?(<div className="px-3 py-4 flex flex-col items-center gap-3">{post.frames.map((f,k)=>(<div key={k} className="relative w-full" style={{maxWidth:360}}><img src={f} alt={`page ${k+1}`} className="block w-full rounded-xl" style={{border:`4px solid ${series?T.ink:T.paper}`,boxShadow:series?"none":"0 8px 28px rgba(0,0,0,.4)"}}/><div className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-xs font-bold" style={{background:series?T.ink:T.accent,color:"#fff"}}>{String(k+1).padStart(2,"0")}</div></div>))}<div className="text-xs font-bold opacity-60 py-2" style={{color:series?T.ink:T.paper}}>↑ scroll the whole page ↑</div></div>):(
+          <><div className="sticky top-0 flex items-center justify-center p-3" style={{height:"100%"}}><div className="relative" style={{maxHeight:"100%",aspectRatio:"4 / 5"}}>
+            <img src={post.frames[fi]} alt={`frame ${fi+1}`} className="block h-full w-auto max-w-full rounded-xl" style={{border:`4px solid ${series?T.ink:T.paper}`,boxShadow:series?"none":"0 12px 40px rgba(0,0,0,.45)"}}/>
+            <div className="absolute top-0 bottom-0 flex flex-col justify-between py-2" style={{right:-14}}>{Array.from({length:n}).map((_,k)=>(<div key={k} style={{width:k===fi?16:8,height:k===fi?4:3,borderRadius:2,background:k<=fi?T.accent:"rgba(150,150,150,.35)",transition:"all .18s cubic-bezier(.34,1.56,.64,1)"}}/>))}</div>
+            <div className="absolute top-2 left-2 lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:series?T.ink:"rgba(0,0,0,.5)",color:"#fff",backdropFilter:"blur(4px)"}}>{String(fi+1).padStart(2,"0")} / {String(n).padStart(2,"0")}</div>
+            {fi===0&&!playing&&n>1&&(<div className="absolute inset-x-0 bottom-3 text-center text-sm font-bold" style={{color:series?T.ink:"#F2EDE2",textShadow:series?"none":"0 2px 6px rgba(0,0,0,.6)",animation:reduceMotion?"none":"loknudge 1.6s ease-in-out infinite"}}>▾ slide down to flip ▾</div>)}
+          </div></div><div style={{height:Math.max(1,n)*PX_PER_FRAME}}/></>)}
+      </div>
+      {index>0&&<button onClick={()=>onNav(-1)} aria-label="Previous post" className="lok-btn absolute left-1.5 top-1/2 w-9 h-9 rounded-full font-extrabold" style={{transform:"translateY(-50%)",background:T.paper,color:T.ink,border:`3px solid ${T.accent}`}}>‹</button>}
+      {index<posts.length-1&&<button onClick={()=>onNav(1)} aria-label="Next post" className="lok-btn absolute right-1.5 top-1/2 w-9 h-9 rounded-full font-extrabold" style={{transform:"translateY(-50%)",background:T.paper,color:T.ink,border:`3px solid ${T.accent}`}}>›</button>}
+      {floats.map(f=>(<div key={f.id} className="absolute bottom-20 pointer-events-none" style={{left:`${f.x}%`,animation:"lokfloat .95s ease-out forwards"}}><ReactionIcon type={f.type} size={34}/></div>))}
+    </div>
+    <div className="flex items-center gap-2 px-3 py-2.5" style={{background:series?T.card:T.ink,borderTop:`2px solid ${series?T.ink:"rgba(242,237,226,.25)"}`}}>
+      <button onClick={togglePlay} aria-label={playing?"Pause":"Play"} className="lok-btn px-3 py-2 rounded-xl font-extrabold lok-display" style={{background:T.alt,color:"#fff",border:`3px solid ${series?T.ink:T.paper}`}}>{playing?"Pause":`Play`}</button>
+      {!isB&&n>=2&&<button onClick={replay} aria-label="Replay drawing" title="Watch it drawn" className="lok-btn px-2.5 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${series?T.ink:"rgba(242,237,226,.5)"}`,color:series?T.ink:T.paper,background:"transparent"}}>↺</button>}
+      <button onClick={()=>onVote(post.id)} aria-label={`Vote — ${post.votes}`} className="lok-btn px-3 py-2 rounded-xl font-extrabold lok-display" style={{background:post.voted?"transparent":T.accent,color:post.voted?(series?T.ink:T.paper):T.onAccent,border:`3px solid ${post.voted?(series?T.ink:"rgba(242,237,226,.5)"):(series?T.ink:T.paper)}`}}>{post.voted?`Voted · ${post.votes}`:`Vote · ${post.votes}`}</button>
+      {onShare&&<button onClick={()=>onShare(post)} aria-label="Share" className="lok-btn px-2.5 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${series?T.ink:"rgba(242,237,226,.5)"}`,color:series?T.ink:T.paper,background:"transparent"}}>↗</button>}
+      {onRemix&&<button onClick={()=>onRemix(post)} aria-label="Remix this flip" className="lok-btn px-2 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${series?T.ink:"rgba(242,237,226,.5)"}`,color:series?T.ink:T.paper,background:"transparent"}} title="Remix — copy frames to Studio">↻</button>}
+      {post.from!=="seed"&&myName&&onDelete&&<button onClick={()=>{if(window.confirm(`Delete "${post.title}"?`))onDelete(post.id);}} aria-label="Delete" className="lok-btn px-2 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${series?T.ink:"rgba(242,237,226,.4)"}`,color:series?T.ink:"rgba(242,237,226,.7)",background:"transparent"}}>🗑</button>}
+      <div className="ml-auto flex items-center gap-1.5">{(()=>{const slots=["splat","heart","drip"];const pack=REACTION_SETS[cosmetics.reactionPack]||REACTION_SETS.base;return slots.map((slot,k)=>(<button key={slot} onClick={()=>react(slot)} aria-label={`React ${pack[k]}`} className="lok-btn flex items-center gap-1 px-2 py-1.5 rounded-xl" style={{background:series?T.paper:"rgba(242,237,226,.12)",border:`2px solid ${series?T.ink:"rgba(242,237,226,.4)"}`,color:series?T.ink:T.paper}}><ReactionIcon type={pack[k]} size={20}/><span className="text-xs font-bold">{post.reactions[slot]}</span></button>));})()}</div>
+    </div>
+  </div>);
+}
+
+const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke},ref){
+  const T=useT();
+  const[layers,setLayers]=useState([{id:1,visible:true,opacity:1,blend:"source-over"}]);
+  const[active,setActive]=useState(1);const[tool,setTool]=useState("pen");const[color,setColor]=useState(ART.ink);const[recentColors,setRecentColors]=useState([]);const[size,setSize]=useState(7);const[symmetry,setSymmetry]=useState("none");const[brush,setBrush]=useState("ink");
+  const idRef=useRef(1);const canvases=useRef(new Map());const drawing=useRef(false);const undoStack=useRef([]);const redoStack=useRef([]);const wrapRef=useRef(null);const lastPts=useRef([]);const midPts=useRef([]);const activeLayer=layers.find(l=>l.id===active);
+  useImperativeHandle(ref,()=>({
+    composite(pageNum=null){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");paperBase(ctx,pageNum);layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv&&l.visible){ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=l.blend;ctx.drawImage(cv,0,0);}});ctx.globalAlpha=1;ctx.globalCompositeOperation="source-over";return tmp.toDataURL("image/png");},
+    blankFrame(){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;paperBase(tmp.getContext("2d"),null);return tmp.toDataURL("image/png");},
+    clearAll(){layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv)cv.getContext("2d").clearRect(0,0,W,H);});undoStack.current=[];redoStack.current=[];},
+  }));
+  const pos=e=>{const r=wrapRef.current.getBoundingClientRect();return[((e.clientX-r.left)*W)/r.width,((e.clientY-r.top)*H)/r.height];};
+  const pushUndo=()=>{const cv=canvases.current.get(active);if(!cv)return;if(undoStack.current.length>9)undoStack.current.shift();undoStack.current.push({id:active,snap:cv.getContext("2d").getImageData(0,0,W,H)});redoStack.current=[];};
+  const dabAt=(ctx,x,y)=>{ctx.globalCompositeOperation="source-over";ctx.globalAlpha=brush==="chalk"?0.5:0.18;ctx.fillStyle=color;const dots=brush==="chalk"?6:1;for(let d=0;d<dots;d++){const ox=brush==="chalk"?(Math.random()-.5)*size*1.4:0,oy=brush==="chalk"?(Math.random()-.5)*size*1.4:0;ctx.beginPath();ctx.arc(x+ox,y+oy,tool==="soft"?size*1.8:size*0.5,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;};
+  const symXY=(x,y)=>{const o=[[x,y]];if(symmetry==="mirrorX"||symmetry==="quad")o.push([W-x,y]);if(symmetry==="mirrorY"||symmetry==="quad")o.push([x,H-y]);if(symmetry==="quad")o.push([W-x,H-y]);if(symmetry.startsWith("radial")){const n=+symmetry.slice(6),cx=W/2,cy=H/2;for(let i=1;i<n;i++){const a=(i/n)*Math.PI*2,c=Math.cos(a),s=Math.sin(a);o.push([cx+(x-cx)*c-(y-cy)*s,cy+(x-cx)*s+(y-cy)*c]);}}return o;};
+  const stamp=(ctx,x,y,start)=>{
+    const pts=symXY(x,y);
+    if(tool==="soft"||brush==="chalk"){pts.forEach(([sx,sy])=>dabAt(ctx,sx,sy));return;}
+    if(start){lastPts.current=pts.map(p=>[...p]);midPts.current=pts.map(p=>[...p]);
+      ctx.globalCompositeOperation=tool==="eraser"?"destination-out":"source-over";ctx.fillStyle=color;ctx.globalAlpha=brush==="marker"&&tool!=="eraser"?0.55:1;
+      pts.forEach(([sx,sy])=>{ctx.beginPath();ctx.arc(sx,sy,(tool==="eraser"?size*2.4:brush==="marker"?size*1.7:size)/2,0,Math.PI*2);ctx.fill();});ctx.globalAlpha=1;return;}
+    ctx.globalCompositeOperation=tool==="eraser"?"destination-out":"source-over";ctx.strokeStyle=color;ctx.lineWidth=tool==="eraser"?size*2.4:brush==="marker"?size*1.7:size;ctx.globalAlpha=brush==="marker"&&tool!=="eraser"?0.55:1;ctx.lineCap="round";ctx.lineJoin="round";
+    pts.forEach(([sx,sy],i)=>{const lp=lastPts.current[i]||[sx,sy];const mp=midPts.current[i]||lp;const nmx=(lp[0]+sx)/2,nmy=(lp[1]+sy)/2;ctx.beginPath();ctx.moveTo(mp[0],mp[1]);ctx.quadraticCurveTo(lp[0],lp[1],nmx,nmy);ctx.stroke();midPts.current[i]=[nmx,nmy];lastPts.current[i]=[sx,sy];});
+    ctx.globalAlpha=1;
+  };
+  const fillLayer=ctx=>{ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;ctx.fillRect(0,0,W,H);};
+  const eyedrop=(x,y)=>{for(let i=layers.length-1;i>=0;i--){const cv=canvases.current.get(layers[i].id);if(!cv||!layers[i].visible)continue;const d=cv.getContext("2d").getImageData(Math.floor(x),Math.floor(y),1,1).data;if(d[3]>10){setColorAndRecent(`rgb(${d[0]},${d[1]},${d[2]})`);setTool("pen");return;}}};
+  const down=e=>{e.preventDefault();const cv=canvases.current.get(active);if(!cv||!activeLayer?.visible)return;e.currentTarget.setPointerCapture(e.pointerId);if(tool==="eyedrop"){eyedrop(...pos(e));return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}drawing.current=true;onStroke&&onStroke();stamp(cv.getContext("2d"),...pos(e),true);};
+  const move=e=>{if(!drawing.current)return;const cv=canvases.current.get(active);if(cv)stamp(cv.getContext("2d"),...pos(e),false);};
+  const up=()=>{drawing.current=false;lastPts.current=[];midPts.current=[];};
+  const undo=()=>{const u=undoStack.current.pop();if(!u)return;const cv=canvases.current.get(u.id);if(cv){redoStack.current.push({id:u.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(u.snap,0,0);}};
+  const redo=()=>{const r=redoStack.current.pop();if(!r)return;const cv=canvases.current.get(r.id);if(cv){undoStack.current.push({id:r.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(r.snap,0,0);}};
+  const addLayer=()=>{if(layers.length>=maxLayers)return;const id=++idRef.current;setLayers(ls=>[...ls,{id,visible:true,opacity:1,blend:"source-over"}]);setActive(id);};
+  const removeLayer=id=>{if(layers.length<=1)return;canvases.current.delete(id);setLayers(ls=>{const next=ls.filter(l=>l.id!==id);if(active===id)setActive(next[next.length-1].id);return next;});};
+  const patchLayer=(id,p)=>setLayers(ls=>ls.map(l=>(l.id===id?{...l,...p}:l)));
+  const setColorAndRecent=c=>{setColor(c);if(tool==="eraser")setTool("pen");setRecentColors(r=>[c,...r.filter(x=>x!==c)].slice(0,8));};
+  const swatches=[ART.ink,ART.pink,ART.teal,"#E8B14B","#7A4FBF","#3E8E4B","#D94040","#5A5A5A","#FF8C42","#C4E8C2","#4EBFFF","#F7D4FF"];
+  return(<div>
+    <div ref={wrapRef} className="relative rounded-2xl overflow-hidden select-none" style={{border:`3px solid ${T.ink}`,background:ART.paper,boxShadow:`6px 6px 0 ${T.shadow}`,aspectRatio:"4 / 5"}}>
+      {onionFrames.map((of,i)=>(<img key={i} src={of.src} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" style={{opacity:of.opacity,mixBlendMode:"multiply"}}/>))}
+      {layers.map(l=>(<canvas key={l.id} width={W} height={H} ref={el=>{if(el)canvases.current.set(l.id,el);}} aria-hidden="true" className="absolute inset-0 w-full h-full" style={{opacity:l.opacity,display:l.visible?"block":"none",mixBlendMode:l.blend==="source-over"?"normal":l.blend}}/>))}
+      <div className="absolute inset-0" style={{touchAction:"none",cursor:"crosshair"}} role="img" aria-label="Drawing canvas" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up}/>
+      {(symmetry==="mirrorX"||symmetry==="quad")&&<div aria-hidden="true" className="absolute top-0 bottom-0 pointer-events-none" style={{left:"50%",width:2,background:`repeating-linear-gradient(${T.accent} 0 6px, transparent 6px 12px)`}}/>}
+      {(symmetry==="mirrorY"||symmetry==="quad")&&<div aria-hidden="true" className="absolute left-0 right-0 pointer-events-none" style={{top:"50%",height:2,background:`repeating-linear-gradient(90deg,${T.accent} 0 6px, transparent 6px 12px)`}}/>}
+      {symmetry.startsWith("radial")&&<div aria-hidden="true" className="absolute pointer-events-none rounded-full" style={{left:"50%",top:"50%",width:10,height:10,transform:"translate(-50%,-50%)",border:`2.5px solid ${T.accent}`}}/>}
+      <div className="absolute top-1.5 left-1.5 lok-display px-2 py-0.5 rounded-md text-xs font-extrabold pointer-events-none" style={{background:"rgba(35,48,107,.85)",color:T.paper,backdropFilter:"blur(3px)"}}>L{layers.findIndex(l=>l.id===active)+1} / {layers.length}</div>
+    </div>
+    <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1" role="toolbar" aria-label="Layer controls">
+      {layers.map((l,i)=>(<div key={l.id} className="shrink-0 flex items-center gap-1 px-1.5 py-1 rounded-lg" style={{border:`2.5px solid ${l.id===active?T.accent:T.ink}`,background:l.id===active?T.card:"transparent"}}>
+        <button onClick={()=>setActive(l.id)} aria-label={`Select layer ${i+1}`} aria-pressed={l.id===active} className="font-bold text-xs px-1" style={{color:T.ink}}>L{i+1}</button>
+        <button onClick={()=>patchLayer(l.id,{visible:!l.visible})} aria-label={l.visible?`Hide layer ${i+1}`:`Show layer ${i+1}`} className="text-xs font-bold w-5" style={{color:T.ink,opacity:l.visible?1:0.35}}>{l.visible?"●":"○"}</button>
+        {layers.length>1&&<button onClick={()=>removeLayer(l.id)} aria-label={`Delete layer ${i+1}`} className="text-xs font-bold" style={{color:T.accent}}>✕</button>}
+      </div>))}
+      <button onClick={addLayer} disabled={layers.length>=maxLayers} aria-label="Add layer" className="shrink-0 px-2.5 py-1 rounded-lg font-extrabold text-sm" style={{border:`2.5px solid ${T.ink}`,color:T.ink,opacity:layers.length>=maxLayers?0.35:1,background:T.card}}>+ layer</button>
+      {activeLayer&&<label className="shrink-0 flex items-center gap-1.5 text-xs font-bold ml-1" style={{color:T.ink}}>opacity<input type="range" min="0.1" max="1" step="0.05" value={activeLayer.opacity} onChange={e=>patchLayer(active,{opacity:+e.target.value})} style={{accentColor:T.accent,width:64}} aria-label="Layer opacity"/></label>}
+    </div>
+    {ccTier&&activeLayer&&(<div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1" role="toolbar" aria-label="Blend modes">
+      <span className="text-xs font-bold opacity-60 shrink-0">blend</span>
+      {BLENDS.map(b=>(<button key={b} onClick={()=>patchLayer(active,{blend:b})} aria-pressed={activeLayer.blend===b} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${activeLayer.blend===b?T.accent:T.ink}`,background:activeLayer.blend===b?T.ink:T.card,color:activeLayer.blend===b?T.paper:T.ink}}>{b==="source-over"?"normal":b}</button>))}
+    </div>)}
+    {ccTier&&(<div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1" role="toolbar" aria-label="Pro tools">
+      <span className="text-xs font-bold opacity-60 shrink-0">pro</span>
+      {[["ink","Ink"],["marker","Marker"],["chalk","Chalk"]].map(([id,l])=>(<button key={id} onClick={()=>{setBrush(id);if(tool==="eraser"||tool==="fill"||tool==="eyedrop")setTool("pen");}} aria-pressed={brush===id} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${brush===id?T.accent:T.ink}`,background:brush===id?T.ink:T.card,color:brush===id?T.paper:T.ink}}>{l}</button>))}
+      <select value={symmetry} onChange={e=>setSymmetry(e.target.value)} aria-label="Symmetry mode" className="shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${symmetry!=="none"?T.accent:T.ink}`,background:symmetry!=="none"?T.ink:T.card,color:symmetry!=="none"?T.paper:T.ink}}>
+        <option value="none">No symmetry</option><option value="mirrorX">Mirror X</option><option value="mirrorY">Mirror Y</option><option value="quad">4-Way</option><option value="radial4">Radial 4</option><option value="radial6">Radial 6</option><option value="radial8">Radial 8</option>
+      </select>
+      <button onClick={()=>setTool("fill")} aria-pressed={tool==="fill"} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${tool==="fill"?T.accent:T.ink}`,background:tool==="fill"?T.ink:T.card,color:tool==="fill"?T.paper:T.ink}}>Fill</button>
+      <button onClick={()=>setTool("eyedrop")} aria-pressed={tool==="eyedrop"} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${tool==="eyedrop"?T.accent:T.ink}`,background:tool==="eyedrop"?T.ink:T.card,color:tool==="eyedrop"?T.paper:T.ink}}>Eyedrop</button>
+    </div>)}
+    <div className="mt-2 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Color and tools">
+      <div className="flex flex-wrap gap-1.5 items-center">
+        {swatches.map(hex=>(<button key={hex} onClick={()=>setColorAndRecent(hex)} aria-label={`Color ${hex}`} aria-pressed={color===hex&&tool!=="eraser"} className="lok-btn w-7 h-7 rounded-full" style={{background:hex,border:`3px solid ${color===hex&&tool!=="eraser"?T.accent:T.ink}`,transform:color===hex&&tool!=="eraser"?"scale(1.18)":"none"}}/>))}
+        <label aria-label="Custom color" style={{cursor:"pointer"}}>
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold" style={{border:`3px dashed ${T.ink}`,background:T.card,color:T.ink}}>+</div>
+          <input type="color" value={color} onChange={e=>setColorAndRecent(e.target.value)} style={{position:"absolute",opacity:0,width:1,height:1}}/>
+        </label>
+        {recentColors.map(hex=>(<button key={"r"+hex} onClick={()=>setColorAndRecent(hex)} aria-label={`Recent ${hex}`} className="lok-btn w-5 h-5 rounded-full" style={{background:hex,border:`2px solid ${T.shadow}`}}/>))}
+      </div>
+      {[["pen","Pen"],["soft","Airbrush"],["eraser","Eraser"]].map(([id,l])=>(<button key={id} onClick={()=>setTool(id)} aria-pressed={tool===id} aria-label={l} className="lok-btn px-2.5 h-8 rounded-full font-bold text-xs" style={{border:`3px solid ${tool===id?T.accent:T.ink}`,background:T.card,color:T.ink}}>{l}</button>))}
+      <label className="flex items-center gap-1.5 text-xs font-bold" style={{color:T.ink}}>
+        size<span className="inline-flex items-center justify-center" style={{width:28,height:28}}><span aria-hidden="true" style={{width:Math.max(4,Math.min(24,size)),height:Math.max(4,Math.min(24,size)),borderRadius:"50%",background:tool==="eraser"?"transparent":color,border:`1.5px solid ${T.ink}`,display:"block"}}/></span>
+        <input type="range" min="2" max="28" value={size} onChange={e=>setSize(+e.target.value)} style={{accentColor:T.accent,width:56}} aria-label={`Brush size ${size}px`}/>
+      </label>
+      <button onClick={undo} aria-label="Undo" className="lok-btn px-2.5 h-8 rounded-full font-bold text-xs" style={{border:`3px solid ${T.ink}`,background:T.card,color:T.ink}}>Undo</button>
+      <button onClick={redo} aria-label="Redo" className="lok-btn px-2.5 h-8 rounded-full font-bold text-xs" style={{border:`3px solid ${T.ink}`,background:T.card,color:T.ink}}>Redo</button>
+    </div>
+  </div>);
+});
+
+function Studio({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt}){
+  const T=useT();const easel=useRef(null);
+  const[tier,setTier]=useState(10);const[frames,setFrames]=useState([]);const[frameDurations,setFrameDurations]=useState([]);
+  const[onionOn,setOnionOn]=useState(true);const[onionOpacity,setOnionOpacity]=useState(0.22);const[onionCount,setOnionCount]=useState(1);const[editingDur,setEditingDur]=useState(null);
+  const[paceMs,setPaceMs]=useState(140);const[title,setTitle]=useState("");const[mode,setMode]=useState("A");const[style,setStyle]=useState("bold");const[pv,setPv]=useState(0);const[justCap,setJustCap]=useState(false);const[zen,setZen]=useState(false);const[promptPick,setPromptPick]=useState(null);
+  const pastPrompts=useMemo(()=>{const doy=d=>Math.floor((d-new Date(d.getFullYear(),0,0))/86400000);return Array.from({length:5},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(i+1));return PROMPTS[(d.getFullYear()*366+doy(d))%PROMPTS.length];});},[]);
+  const activePrompt=promptPick||dailyPrompt;
+  useEffect(()=>{if(frames.length<2)return;const t=setInterval(()=>setPv(p=>(p+1)%frames.length),paceMs);return()=>clearInterval(t);},[frames.length,paceMs]);
+  const onionFrames=onionOn&&frames.length>0?frames.slice(-onionCount).map((f,i)=>({src:f,color:i===0?ART.pink:ART.teal,opacity:onionOpacity/(i+1)})):[];
+  const capture=()=>{const url=easel.current.composite(frames.length);setFrames(f=>[...f,url]);setFrameDurations(d=>[...d,paceMs]);setJustCap(true);setTimeout(()=>setJustCap(false),360);say(`Page ${frames.length+1} captured`);};
+  const insertBlank=i=>{const blank=easel.current.blankFrame?easel.current.blankFrame():easel.current.composite(0);setFrames(f=>[...f.slice(0,i+1),blank,...f.slice(i+1)]);setFrameDurations(d=>[...d.slice(0,i+1),paceMs,...d.slice(i+1)]);say(`Blank inserted after page ${i+1}`);};
+  const duplicateFrame=i=>{setFrames(f=>[...f.slice(0,i+1),f[i],...f.slice(i+1)]);setFrameDurations(d=>[...d.slice(0,i+1),d[i]??paceMs,...d.slice(i+1)]);say(`Page ${i+1} duplicated`);};
+  const moveFrame=(i,d)=>{setFrames(f=>{const j=i+d;if(j<0||j>=f.length)return f;const c=[...f];[c[i],c[j]]=[c[j],c[i]];return c;});setFrameDurations(dd=>{const j=i+d;if(j<0||j>=dd.length)return dd;const c=[...dd];[c[i],c[j]]=[c[j],c[i]];return c;});};
+  const ready=frames.length>=2;
+  return(<div className="mt-4">
+    <div className="flex items-center justify-between">
+      <div><h2 className="lok-display text-xl font-extrabold flex items-center gap-2">Studio{ccTier&&<span className="text-xs px-1.5 py-0.5 rounded" style={{background:T.accent,color:T.onAccent}}>PRO</span>}</h2><p className="text-xs opacity-70 mt-0.5">Draw · capture · repeat · publish</p></div>
+      <div className="flex items-center gap-2">
+        <button onClick={()=>setZen(z=>!z)} aria-pressed={zen} aria-label="Speed Draw mode" title="Hide controls, just draw" className="lok-btn px-2.5 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${zen?T.accent:T.ink}`,background:zen?T.ink:T.card,color:zen?T.paper:T.ink}}>⚡ Speed</button>
+        <div className="text-right"><div className="lok-display text-2xl font-extrabold" style={{color:frames.length?T.accent:T.ink}}>{frames.length}</div><div className="text-[10px] font-bold uppercase tracking-widest opacity-60">pages</div></div>
+      </div>
+    </div>
+    {!kids&&activePrompt&&!zen&&(<>
+      <div className="mt-2 px-3 py-2 rounded-xl text-sm font-bold flex items-center gap-2" style={{border:`2.5px dashed ${T.ink}`,color:T.ink}}><span style={{opacity:0.6}}>Prompt</span><span style={{color:T.accent}}>"{activePrompt}"</span>{promptPick&&<button onClick={()=>setPromptPick(null)} aria-label="Back to today's prompt" className="ml-auto text-[10px] font-bold underline opacity-60">today's</button>}</div>
+      <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1"><span className="text-[9px] font-bold uppercase tracking-widest opacity-40 shrink-0">Past</span>
+        {pastPrompts.map(p=>(<button key={p} onClick={()=>setPromptPick(p)} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`1.5px solid ${promptPick===p?T.accent:T.shadow}`,color:T.ink,opacity:0.8}}>{p}</button>))}
+      </div>
+    </>)}
+    {!zen&&(<><div className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-1"><span className="text-[10px] font-bold uppercase tracking-widest opacity-50 shrink-0 mr-1">Layers</span>
+      {TIERS.map(t=>{const own=ownedTiers.includes(t.layers);const on=tier===t.layers;return(<button key={t.layers} onClick={()=>own?setTier(t.layers):say(`Unlock ${t.label} in Shop`)} aria-label={`${own?"Use":"Unlock"} ${t.label}`} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${on?T.accent:T.ink}`,background:on?T.ink:T.card,color:on?T.paper:T.ink,opacity:own?1:0.45}}>{own?t.label:`🔒 ${t.label}`}</button>);})}
+    </div>
+    <div className="mt-2 flex items-center gap-2 flex-wrap">
+      <button onClick={()=>setOnionOn(v=>!v)} aria-pressed={onionOn} className="lok-btn px-2.5 py-1 rounded-full text-xs font-bold" style={{border:`2px solid ${onionOn?T.accent:T.shadow}`,background:onionOn?T.ink:"transparent",color:onionOn?T.paper:T.ink}}>🧅 Onion {onionOn?"ON":"OFF"}</button>
+      {onionOn&&frames.length>0&&(<>
+        <label className="flex items-center gap-1 text-xs" style={{color:T.ink}}>Opacity<input type="range" min="0.05" max="0.5" step="0.05" value={onionOpacity} onChange={e=>setOnionOpacity(+e.target.value)} style={{accentColor:T.accent,width:48}} aria-label="Onion opacity"/></label>
+        <div className="flex items-center gap-1 text-xs" style={{color:T.ink}}>Prev{[1,2,3].map(n=><button key={n} onClick={()=>setOnionCount(n)} aria-pressed={onionCount===n} className="lok-btn w-6 h-6 rounded-full text-[10px] font-bold" style={{border:`2px solid ${onionCount===n?T.accent:T.shadow}`,background:onionCount===n?T.ink:"transparent",color:onionCount===n?T.paper:T.ink}}>{n}</button>)}</div>
+      </>)}
+    </div></>)}
+    <div className="mt-2"><Easel ref={easel} key={tier} maxLayers={tier} ccTier={ccTier} onionFrames={onionFrames}/></div>
+    <button onClick={capture} aria-label={`Capture page ${frames.length+1}`} className="lok-btn lok-display mt-3 w-full py-3.5 rounded-xl text-lg font-extrabold flex items-center justify-center gap-2" style={{background:T.ink,color:T.paper,boxShadow:`4px 4px 0 ${T.accent}`,transform:justCap?"scale(.97)":"scale(1)",transition:"transform .2s"}}>
+      <span style={{fontSize:20,lineHeight:1}}>＋</span> Capture page {frames.length+1}
+    </button>
+    {frames.length===0&&<p className="text-center text-xs opacity-50 mt-2">Capture 2+ pages to animate. 🧅 Onion shows previous pages as ghosts.</p>}
+    {frames.length>0&&(<div style={{animation:"lokrise .3s ease"}}>
+      <div className="mt-4 flex items-center justify-between">
+        <div className="text-[10px] font-bold uppercase tracking-widest opacity-50">Timeline · {frames.length} pages</div>
+        <button onClick={()=>{setFrames([]);setFrameDurations([]);easel.current.clearAll();say("Cleared all pages");}} aria-label="Clear all pages" className="text-[11px] font-bold underline opacity-60">clear all</button>
+      </div>
+      <div className="mt-1.5 flex gap-2 overflow-x-auto pb-2">
+        {frames.map((f,i)=>(<div key={i} className="shrink-0 flex flex-col gap-0.5" style={{width:76}}>
+          <div className="rounded-lg overflow-hidden relative" style={{border:`2.5px solid ${T.ink}`,boxShadow:`2px 2px 0 ${T.shadow}`}}>
+            <img src={f} alt={`page ${i+1}`} className="block w-full" style={{aspectRatio:"4/5",objectFit:"cover"}}/>
+            <div className="absolute top-0.5 left-0.5 px-1 rounded text-[9px] font-bold" style={{background:T.ink,color:"#fff"}}>{i+1}</div>
+          </div>
+          <div className="flex items-center" style={{gap:2}}>
+            <button onClick={()=>moveFrame(i,-1)} aria-label={`Move page ${i+1} left`} className="lok-btn flex-1 font-bold text-[10px] py-0.5 rounded text-center" style={{color:T.ink,border:`1px solid ${T.shadow}`}}>‹</button>
+            <button onClick={()=>setEditingDur(editingDur===i?null:i)} aria-label={`Edit duration ${i+1}`} className="lok-btn flex-1 text-[9px] font-mono py-0.5 rounded text-center opacity-70" style={{border:`1px solid ${T.shadow}`}}>{frameDurations[i]??paceMs}ms</button>
+            <button onClick={()=>moveFrame(i,1)} aria-label={`Move page ${i+1} right`} className="lok-btn flex-1 font-bold text-[10px] py-0.5 rounded text-center" style={{color:T.ink,border:`1px solid ${T.shadow}`}}>›</button>
+          </div>
+          {editingDur===i&&<input type="number" min="40" max="2000" value={frameDurations[i]??paceMs} onChange={e=>setFrameDurations(d=>{const n=[...d];n[i]=+e.target.value;return n;})} onBlur={()=>setEditingDur(null)} autoFocus aria-label={`Page ${i+1} duration ms`} className="w-full text-center text-[10px] rounded px-1 py-0.5" style={{border:`2px solid ${T.accent}`,background:T.card}}/>}
+          <div className="flex items-center" style={{gap:2}}>
+            <button onClick={()=>duplicateFrame(i)} aria-label={`Duplicate page ${i+1}`} className="lok-btn flex-1 text-[9px] font-bold py-0.5 rounded text-center" style={{border:`1px solid ${T.shadow}`,color:T.ink}}>dup</button>
+            <button onClick={()=>insertBlank(i)} aria-label={`Insert blank after ${i+1}`} className="lok-btn flex-1 text-[9px] font-bold py-0.5 rounded text-center" style={{border:`1px solid ${T.shadow}`,color:T.accent}}>+↓</button>
+            <button onClick={()=>{setFrames(fs=>fs.filter((_,k)=>k!==i));setFrameDurations(d=>d.filter((_,k)=>k!==i));}} aria-label={`Delete page ${i+1}`} className="lok-btn flex-1 text-[9px] font-bold py-0.5 rounded text-center" style={{border:`1px solid ${T.shadow}`,color:T.accent}}>✕</button>
+          </div>
+        </div>))}
+      </div>
+      <div className="mt-3 p-3 rounded-2xl flex gap-3 items-center" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`4px 4px 0 ${T.shadow}`}}>
+        <div className="relative shrink-0"><img src={frames[Math.min(pv,frames.length-1)]} alt="preview" className="rounded-lg" style={{width:92,aspectRatio:"4/5",objectFit:"cover",border:`2.5px solid ${T.ink}`}}/>{ready&&<div className="absolute -bottom-1.5 -right-1.5 lok-display text-[10px] font-extrabold px-1.5 py-0.5 rounded" style={{background:T.accent,color:T.onAccent,border:`2px solid ${T.ink}`}}>▶ live</div>}</div>
+        <div className="flex-1"><div className="font-bold text-sm">Default pace · <span style={{color:T.accent}}>{paceMs}ms</span>/page</div><input type="range" min="60" max="500" step="10" value={paceMs} onChange={e=>setPaceMs(+e.target.value)} className="w-full" style={{accentColor:T.accent}} aria-label="Default pace"/><div className="text-xs opacity-70">{ready?"Preview plays exactly as viewers see it.":"Add one more page to preview."}</div></div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div><div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Playback</div><div className="flex gap-2">{[["A","Scrub"],["B","Whole page"]].map(([id,l])=>(<button key={id} onClick={()=>setMode(id)} aria-pressed={mode===id} className="lok-btn flex-1 py-2 rounded-xl text-xs font-bold" style={{border:`2.5px solid ${mode===id?T.accent:T.ink}`,background:mode===id?T.ink:T.card,color:mode===id?T.paper:T.ink}}>{l}</button>))}</div></div>
+        <div><div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Style</div><div className="flex gap-2">{[["bold","Bold"],["series","Series"]].map(([id,l])=>(<button key={id} onClick={()=>setStyle(id)} aria-pressed={style===id} className="lok-btn flex-1 py-2 rounded-xl text-xs font-bold" style={{border:`2.5px solid ${style===id?T.accent:T.ink}`,background:style===id?T.alt:T.card,color:style===id?"#fff":T.ink}}>{l}</button>))}</div></div>
+      </div>
+      <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Name this flip…" aria-label="Flip title" className="mt-3 w-full px-3 py-2.5 rounded-xl font-bold" style={{border:`3px solid ${T.ink}`,background:T.card,color:T.ink}}/>
+      <button disabled={!ready} aria-label={ready?"Publish to gallery":"Need 2+ pages"} onClick={()=>{if(!ready){say("Capture at least 2 pages first");return;}onPublish({id:"p"+Date.now(),title:title.trim()||"Untitled flip",frames,frameDurations,paceMs,mode,style,weeklyPrompt:activePrompt===WEEKLY_PROMPT?WEEKLY_PROMPT:null,votes:0,voted:false,viewed:false,views:0,reactions:{splat:0,heart:0,drip:0},from:"studio"});setFrames([]);setFrameDurations([]);setTitle("");easel.current.clearAll();}} className="lok-btn lok-display mt-3 w-full py-3.5 rounded-xl text-lg font-extrabold" style={{background:ready?T.accent:T.shadow,color:ready?T.onAccent:T.ink,border:`3px solid ${T.ink}`,boxShadow:ready?`4px 4px 0 ${T.ink}`:"none",opacity:ready?1:0.6}}>
+        {ready?"Publish to gallery →":`Capture ${2-frames.length} more page${2-frames.length===1?"":"s"}`}
+      </button>
+    </div>)}
+  </div>);
+}
+
+function Battle({ownedTiers,ccTier,wins,bigBattleOwned,kids,phase,lillok,customLilLok,onResult,onUnlockBig,onPublish,onLine,blip,hap,say}){
+  const T=useT();
+  const[pstate,setPstate]=useState("lobby");const[format,setFormat]=useState(FORMATS[0]);const[duration,setDuration]=useState(60);const[tier,setTier]=useState(10);const[prompt,setPrompt]=useState(PROMPTS[0]);const[count,setCount]=useState(3);const[timeLeft,setTimeLeft]=useState(0);const[bots,setBots]=useState([]);const[botThumbs,setBotThumbs]=useState([]);const[entries,setEntries]=useState([]);const[results,setResults]=useState(null);const[shake,setShake]=useState(false);const[splat,setSplat]=useState(null);const[block,setBlock]=useState(null);const[blocked,setBlocked]=useState(0);const[myArt,setMyArt]=useState(null);const[bFrames,setBFrames]=useState([]);const[featured,setFeatured]=useState(false);
+  const easel=useRef(null);const strokes=useRef(0);const tickRef=useRef(null);const matchT=useRef(0);
+  const promptPool=kids?KID_PROMPTS:PROMPTS;const bigUnlocked=bigBattleOwned||wins>=1;
+  const startMatch=()=>{const n=format.players-1;const nb=Array.from({length:n},(_,i)=>({name:kids?`buddy ${i+1}`:BOT_NAMES[i],seed:Math.floor(Math.random()*9000)+i*137+11}));setBots(nb);setBotThumbs(nb.map(b=>renderDoodle(b.seed,0)));setPrompt(promptPool[Math.floor(Math.random()*promptPool.length)]);strokes.current=0;setResults(null);setBlocked(0);setMyArt(null);setBFrames([]);setCount(3);setPstate("count");};
+  const captureBattle=()=>{if(!easel.current)return;if(bFrames.length>=14){say("Max 14 pages");return;}const url=easel.current.composite(bFrames.length);setBFrames(f=>[...f,url]);blip&&blip("D5");say(`Page ${bFrames.length+1} captured`);};
+  useEffect(()=>{if(pstate!=="count")return;if(count===0){setTimeLeft(duration);matchT.current=0;setPstate("draw");onLine&&onLine("battle_start");return;}const t=setTimeout(()=>setCount(c=>c-1),800);return()=>clearTimeout(t);},[pstate,count,duration]);
+  useEffect(()=>{if(pstate!=="draw")return;tickRef.current=setInterval(()=>{matchT.current+=1;setTimeLeft(t=>Math.max(0,t-1));if(matchT.current%2===0)setBotThumbs(bots.map(b=>renderDoodle(b.seed,matchT.current/duration)));if(!kids&&matchT.current>3&&matchT.current%7===0)fireIntervention();},1000);return()=>clearInterval(tickRef.current);},[pstate,bots,duration,kids,phase]);
+  const fireIntervention=()=>{const decay=phase==="decaying";const kind=INTERVENTIONS[Math.floor(Math.random()*INTERVENTIONS.length)];const id=Math.random();setBlock({id,kind});setTimeout(()=>{setBlock(b=>{if(b&&b.id===id){if(kind==="shake"){setShake(true);setTimeout(()=>setShake(false),900);}else{setSplat({k:kind,seed:Math.floor(Math.random()*9999)});setTimeout(()=>setSplat(null),1500);}if(decay)say(`${lillok.name} fumbled!`);return null;}return b;});},1400);};
+  const doBlock=()=>{if(!block)return;setBlocked(b=>b+1);setBlock(null);blip&&blip("G5");hap&&hap([100,50,100]);say(phase==="thriving"?`${lillok.name} deflected it!`:"Blocked!");};
+  useEffect(()=>{if(pstate==="draw"&&timeLeft===0){clearInterval(tickRef.current);setBlock(null);setSplat(null);setShake(false);const final=easel.current?easel.current.composite():renderDoodle(1,0);const allFrames=[...bFrames,final];setBFrames(allFrames);setMyArt(final);if(format.coop||kids){setPstate("done");onResult(true,featured?3:1);return;}setEntries([{name:"You",art:final,isMe:true},...bots.map(b=>({name:b.name,art:renderDoodle(b.seed,1),isMe:false}))]);setPstate("vote");}},[timeLeft,pstate]);
+  const castVotes=pickIdx=>{const tally=entries.map(()=>0);tally[pickIdx]+=1;const boost=Math.min(strokes.current/35,1)*1.4+0.4+(phase==="thriving"?0.4:0)+blocked*0.15;entries.forEach((_,vi)=>{if(entries[vi].isMe)return;const w=entries.map((e,k)=>(k===vi?0:e.isMe?boost:1));const sum=w.reduce((a,b)=>a+b,0);let r=Math.random()*sum,ch=0;for(let k=0;k<w.length;k++){r-=w[k];if(r<=0){ch=k;break;}}tally[ch]+=1;});const best=Math.max(...tally);const winners=tally.map((v,k)=>[v,k]).filter(([v])=>v===best).map(([,k])=>k);const wi=winners[Math.floor(Math.random()*winners.length)];const won=entries[wi].isMe;onResult(won,featured?3:1);onLine&&onLine(won?"win":"loss");setResults({tally,winnerIdx:wi,won});setPstate("results");};
+  const publishMine=()=>{const fr=bFrames.length>=2?bFrames:[myArt];onPublish({id:"b"+Date.now(),title:`"${prompt}" — battle`,frames:fr,paceMs:220,mode:"A",style:"bold",loop:fr.length>=2,votes:results?.won?1:0,voted:false,viewed:false,views:0,reactions:{splat:0,heart:0,drip:0},from:"battle"});say(fr.length>=2?"Battle animation published":"Battle piece published");};
+  if(pstate==="lobby")return(<div className="mt-4">
+    <h2 className="lok-display text-lg font-extrabold">{kids?"Draw Together":"Lok N Slide — Battle"}</h2>
+    <p className="text-sm opacity-70 mt-0.5">{kids?"Same prompt, draw with your buddies, everyone wins!":"Same prompt, same clock, layered canvases. Competitors vote — never for themselves."}</p>
+    {!kids&&(<button onClick={()=>setFeatured(f=>!f)} aria-pressed={featured} aria-label="Featured match: 3× Loks" className="lok-btn mt-3 w-full p-3.5 rounded-2xl text-left relative overflow-hidden" style={{border:`3px solid ${T.ink}`,background:featured?T.ink:T.card,color:featured?T.paper:T.ink,boxShadow:featured?`6px 6px 0 ${T.accent}`:`5px 5px 0 #E8B14B`}}>
+      <div className="flex items-center gap-3">
+        <div className="lok-display font-extrabold text-2xl shrink-0" style={{color:featured?"#E8B14B":T.accent}}>3×</div>
+        <div className="min-w-0 flex-1"><div className="lok-display font-extrabold text-sm uppercase tracking-widest" style={{color:featured?"#E8B14B":"#B8860B"}}>✦ Featured match</div><div className="text-xs opacity-75 mt-0.5">Triple Loks on a win. Rotates daily.</div></div>
+        <span className="text-xs font-extrabold shrink-0" style={{color:featured?T.accent:T.alt}}>{featured?"Armed ✓":"Arm it"}</span>
+      </div>
+    </button>)}
+    {!kids&&(<><div className="mt-3 text-xs font-bold uppercase tracking-widest opacity-60">Format</div>
+      <div className="mt-1.5 grid grid-cols-2 gap-2">{FORMATS.map((f,fi2)=>{const locked=f.locked&&!bigUnlocked;const sel=format.id===f.id;return(<button key={f.id} onClick={()=>locked?say("Big Battle unlocks at 1 win"):setFormat(f)} aria-label={`${f.label} — ${f.mood}`} className="lok-btn p-2.5 rounded-xl text-left" style={{border:`3px solid ${sel?T.accent:T.ink}`,background:sel?T.ink:T.card,color:sel?T.paper:T.ink,opacity:locked?0.55:1,boxShadow:sel?`4px 4px 0 ${T.accent}`:`3px 3px 0 ${T.shadow}`,animation:reduceMotion?"none":`lokrise .3s ease ${fi2*0.06}s both`}}><div style={{fontSize:20,lineHeight:1,marginBottom:3}}>{locked?"🔒":f.icon}</div><div className="lok-display font-extrabold text-sm">{f.label}</div><div className="text-[11px] opacity-70 mt-0.5">{f.mood}</div><div className="text-[11px] font-bold mt-0.5" style={{color:sel?T.accent:T.alt}}>{f.coop?"hot-seat":`${f.players} artists`}</div></button>);})}
+      </div>{!bigUnlocked&&<button onClick={onUnlockBig} className="lok-btn mt-2 w-full py-2 rounded-xl text-sm font-bold" style={{border:`2.5px dashed ${T.ink}`,color:T.ink}}>Unlock Big Battle · 50 Loks</button>}</>)}
+    <div className="mt-3 text-xs font-bold uppercase tracking-widest opacity-60">Clock</div>
+    <div className="mt-1.5 flex gap-2">{[30,60,90].map(s=>(<button key={s} onClick={()=>setDuration(s)} className="lok-btn flex-1 py-1.5 rounded-full text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:duration===s?T.accent:T.card,color:duration===s?T.onAccent:T.ink}}>{s}s</button>))}</div>
+    <button onClick={startMatch} className="lok-btn lok-display mt-4 w-full py-3.5 rounded-xl text-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,boxShadow:`5px 5px 0 ${T.ink}`,animation:reduceMotion?"none":"lokpulse 2.4s ease-in-out infinite"}}>{kids?"Start drawing!":"Find a match"}</button>
+  </div>);
+  if(pstate==="count")return(<div className="mt-12 text-center">
+    <div className="text-sm font-bold uppercase tracking-widest opacity-60">Your prompt</div>
+    <div className="lok-display text-2xl font-extrabold mt-2 mx-auto px-4 py-3 rounded-2xl" style={{maxWidth:360,border:`3px solid ${T.ink}`,background:T.card,boxShadow:`5px 5px 0 ${T.shadow}`}}>"{prompt}"</div>
+    <div key={count} className="lok-display font-extrabold mt-8" style={{fontSize:count===0?80:110,color:T.accent,animation:"lokcount .4s cubic-bezier(.34,1.56,.64,1)",textShadow:`4px 4px 0 ${T.ink}`}}>{count===0?"DRAW!":count}</div>
+    <div className="text-sm opacity-70 mt-2">{format.label} · {duration}s</div>
+  </div>);
+  if(pstate==="draw")return(<div className="mt-3" style={{animation:shake&&!reduceMotion?"lokshake .9s":"none"}}>
+    <div className="flex items-center justify-between">
+      <div className="min-w-0"><div className="text-xs font-bold uppercase tracking-widest opacity-60">Prompt</div><div className="lok-display font-extrabold leading-tight truncate">"{prompt}"</div></div>
+      <div className="lok-display text-2xl font-extrabold px-3 py-1 rounded-xl shrink-0" style={{background:timeLeft<=10?T.accent:T.ink,color:timeLeft<=10?T.onAccent:T.paper,animation:timeLeft<=10&&timeLeft>0&&!reduceMotion?"lokpulse .6s ease-in-out infinite":"none",transition:"background .3s ease"}}>{timeLeft}s</div>
+    </div>
+    <div className="mt-1.5 h-2 rounded-full overflow-hidden" style={{background:T.shadow}}><div style={{width:`${(timeLeft/duration)*100}%`,height:"100%",background:T.accent,transition:"width 1s linear"}}/></div>
+    <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">{bots.map((b,i)=>(<div key={b.name} className="shrink-0 text-center" style={{width:60}}><img src={botThumbs[i]} alt={b.name} className="w-full rounded-md" style={{aspectRatio:"4/5",objectFit:"cover",border:`2px solid ${T.ink}`}}/><div className="text-[10px] font-bold truncate opacity-70">{b.name}</div></div>))}</div>
+    <div className="mt-2 relative">
+      <Easel ref={easel} maxLayers={tier} ccTier={ccTier} onStroke={()=>(strokes.current+=1)}/>
+      {splat&&<InterventionFX kind={splat.k} seed={splat.seed}/>}
+      {block&&(<button onClick={doBlock} className="lok-btn absolute left-1/2 top-1/2 px-5 py-3 rounded-2xl lok-display font-extrabold text-lg" style={{transform:"translate(-50%,-50%)",background:T.ink,color:T.paper,border:`3px solid ${T.accent}`,animation:"lokpulse .5s infinite"}}>LOK BLOCK!</button>)}
+    </div>
+    <div className="mt-2 flex items-center gap-2">
+      <button onClick={captureBattle} className="lok-btn lok-display flex-1 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-center gap-1.5" style={{background:T.ink,color:T.paper,boxShadow:`3px 3px 0 ${T.accent}`}}><span style={{fontSize:16}}>＋</span>Capture page {bFrames.length+1}</button>
+      {bFrames.length>0&&(<div className="flex items-center gap-1 px-2 py-1 rounded-xl shrink-0" style={{border:`2.5px solid ${T.ink}`,background:T.card}}>{bFrames.slice(-4).map((f,i)=>(<img key={i} src={f} alt="" className="rounded" style={{width:22,aspectRatio:"4/5",objectFit:"cover",border:`1px solid ${T.ink}`}}/>))}<span className="lok-display text-xs font-extrabold ml-0.5" style={{color:T.accent}}>{bFrames.length}</span></div>)}
+    </div>
+  </div>);
+  if(pstate==="done")return(<div className="mt-6 text-center">
+    <h2 className="lok-display text-2xl font-extrabold">{kids?"Great drawing! 🎨":"Co-op complete!"}</h2>
+    <p className="text-sm opacity-70 mt-1">"{prompt}"</p>
+    {myArt&&<img src={myArt} alt="your art" className="mx-auto mt-3 rounded-xl" style={{width:200,border:`3px solid ${T.ink}`}}/>}
+    <div className="mt-4 flex gap-2 px-4"><button onClick={publishMine} className="lok-btn lok-display flex-1 py-3 rounded-xl font-extrabold" style={{background:T.ink,color:T.paper}}>Publish it</button><button onClick={startMatch} className="lok-btn lok-display flex-1 py-3 rounded-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}}>Again</button></div>
+    <button onClick={()=>setPstate("lobby")} className="mt-2 w-full py-2 text-sm font-bold underline opacity-70">Back</button>
+  </div>);
+  if(pstate==="vote")return(<div className="mt-4">
+    <h2 className="lok-display text-lg font-extrabold">Time! Cast your vote</h2>
+    <p className="text-sm opacity-70">"{prompt}" — pick the best.</p>
+    <div className="mt-3 grid grid-cols-2 gap-3">{entries.map((e,i)=>(<button key={i} disabled={e.isMe} onClick={()=>castVotes(i)} className="lok-btn text-left rounded-2xl overflow-hidden" style={{border:`3px solid ${T.ink}`,background:T.card,opacity:e.isMe?0.7:1,boxShadow:`4px 4px 0 ${T.shadow}`}}><img src={e.art} alt={e.name} className="w-full block" style={{aspectRatio:"4/5",objectFit:"cover"}}/><div className="px-2 py-1.5 font-bold text-sm flex justify-between"><span>{e.name}</span>{e.isMe?<span className="opacity-50 text-xs">you</span>:<span style={{color:T.accent}}>vote ▸</span>}</div></button>))}</div>
+  </div>);
+  if(pstate==="results"&&results){
+    const order=entries.map((e,i)=>({...e,votes:results.tally[i],i})).sort((a,b)=>b.votes-a.votes);
+    return(<div className="mt-4">
+      <div className="text-center" style={{animation:"lokpop .5s cubic-bezier(.34,1.56,.64,1)"}}><div className="lok-display text-3xl font-extrabold" style={{color:results.won?T.accent:T.ink}}>{results.won?"You took it! 🏆":`${entries[results.winnerIdx].name} takes it`}</div></div>
+      <p className="text-center text-sm opacity-70 mt-1">"{prompt}"</p>
+      <div className="mt-3 flex flex-col gap-2">{order.map((e,idx)=>(<div key={e.i} className="flex items-center gap-3 p-2 rounded-xl" style={{border:`3px solid ${e.i===results.winnerIdx?T.accent:T.ink}`,background:T.card,animation:`lokrise .3s ease ${idx*0.06}s both`}}><span className="lok-display font-extrabold w-5 text-center" style={{color:idx===0?T.accent:T.ink}}>{idx+1}</span><img src={e.art} alt={e.name} className="rounded-md" style={{width:52,aspectRatio:"4/5",objectFit:"cover",border:`2px solid ${T.ink}`}}/><div className="font-bold flex-1">{e.name}{e.i===results.winnerIdx?" 🏆":""}</div><div className="lok-display font-extrabold">{e.votes} {e.votes===1?"vote":"votes"}</div></div>))}</div>
+      <div className="mt-4 flex gap-2"><button onClick={publishMine} className="lok-btn lok-display flex-1 py-3 rounded-xl font-extrabold" style={{background:T.ink,color:T.paper}}>Publish</button><button onClick={startMatch} className="lok-btn lok-display flex-1 py-3 rounded-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}}>Rematch</button></div>
+      <button onClick={()=>{const msg=`I just drew "${prompt}" in Lok N Slide — think you can beat me? lok.app/battle`;if(navigator.share){navigator.share({title:"Lok N Slide challenge",text:msg}).catch(()=>{});}else{navigator.clipboard?.writeText(msg);say("Challenge copied — send it!");}}} aria-label="Challenge a friend" className="lok-btn mt-2 w-full py-2 rounded-xl font-bold text-sm" style={{border:`2.5px dashed ${T.ink}`,color:T.ink}}>↗ Challenge a friend</button>
+      <button onClick={()=>setPstate("lobby")} className="mt-2 w-full py-2 text-sm font-bold underline opacity-70">Back to lobby</button>
+    </div>);
+  }
+  return null;
+}
+
+function OpenFront({kids,loks,dailyPrompt,onWager,onEarn,hinted,onHinted,blip,say}){
+  const T=useT();const[phase,setPhase]=useState("lobby");const[mode,setMode]=useState("shapes");const[wagerOn,setWagerOn]=useState(false);const[online,setOnline]=useState(0);const[shape,setShape]=useState("star");const[time,setTime]=useState(0);const[score,setScore]=useState(0);const[board,setBoard]=useState([]);const[pot,setPot]=useState(0);const[wager,setWager]=useState(10);const[stake,setStake]=useState(0);const[lastPayout,setLastPayout]=useState(0);
+  const guideRef=useRef(null);const inkRef=useRef(null);const wrapRef=useRef(null);const targetPts=useRef([]);const drawing=useRef(false);const last=useRef(null);const painted=useRef(0);const totalLen=useRef(1);const tickRef=useRef(null);const ROUND_BASE=12;const modeTime={shapes:12,stencils:16,wild:20,chars:22};
+  const setupShape=k=>{const pts=traceShape(k);targetPts.current=pts.map(p=>({...p,0:p[0],1:p[1],hit:false}));const g=guideRef.current.getContext("2d");g.clearRect(0,0,W,H);g.strokeStyle="rgba(35,48,107,0.28)";g.lineWidth=26;g.lineCap="round";g.lineJoin="round";g.beginPath();pts.forEach(([x,y],i)=>(i===0?g.moveTo(x,y):g.lineTo(x,y)));g.stroke();g.strokeStyle="rgba(35,48,107,0.5)";g.lineWidth=3;g.setLineDash([6,8]);g.stroke();g.setLineDash([]);inkRef.current.getContext("2d").clearRect(0,0,W,H);painted.current=0;};
+  const start=()=>{const w=wagerOn?wager:0;if(w>0){if(!onWager(w)){say(`Need ${w} Loks`);return;}}setStake(w);const pool=MODES[mode].pool;const k=pool[Math.floor(Math.random()*pool.length)];setShape(k);setScore(0);setTime(modeTime[mode]||ROUND_BASE);setPhase("play");setOnline(Math.floor(700+Math.random()*500));const field=Math.floor(5+Math.random()*4);setPot(w*(field+1));setBoard(FRONT_NAMES.slice(0,field).map(n=>({name:n,score:0})).concat([{name:"you",score:0,me:true}]));setTimeout(()=>setupShape(k),0);};
+  useEffect(()=>{if(phase!=="play")return;tickRef.current=setInterval(()=>setTime(t=>{if(t<=0.1){finish();return 0;}return +(t-0.1).toFixed(1);}),100);const bots=setInterval(()=>setBoard(bd=>bd.map(p=>p.me?p:{...p,score:Math.min(98,p.score+Math.random()*6)}).sort((a,b)=>b.score-a.score)),600);return()=>{clearInterval(tickRef.current);clearInterval(bots);};},[phase]);
+  const coverage=()=>Math.min(100,Math.round((painted.current/Math.max(1,targetPts.current.length))*100));
+  const finish=()=>{clearInterval(tickRef.current);const cov=coverage();const speedBonus=Math.round(Math.max(0,time)*2);const final=Math.min(100,cov)+speedBonus;setScore(final);setBoard(bd=>{const nb=bd.map(p=>p.me?{...p,score:final}:p).sort((a,b)=>b.score-a.score);const place=nb.findIndex(p=>p.me)+1;const field=nb.length;let payout;if(pot>0)payout=place===1?Math.round(pot*0.6):place===2?Math.round(pot*0.3):place===3?Math.round(pot*0.1):0;else payout=place===1?15:place<=Math.ceil(field/2)?6:1;setLastPayout(payout);setTimeout(()=>{if(payout>0)onEarn(payout);blip&&blip(place===1?"C6":"E5");say(place===1?`1st! +${payout} Loks`:`#${place} · +${payout} Loks`);},50);return nb;});setPhase("results");};
+  const pos=e=>{const r=wrapRef.current.getBoundingClientRect();return[((e.clientX-r.left)*W)/r.width,((e.clientY-r.top)*H)/r.height];};
+  const scorePoint=(x,y)=>{const pts=targetPts.current;for(let i=0;i<pts.length;i++){if(!pts[i].hit&&Math.hypot((pts[i][0]??pts[i].x??pts[i][0])-x,(pts[i][1]??pts[i].y??pts[i][1])-y)<22){pts[i].hit=true;painted.current++;return true;}}return false;};
+  const lastBoard=useRef(0);
+  const down=e=>{if(phase!=="play")return;e.preventDefault();wrapRef.current.setPointerCapture(e.pointerId);drawing.current=true;last.current=pos(e);paint(...last.current);};
+  const move=e=>{if(!drawing.current)return;const[x,y]=pos(e);paint(x,y);};
+  const paint=(x,y)=>{const ctx=inkRef.current.getContext("2d");const hit=scorePoint(x,y);ctx.strokeStyle=hit?ART.teal:ART.pink;ctx.lineWidth=12;ctx.lineCap="round";ctx.lineJoin="round";ctx.beginPath();const[px,py]=last.current||[x,y];ctx.moveTo(px,py);ctx.lineTo(x,y);ctx.stroke();last.current=[x,y];if(hit){const now=performance.now();if(now-lastBoard.current>120){lastBoard.current=now;setBoard(bd=>bd.map(p=>p.me?{...p,score:coverage()}:p));}if(Math.random()<0.12)blip&&blip("D5");}};
+  const up=()=>{drawing.current=false;last.current=null;};
+  if(phase==="lobby"&&!hinted)return(<div className="mt-4 text-center" style={{animation:"lokrise .3s ease"}}>
+    <div className="lok-display text-2xl font-extrabold" style={{color:T.accent}}>Trace Rush</div>
+    <div className="mt-3 p-4 rounded-2xl" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`5px 5px 0 ${T.shadow}`}}>
+      <div className="flex items-center justify-center gap-2 mb-3">
+        <div className="flex items-center justify-center rounded-lg text-[10px] font-bold" style={{width:56,height:70,border:`2.5px dashed ${T.ink}`,opacity:0.45}}>ghost<br/>shape</div>
+        <div style={{fontSize:20}}>→</div>
+        <div className="flex items-center justify-center rounded-lg text-[10px] font-bold" style={{width:56,height:70,border:`2.5px solid ${ART.teal}`,color:ART.teal}}>your<br/>trace</div>
+        <div style={{fontSize:20}}>→</div>
+        <div className="lok-display flex items-center justify-center rounded-lg text-lg font-extrabold" style={{width:56,height:70,border:`2.5px solid ${T.accent}`,color:T.accent}}>98</div>
+      </div>
+      <p className="text-sm leading-snug">A dashed shape appears. Trace it before the clock runs out. <span style={{color:ART.teal,fontWeight:700}}>Teal</span> = on the line, <span style={{color:T.accent,fontWeight:700}}>pink</span> = off. Finish early for a speed bonus.</p>
+    </div>
+    <button onClick={()=>onHinted&&onHinted()} className="lok-btn lok-display mt-3 w-full py-3.5 rounded-xl text-lg font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,boxShadow:`4px 4px 0 ${T.ink}`}}>Got it — let's trace</button>
+  </div>);
+  if(phase==="lobby")return(<div className="mt-4">
+    <h2 className="lok-display text-lg font-extrabold">Trace Rush</h2>
+    <p className="text-sm opacity-70 mt-0.5">Pick a mode. Trace the target cleanly before the clock runs out. Accuracy + speed = your score.</p>
+    <div className="mt-3 text-xs font-bold uppercase tracking-widest opacity-60">Game mode</div>
+    <div className="mt-1.5 grid grid-cols-2 gap-2">{Object.entries(MODES).map(([id,m])=>{const sel=mode===id;return(<button key={id} onClick={()=>setMode(id)} className="lok-btn p-2.5 rounded-xl text-left" style={{border:`3px solid ${sel?T.accent:T.ink}`,background:sel?T.ink:T.card,color:sel?T.paper:T.ink}}><div className="lok-display font-extrabold text-sm">{m.name}</div><div className="text-[11px] opacity-75">{m.tag}</div></button>);})}
+    </div>
+    <button onClick={start} className="lok-btn lok-display mt-3 w-full py-3.5 rounded-xl text-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,boxShadow:`5px 5px 0 ${T.ink}`,animation:reduceMotion?"none":"lokpulse 2.4s infinite"}}>Play {MODES[mode].name}</button>
+  </div>);
+  if(phase==="results"){const me=board.find(p=>p.me);const place=board.findIndex(p=>p.me)+1;return(<div className="mt-4">
+    <h2 className="lok-display text-2xl font-extrabold text-center">{place===1?"Cleanest line! 🏆":`You placed #${place}`}</h2>
+    <p className="text-center text-sm opacity-70">{MODES[mode].name} · score {me?.score}</p>
+    <div className="mt-3 flex flex-col gap-1.5">{board.map((p,i)=>(<div key={p.name} className="flex items-center gap-3 p-2 rounded-xl" style={{border:`2.5px solid ${p.me?T.accent:T.ink}`,background:T.card}}><span className="lok-display font-extrabold w-5 text-center">{i+1}</span><span className="flex-1 font-bold" style={{color:p.me?T.accent:T.ink}}>{p.name}</span><span className="lok-display font-extrabold">{Math.round(p.score)}</span></div>))}</div>
+    <div className="mt-4 flex gap-2"><button onClick={start} className="lok-btn lok-display flex-1 py-3 rounded-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}}>Next round</button><button onClick={()=>setPhase("lobby")} className="lok-btn lok-display flex-1 py-3 rounded-xl font-extrabold" style={{background:T.card,color:T.ink,border:`3px solid ${T.ink}`}}>Leave</button></div>
+  </div>);}
+  const cov=coverage();
+  return(<div className="mt-3">
+    <div className="flex items-center gap-2">
+      <div className="flex-1 p-2 rounded-xl" style={{border:`2.5px solid ${T.ink}`,background:T.card}}><div className="text-[10px] font-bold uppercase tracking-widest opacity-60">{MODES[mode].name}</div><div className="lok-display font-extrabold text-sm" style={{color:T.accent}}>{shape.replace(/-/g," ")}</div></div>
+      <div className="text-center px-3 py-1.5 rounded-xl" style={{background:time<=4?T.accent:T.ink,color:time<=4?T.onAccent:T.paper,animation:time<=4&&time>0&&!reduceMotion?"lokpulse .5s ease-in-out infinite":"none",transition:"background .3s ease"}}><div className="lok-display text-xl font-extrabold leading-none">{time.toFixed(1)}</div><div className="text-[9px] font-bold">sec</div></div>
+    </div>
+    <div className="mt-2 flex items-center gap-2"><div className="flex-1 h-3 rounded-full overflow-hidden" style={{background:T.shadow}}><div style={{width:`${cov}%`,height:"100%",background:T.alt,transition:"width .1s"}}/></div><span className="lok-display font-extrabold text-sm">{cov}%</span></div>
+    <div ref={wrapRef} className="relative mt-2 rounded-2xl overflow-hidden select-none" style={{border:`3px solid ${T.ink}`,background:ART.paper,boxShadow:`6px 6px 0 ${T.shadow}`,aspectRatio:"4/5"}} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up}>
+      <canvas ref={guideRef} width={W} height={H} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true"/>
+      <canvas ref={inkRef} width={W} height={H} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true"/>
+      <div className="absolute inset-0" role="img" aria-label="Trace Rush canvas" style={{touchAction:"none",cursor:"crosshair"}}/>
+      <button onClick={finish} className="lok-btn absolute bottom-2 right-2 px-3 py-1.5 rounded-full text-xs font-bold" style={{background:T.ink,color:T.paper}}>Lock it in</button>
+    </div>
+    <div className="mt-2 flex items-center gap-2"><div className="text-xs opacity-70"><span style={{color:T.alt}}>●</span> {online.toLocaleString()} online</div></div>
+    <p className="mt-1 text-center text-xs opacity-50">Teal = on the line · pink = off. Finish early for speed bonus.</p>
+  </div>);
+}
+
+function ShopItem({owned,equipped,price,onClick,children,swatch}){const T=useT();return(<button onClick={onClick} className="lok-btn text-left rounded-2xl overflow-hidden w-full" style={{border:`3px solid ${equipped?T.accent:T.ink}`,background:T.card,boxShadow:`4px 4px 0 ${T.shadow}`}}>{swatch}<div className="px-2.5 py-2 flex items-center justify-between gap-2"><div className="min-w-0">{children}</div><span className="text-xs font-extrabold shrink-0" style={{color:equipped?T.alt:T.accent}}>{equipped?"On ✓":owned?"Equip":price===0?"Free":price}</span></div></button>);}
+function Shop({modules=[],onBuyModule,loks,lokPass,kids,uiTheme,ownedThemes,effect,ownedEffects,sky,ownedSkies=[],onSky,animFx,ownedAnimFx=[],onAnimFx,fontPack,onFontPack,cursorPack,onCursorPack,musicPack,onMusicPack,stickerPack,onStickerPack,postExport,onPostExport,cosmetics,owned,onBuyCosmetic,setKids,onBuyPass,onTheme,onEffect,onTier,onCc}){
+  const T=useT();const[catTab,setCatTab]=useState("featured");const[modTab,setModTab]=useState("layers");const[showAll,setShowAll]=useState(false);
+  const Section=({title,sub,children})=>(<section className="mt-5"><h3 className="lok-display text-base font-extrabold">{title}</h3>{sub&&<p className="text-xs opacity-60 mb-1">{sub}</p>}<div className="mt-2">{children}</div></section>);
+  const has=(cat,id)=>owned[cat]?.includes(id);const eq=(cat,id)=>cosmetics[cat]===id;const buy=(cat,item)=>onBuyCosmetic(cat,item);
+  const cats=[["featured","Featured"],["themes","Skins"],["effects","Effects"],["fx","FX"],["skies","Skies"],["cosmetic","Cosmetics"],["studio","Studio"],["paper","Paper"],["cursors","Cursors"],["fonts","Fonts"],["stickers","Stickers"],["export","Export"],["blot","Blot Shop"],["lillok","LilLok+"],["music","Music"]];
+  const moduleTypes=[{type:"layers",label:"Layers"},{type:"brush",label:"Brushes"},{type:"tool",label:"Tools"},{type:"feature",label:"Features"},{type:"canvas",label:"Canvas"}];
+  return(<div className="mt-4">
+    <h2 className="lok-display text-lg font-extrabold">Shop</h2>
+    <p className="text-sm opacity-70 mt-0.5">{kids?"Everything here is free play.":"Spend Loks you earn — or grab the LokPass."}</p>
+    <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">{cats.map(([id,l])=>(<button key={id} onClick={()=>setCatTab(id)} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:catTab===id?T.ink:T.card,color:catTab===id?T.paper:T.ink}}>{l}</button>))}
+      <button onClick={()=>setShowAll(s=>!s)} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-sm font-bold" style={{border:`2.5px solid ${showAll?T.accent:T.shadow}`,background:showAll?T.ink:T.card,color:showAll?T.paper:T.shadow}} aria-pressed={showAll}>👀 All</button>
+    </div>
+    {catTab==="featured"&&(<>
+      {!kids&&(<div className="mt-3 p-4 rounded-2xl relative overflow-hidden" style={{border:`3px solid ${T.ink}`,background:T.ink,color:T.paper,boxShadow:`6px 6px 0 ${T.accent}`}}><div className="lok-display text-xl font-extrabold">LokPass</div><p className="text-sm opacity-85 mt-1">No ads. Every UI theme unlocked. PASS badge.</p><button onClick={onBuyPass} disabled={lokPass} className="lok-btn lok-display mt-3 w-full py-2.5 rounded-xl text-lg font-extrabold" style={{background:lokPass?"transparent":T.accent,color:lokPass?T.paper:T.onAccent,border:`3px solid ${T.paper}`,opacity:lokPass?0.7:1}} aria-label={lokPass?"LokPass active":"Get LokPass"}>{lokPass?"Active ✓":"Get LokPass — $2.99"}</button></div>)}
+      <div className="mt-3 p-3 rounded-2xl flex items-center gap-3" style={{border:`3px solid ${T.ink}`,background:T.card}}><div className="flex-1"><div className="lok-display font-extrabold">Lok Juniors {kids?"· ON":""}</div><div className="text-xs opacity-70">Safe walled-garden mode for kids &amp; classrooms.</div></div><button onClick={()=>setKids(!kids)} className="lok-btn px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:kids?T.alt:T.card,color:kids?"#fff":T.ink,border:`3px solid ${T.ink}`}} aria-pressed={kids}>{kids?"Turn off":"Turn on"}</button></div>
+      {(()=>{const dS=Math.floor(Date.now()/86400000);const pick=(a,o)=>a[(dS+o)%a.length];const tE=Object.entries(THEMES);const tT=tE[dS%tE.length];const tEf=pick(EFFECTS,1);const tC=pick(NAME_COLORS.filter(x=>x.id!=="default"),2);const tP=pick(PAPERS.filter(x=>x.id!=="plain"),3);return(<Section title="✨ Today's picks" sub="New items featured daily!"><div className="grid grid-cols-2 gap-2">
+        {tE.length>0&&(()=>{const[id,th]=tT;const own=ownedThemes.includes(id);const e2=uiTheme===id;return(<ShopItem key={"ft-"+id} owned={own} equipped={e2} price={th.price} onClick={()=>onTheme(id)}><div className="font-bold text-sm truncate">{th.name}</div><div className="text-[10px] opacity-70 truncate">Skin</div></ShopItem>);})()}
+        {EFFECTS.length>0&&(()=>{const e=tEf;const own=ownedEffects.includes(e.id);const e2=effect===e.id;return(<ShopItem key={"fe-"+e.id} owned={own} equipped={e2} price={e.price} onClick={()=>onEffect(e.id,e)}><div className="font-bold text-sm truncate">{e.name}</div><div className="text-[10px] opacity-70 truncate">Effect</div></ShopItem>);})()}
+        {NAME_COLORS.length>0&&(()=>{const c=tC;return(<ShopItem key={"fc-"+c.id} owned={has("nameColor",c.id)} equipped={eq("nameColor",c.id)} price={c.price} onClick={()=>buy("nameColor",c)}><div className="font-bold text-sm truncate" style={{color:c.color==="rainbow"?undefined:c.color||T.ink,background:c.color==="rainbow"?"linear-gradient(90deg,#FF5DA2,#E8B14B,#2FA9A0)":undefined,WebkitBackgroundClip:c.color==="rainbow"?"text":undefined,WebkitTextFillColor:c.color==="rainbow"?"transparent":undefined}}>{c.name}</div><div className="text-[10px] opacity-70 truncate">Name color</div></ShopItem>);})()}
+        {PAPERS.length>0&&(()=>{const p=tP;const own=has("paper",p.id);const e2=eq("paper",p.id);return(<ShopItem key={"fp-"+p.id} owned={own} equipped={e2} price={p.price} onClick={()=>buy("paper",p)}><div className="font-bold text-sm truncate">{p.name}</div><div className="text-[10px] opacity-70 truncate">Paper</div></ShopItem>);})()}
+      </div></Section>);})()}
+    </>)}
+    {catTab==="themes"&&!kids&&(<Section title="UI themes" sub={`Own skins to unlock new waves.`}><div className="grid grid-cols-2 gap-3">{Object.entries(THEMES).filter(([,th])=>showAll||(th.wave||1) < 2 || ownedThemes.length>=SKIN_WAVE_GATE).filter(([,th])=>showAll||(th.wave||1) < 3 || ownedThemes.length>=SKIN_WAVE_3_GATE).filter(([,th])=>showAll||(th.wave||1) < 4 || ownedThemes.length>=SKIN_WAVE_4_GATE).map(([id,th])=>{const own=ownedThemes.includes(id);const e2=uiTheme===id;return(<button key={id} onClick={()=>onTheme(id)} className="lok-btn text-left rounded-2xl overflow-hidden" style={{border:`3px solid ${e2?T.accent:own||showAll?T.ink:T.shadow}`,background:T.card,boxShadow:`4px 4px 0 ${T.shadow}`,opacity:own||showAll?1:.5}} aria-label={`Theme ${th.name}`}><div className="flex h-10 relative">{[th.paper,th.ink,th.accent,th.alt].map((c,k)=>(<div key={k} className="flex-1" style={{background:c}}/>))}{th.animated&&<><div className="absolute inset-0" style={{background:`linear-gradient(110deg, transparent 30%, ${th.accent}55 50%, transparent 70%)`,backgroundSize:"220% 100%",animation:"loksheen 2.8s linear infinite"}}/><span className="absolute top-1 right-1 lok-display px-1.5 rounded text-[9px] font-extrabold" style={{background:th.accent,color:th.onAccent}}>● LIVE</span></>}</div><div className="px-2.5 py-2"><div className="font-bold text-sm">{th.name}</div><div className="text-xs opacity-70">{th.desc}</div><div className="mt-1 text-xs font-extrabold" style={{color:T.accent}}>{e2?"Equipped":own?"Equip":showAll?lokPass?"In PASS":`${th.price} Loks`:"🔒 Wave "+(th.wave||1)}</div></div></button>);})}</div></Section>)}
+    {catTab==="effects"&&(<Section title="Page effects"><div className="grid grid-cols-2 gap-2">{EFFECTS.map(e=>{const own=ownedEffects.includes(e.id);const e2=effect===e.id;return(<ShopItem key={e.id} owned={own} equipped={e2} price={e.price} onClick={()=>onEffect(e.id,e)}><div className="font-bold text-sm">{e.name}</div></ShopItem>);})}</div></Section>)}
+    {catTab==="fx"&&(<Section title="Animation FX" sub="Visual effects play over your flip when viewed."><div className="grid grid-cols-2 gap-2">{ANIMATION_FX.filter(f=>showAll||f.id!=="none").map(f=>{const own=ownedAnimFx.includes(f.id);const e2=animFx===f.id;return(<ShopItem key={f.id} owned={own} equipped={e2} price={f.price} onClick={()=>onAnimFx(f.id,f)}><div className="font-bold text-sm">{f.name}</div>{f.desc&&<div className="text-[10px] opacity-70">{f.desc}</div>}</ShopItem>);})}</div></Section>)}
+    {catTab==="skies"&&(<Section title="Atmosphere"><div className="grid grid-cols-2 gap-2">{SKIES.map(s=>{const own=ownedSkies.includes(s.id);const e2=sky===s.id;return(<ShopItem key={s.id} owned={own} equipped={e2} price={s.price} onClick={()=>onSky(s.id,s)}><div className="font-bold text-sm">{s.name}</div></ShopItem>);})}</div></Section>)}
+    {catTab==="cursors"&&(<Section title="Drawing Cursors"><div className="grid grid-cols-2 gap-2">{CURSORS.filter(c=>showAll||c.id!=="default").map(c=>{const own=has("cursorPack",c.id);const e2=eq("cursorPack",c.id);return(<ShopItem key={c.id} owned={own} equipped={e2} price={c.price} onClick={()=>buy("cursorPack",c)}><div className="font-bold text-sm">{c.name}</div></ShopItem>);})}</div></Section>)}
+    {catTab==="fonts"&&(<Section title="Font Packs" sub="Change the app font style."><div className="grid grid-cols-2 gap-2">{FONT_PACKS.filter(f=>showAll||f.id!=="default").map(f=>{const own=has("fontPack",f.id);const e2=eq("fontPack",f.id);return(<ShopItem key={f.id} owned={own} equipped={e2} price={f.price} onClick={()=>buy("fontPack",f)}><div className="font-bold text-sm">{f.name}</div>{f.desc&&<div className="text-[10px] opacity-70">{f.desc}</div>}</ShopItem>);})}</div></Section>)}
+    {catTab==="stickers"&&(<Section title="Sticker Packs" sub="Unlock themed sticker sets for your Studio."><div className="grid grid-cols-2 gap-2">{STICKER_PACKS.filter(s=>showAll||s.id!=="emoji").map(s=>{const own=has("stickerPack",s.id);const e2=eq("stickerPack",s.id);return(<ShopItem key={s.id} owned={own} equipped={e2} price={s.price} onClick={()=>buy("stickerPack",s)}><div className="font-bold text-sm">{s.name}</div><div className="text-[10px] opacity-70">{s.stickers.slice(0,4).join(" ")}{s.stickers.length>4?" +"+s.stickers.length:""}</div></ShopItem>);})}</div></Section>)}
+    {catTab==="export"&&(<Section title="Export Formats" sub="Extra export options for your flips."><div className="grid grid-cols-2 gap-2">{POST_EXPORTS.filter(e=>showAll||e.id!=="png").map(e=>{const own=has("postExport",e.id);const e2=eq("postExport",e.id);return(<ShopItem key={e.id} owned={own} equipped={e2} price={e.price} onClick={()=>buy("postExport",e)}><div className="font-bold text-sm">{e.name}{e.soon&&<span className="ml-1 text-[9px] opacity-50">soon</span>}</div>{e.desc&&<div className="text-[10px] opacity-70">{e.desc}</div>}</ShopItem>);})}</div></Section>)}
+    {catTab==="cosmetic"&&(<>
+      <Section title="Name color"><div className="grid grid-cols-2 gap-2">{NAME_COLORS.map(c=>(<ShopItem key={c.id} owned={has("nameColor",c.id)} equipped={eq("nameColor",c.id)} price={c.price} onClick={()=>buy("nameColor",c)}><div className="font-bold text-sm" style={{color:c.color==="rainbow"?undefined:c.color||T.ink,background:c.color==="rainbow"?"linear-gradient(90deg,#FF5DA2,#E8B14B,#2FA9A0)":undefined,WebkitBackgroundClip:c.color==="rainbow"?"text":undefined,WebkitTextFillColor:c.color==="rainbow"?"transparent":undefined}}>{c.name}</div></ShopItem>))}</div></Section>
+      <Section title="Avatar frames"><div className="grid grid-cols-2 gap-2">{FRAMES.map(f=>{const own=has("frame",f.id);const e2=eq("frame",f.id);return(<ShopItem key={f.id} owned={own} equipped={e2} price={f.price} onClick={()=>buy("frame",f)}><div className="font-bold text-sm">{f.name}</div></ShopItem>);})}</div></Section>
+      <Section title="Reaction packs"><div className="grid grid-cols-2 gap-2">{REACTION_PACKS.map(r=>(<ShopItem key={r.id} owned={has("reactionPack",r.id)} equipped={eq("reactionPack",r.id)} price={r.price} onClick={()=>buy("reactionPack",r)}><div className="font-bold text-sm leading-tight">{r.name}</div></ShopItem>))}</div></Section>
+      <Section title="Avatar accents"><div className="grid grid-cols-2 gap-2">{AVATAR_ACCENTS.map(a=>(<ShopItem key={a.id} owned={has("avatarAccent",a.id)} equipped={eq("avatarAccent",a.id)} price={a.price} onClick={()=>buy("avatarAccent",a)}><div className="font-bold text-sm">{a.name}</div></ShopItem>))}</div></Section>
+    </>)}
+    {catTab==="studio"&&(<>
+      <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">{moduleTypes.filter(t=>t.type!=="achievement").map(({type,label})=>(<button key={type} onClick={()=>setModTab(type)} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:modTab===type?T.ink:T.card,color:modTab===type?T.paper:T.ink}}>{label}</button>))}</div>
+      <Section title="Modules" sub="Expand your studio toolbox."><div className="grid grid-cols-2 gap-2">{STUDIO_MODULES.filter(m=>m.type===modTab||modTab==="all").filter(m=>showAll||m.price>0).map(m=>{const own=modules.includes(m.id);return(<ShopItem key={m.id} owned={own} equipped={own} price={m.price} onClick={()=>{if(own){say("Already owned");}else if(m.price===0){say("Free — claim it!");onBuyModule?.(m);}else{onBuyModule?.(m);}}}><div className="font-bold text-sm">{m.name}</div>{m.desc&&<div className="text-[10px] opacity-70">{m.desc}</div>}</ShopItem>);})}</div></Section>
+      {!modules.includes("module_uber")&&<Section title="Studio Pro" sub="Blend modes, symmetry (mirror · radial), fill, eyedropper, marker &amp; chalk brushes"><div className="flex items-center justify-between p-2.5 rounded-xl" style={{border:`3px solid ${T.ink}`,background:T.card}}><div className="font-bold text-sm">Pro easel unlock</div>{ccTier?<span className="text-sm font-extrabold" style={{color:T.alt}}>Owned ✓</span>:<button onClick={onCc} className="lok-btn px-3 py-1 rounded-full text-sm font-extrabold" style={{background:T.accent,color:T.onAccent,border:`2.5px solid ${T.ink}`}}>120 Loks</button>}</div></Section>}
+    </>)}
+    {catTab==="paper"&&(<Section title="Canvas paper" sub="Paper textures and drawing guides."><div className="grid grid-cols-2 gap-2">{PAPERS.map(p=>(<ShopItem key={p.id} owned={has("paper",p.id)} equipped={eq("paper",p.id)} price={p.price} onClick={()=>buy("paper",p)}><div className="font-bold text-sm">{p.name}</div></ShopItem>))}</div></Section>)}
+    {catTab==="blot"&&(<><Section title="Blot borders" sub="Borders for your LilLok container.">
+      <div className="grid grid-cols-2 gap-2">{BLOT_BORDERS.map(b=>(
+        <ShopItem key={b.id} owned={has("blotBorder",b.id)} equipped={eq("blotBorder",b.id)} price={b.price} onClick={()=>buy("blotBorder",b)}
+          swatch={<div className="flex items-center justify-center py-3"><div className="rounded-full" style={{width:44,height:44,background:T.paper,...blotBorderStyle(b.id,T)}}/></div>}>
+          <div className="font-bold text-sm">{b.name}</div>
+        </ShopItem>))}
+      </div>
+    </Section>
+    <Section title="LilLok gear" sub="Accessories for your ink buddy."><div className="grid grid-cols-2 gap-2">{LILLOK_GEAR.filter(g=>g.id!=="none").map(g=>(<ShopItem key={g.id} owned={has("lillokGear",g.id)} equipped={eq("lillokGear",g.id)} price={g.price} onClick={()=>buy("lillokGear",g)}><div className="font-bold text-sm">{g.name}</div></ShopItem>))}</div></Section></>)}
+    {catTab==="lillok"&&(<>
+      <Section title="LilLok Skins" sub="Change your LilLok's appearance."><div className="grid grid-cols-2 gap-2">{LILLOK_SKINS.filter(s=>s.id!=="none").map(s=>(<ShopItem key={s.id} owned={has("lillokSkin",s.id)} equipped={eq("lillokSkin",s.id)} price={s.price} onClick={()=>buy("lillokSkin",s)}><div className="font-bold text-sm">{s.name}</div></ShopItem>))}</div></Section>
+      <Section title="LilLok Auras"><div className="grid grid-cols-2 gap-2">{LILLOK_AURAS.filter(a=>a.id!=="none").map(a=>(<ShopItem key={a.id} owned={has("lillokAura",a.id)} equipped={eq("lillokAura",a.id)} price={a.price} onClick={()=>buy("lillokAura",a)}><div className="font-bold text-sm">{a.name}</div></ShopItem>))}</div></Section>
+      <Section title="LilLok Pets"><div className="grid grid-cols-2 gap-2">{LILLOK_PETS.filter(p=>p.id!=="none").map(p=>(<ShopItem key={p.id} owned={has("lillokPet",p.id)} equipped={eq("lillokPet",p.id)} price={p.price} onClick={()=>buy("lillokPet",p)}><div className="font-bold text-sm">{p.name}</div></ShopItem>))}</div></Section>
+      <Section title="Voice Packs"><div className="grid grid-cols-2 gap-2">{VOICE_PACKS.filter(v=>v.id!=="default").map(v=>(<ShopItem key={v.id} owned={has("voicePack",v.id)} equipped={eq("voicePack",v.id)} price={v.price} onClick={()=>buy("voicePack",v)}><div className="font-bold text-sm">{v.name}</div></ShopItem>))}</div></Section>
+    </>)}
+    {catTab==="music"&&(<Section title="Background Music" sub="Ambient soundtracks for your studio sessions."><div className="grid grid-cols-2 gap-2">{MUSIC_PACKS.filter(m=>showAll||m.id!=="none").map(m=>{const own=has("musicPack",m.id);const e2=eq("musicPack",m.id);return(<ShopItem key={m.id} owned={own} equipped={e2} price={m.price} onClick={()=>buy("musicPack",m)}><div className="font-bold text-sm">{m.name}</div></ShopItem>);})}</div></Section>)}
+    <p className="mt-5 text-center text-xs opacity-60">Balance: {loks} Loks</p>
+  </div>);
+}
+
+function PostCard({p,onOpen}){
+  const T=useT();
+  if(!p.frames||p.frames.length===0)return(<button onClick={()=>onOpen(p.id)} className="lok-btn text-left rounded-2xl overflow-hidden" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`5px 5px 0 ${T.shadow}`}} aria-label={p.title}><div className="flex items-center justify-center" style={{aspectRatio:"4/5",background:T.paper}}><div className="text-center opacity-40"><div className="lok-display font-extrabold">{p.title}</div><div className="text-xs">Rendering…</div></div></div></button>);
+  return(<button onClick={()=>onOpen(p.id)} className="lok-btn text-left rounded-2xl overflow-hidden" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`5px 5px 0 ${T.shadow}`}} aria-label={`Open ${p.title}`}><div className="relative"><img src={p.frames[Math.floor(p.frames.length/2)]} alt={p.title} className="w-full block" style={{aspectRatio:"4 / 5",objectFit:"cover"}}/><div className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-md text-xs font-bold" style={{background:T.ink,color:T.paper}}>{p.from==="battle"?"⚔ battle":p.mode==="B"?"▣ page":`${p.frames.length}pg`}</div></div><div className="px-2.5 py-2"><div className="font-bold leading-tight truncate text-sm">{p.title}</div><div className="text-xs opacity-70 mt-0.5">{p.votes} votes · {p.views||0} views</div></div></button>);
+}
+function PersonRow({name,note}){const T=useT();const seed=name.length*31;return(<div className="flex items-center gap-3 p-2 rounded-xl mb-2" style={{border:`2.5px solid ${T.ink}`,background:T.card}}><img src={renderAvatar(seed)} alt={name} className="w-11 h-11 rounded-full" style={{border:`2px solid ${T.ink}`}}/><div className="font-bold flex-1">{name}</div>{note&&<span className="text-xs opacity-60">{note}</span>}</div>);}
+
+function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,xp,quests,following,lokdInCount,bookmarks,notifications=[],notifUnread=0,loks=0,totalEarned=0,questsCompleted=0,canInstall=false,onInstall,onClearNotifs,onOpen,onDelete,onRename,say,pace="sweep",setPace,speed=1,setSpeed,soundLab=false,onUnlockSoundLab,soundQueue=[],setSoundQueue,founder=false,onFounderJoin,animatedToken=false,garden=[],setGarden,wordTwister={},setWordTwister,timeMachineIdx=-1,setTimeMachineIdx,heatmapData=[],sessionPin=null,setSessionPin,pinInput="",setPinInput,verified=false,setVerified}){
+  const T=useT();const[filter,setFilter]=useState("newest");const[view,setView]=useState("gallery");const[editing,setEditing]=useState(false);const[draft,setDraft]=useState(profile);const[showNotifs,setShowNotifs]=useState(false);const[searchQ,setSearchQ]=useState("");const[showSettings,setShowSettings]=useState(false);
+  const tapCount=useRef(0);const tapTimer=useRef(null);const audioRef=useRef(null);const[slUrl,setSlUrl]=useState("");const[slPlaying,setSlPlaying]=useState(null);const[fHandle,setFHandle]=useState(profile.name||"");const[fEmail,setFEmail]=useState("");const[fBusy,setFBusy]=useState(false);
+  const versionTap=()=>{if(soundLab)return;tapCount.current++;clearTimeout(tapTimer.current);tapTimer.current=setTimeout(()=>{tapCount.current=0;},1200);if(tapCount.current>=7){tapCount.current=0;onUnlockSoundLab&&onUnlockSoundLab();say("🔊 Sound Lab unlocked","success");}};
+  const ytId=u=>{const m=u.match(/(?:youtu\.be\/|v=|shorts\/)([\w-]{11})/);return m?m[1]:null;};
+  const slAdd=()=>{const u=slUrl.trim();if(!u)return;const kind=ytId(u)?"youtube":/spotify\.com/.test(u)?"spotify":"mp3";setSoundQueue(q=>[...q.slice(-9),{id:Date.now(),url:u,kind}]);setSlUrl("");say(kind==="spotify"?"Queued (Spotify embed — full playback needs Premium SDK)":"Queued");};
+  const slPlay=item=>{if(item.kind==="mp3"){if(audioRef.current){audioRef.current.pause();}const a=new Audio(item.url);audioRef.current=a;a.play().catch(()=>say("Couldn't play that URL"));}setSlPlaying(item.id);};
+  const slStop=()=>{if(audioRef.current)audioRef.current.pause();setSlPlaying(null);};
+  useEffect(()=>()=>{if(audioRef.current)audioRef.current.pause();},[]);
+  const joinFounders=async()=>{if(!fHandle.trim()||fHandle.trim().length<2){say("Enter a handle");return;}setFBusy(true);try{await onFounderJoin(fHandle.trim(),fEmail.trim());say("You're a founder! Data secured on the test server 🏆","success");}catch{say("Couldn't reach the server — try again","error");}setFBusy(false);};
+  const isIOS=typeof navigator!=="undefined"&&/iPad|iPhone|iPod/.test(navigator.userAgent);
+  const avatar=useMemo(()=>renderAvatar(profile.avatarSeed),[profile.avatarSeed]);
+  const filtered=[...posts].filter(p=>!searchQ||p.title?.toLowerCase().includes(searchQ.toLowerCase())||p.style?.toLowerCase().includes(searchQ.toLowerCase())).sort((a,b)=>{if(filter==="loks")return b.votes-a.votes;if(filter==="views")return(b.views||0)-(a.views||0);return 0;}).filter(p=>filter==="battle"?p.from==="battle":filter==="series"?p.style==="series":filter==="weekly"?p.weeklyPrompt===WEEKLY_PROMPT:true);
+  const nextMilestone=[10,25,50,100].find(m=>questsCompleted<m);
+  const bookmarked=posts.filter(p=>bookmarks.includes(p.id));
+  return(<div>
+    <section className="mt-4 p-4 rounded-2xl" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`6px 6px 0 ${T.shadow}`}}>
+      <div className="flex items-center gap-4">
+        <FramedAvatar src={avatar} size={72} frame={cosmetics.frame} accent={cosmetics.avatarAccent} ink={T.ink} acc={T.accent} animated={animatedToken}/>
+        <div className="min-w-0 flex-1"><div className="lok-display text-xl font-extrabold leading-tight flex items-center gap-2 flex-wrap"><NameTag name={profile.name} color={cosmetics.nameColor} style={{color:T.ink}}/>{lokPass&&!kids&&<span className="text-xs px-1.5 py-0.5 rounded" style={{background:T.accent,color:T.onAccent}}>PASS</span>}</div><div className="text-sm opacity-70">{posts.length} flips · {wins} {wins===1?"win":"wins"}</div></div>
+        <div className="flex gap-1.5">
+          {notifUnread>0&&<button onClick={()=>{setShowNotifs(v=>!v);onClearNotifs&&onClearNotifs();}} className="lok-btn relative px-2 py-1.5 rounded-full text-xs font-bold" style={{border:`2px solid ${T.accent}`,background:T.accent,color:"#fff"}} aria-label={`${notifUnread} notifications`}>🔔 {notifUnread}</button>}
+          <button onClick={()=>{setDraft(profile);setEditing(true);}} className="lok-btn px-3 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Edit profile">Edit</button>
+          <button onClick={()=>setShowSettings(true)} className="lok-btn px-2.5 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Settings">⚙</button>
+        </div>
+      </div>
+      {showNotifs&&notifications.length>0&&(<div className="mt-3 flex flex-col gap-1.5">{notifications.slice(-5).reverse().map(n=>(<div key={n.id} className="text-xs px-3 py-2 rounded-xl" style={{background:T.paper,border:`1.5px solid ${T.shadow}`}}>{n.msg}</div>))}</div>)}
+      <p className="mt-3 text-sm leading-snug">{profile.bio}</p>
+      <div className="mt-3 grid grid-cols-3 gap-2">{[["lokdin","Lok'd in",(lokdInCount).toLocaleString()],["lokd","Lok'd",following.length],["bookmarks","Bookmarks",bookmarks.length]].map(([id,label,n])=>(<button key={id} onClick={()=>setView(view===id?"gallery":id)} className="lok-btn py-2 rounded-xl text-center" style={{border:`2.5px solid ${view===id?T.accent:T.ink}`,background:view===id?T.ink:"transparent",color:view===id?T.paper:T.ink}} aria-pressed={view===id}><div className="lok-display font-extrabold leading-none">{n}</div><div className="text-[11px] opacity-75">{label}</div></button>))}</div>
+    </section>
+    {!kids&&(<section className="mt-3 p-4 rounded-2xl" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`4px 4px 0 ${T.shadow}`}}>
+      <div className="flex items-center justify-between"><div className="lok-display font-extrabold">Level {level}</div><div className="text-xs opacity-70">{xp%100}/100 XP</div></div>
+      <div className="mt-1 h-2.5 rounded-full overflow-hidden" style={{background:T.shadow}}><div style={{width:`${xp%100}%`,height:"100%",background:T.accent}}/></div>
+      <div className="lok-display font-extrabold mt-3 mb-1 text-sm">Today's quests</div>
+      <div className="space-y-1.5">{quests?.items?.map(q=>(<div key={q.id} className="flex items-center gap-2 text-sm"><span className="font-bold" style={{color:q.done?T.alt:T.ink,opacity:q.done?1:0.9}}>{q.done?"✓":"○"}</span><span className="flex-1" style={{textDecoration:q.done?"line-through":"none",opacity:q.done?0.55:1}}>{q.label}</span><span className="text-xs font-bold" style={{color:T.accent}}>{q.progress}/{q.goal} · +{q.reward}</span></div>))}</div>
+    </section>)}
+    {!kids&&(<section className="mt-3 p-3 rounded-2xl" style={{border:`2px solid ${T.alt}`,background:T.card}}>
+      <div className="flex items-center gap-2 mb-1.5"><div className="lok-display font-extrabold text-sm" style={{color:T.alt}}>🌀 Word Twister</div><span className="text-xs opacity-50">daily</span></div>
+      {wordTwister.word?(!wordTwister.found?<div className="flex items-center gap-2"><span className="lok-display text-2xl font-extrabold tracking-widest" style={{color:T.accent}}>{wordTwister.shuffled}</span><input value={wordTwister.guess||""} onChange={e=>{const v=e.target.value.toLowerCase();setWordTwister(w=>{if(v===w.word){setLoks(l=>l+5);setTotalEarned(t=>t+5);say("Word cracked! +5 Loks","success");return{...w,found:true,guess:v};}return{...w,guess:v};});}} placeholder="Unscramble…" maxLength={20} className="flex-1 px-2 py-1.5 rounded-lg text-sm font-bold" style={{border:`2px solid ${T.ink}`,background:T.paper,color:T.ink}} aria-label="Guess the word"/></div>:<div className="text-sm font-bold" style={{color:T.alt}}>Solved ✓ <span className="font-mono">{wordTwister.word}</span></div>):<button onClick={()=>{const pool=["SKETCH","INKWELL","BLOOM","RISOPRINT","LILLOK","FLIPBOOK","STENCIL","VIGNETTE"];const w=pool[Math.floor(Math.random()*pool.length)];const shuffled=w.split("").sort(()=>Math.random()-.5).join("");setWordTwister({word:w,shuffled,found:false,guess:""});}} className="lok-btn text-xs font-bold px-3 py-1.5 rounded-lg" style={{border:`2px solid ${T.ink}`}}>Start daily twister</button>}
+    </section>)}
+    {!kids&&(<section className="mt-3 p-3 rounded-2xl" style={{border:`2px solid ${T.shadow}`,background:T.card}}>
+      <div className="flex items-center justify-between mb-1.5"><div className="lok-display font-extrabold text-sm">Loks</div>{nextMilestone&&<div className="text-[10px] opacity-50 font-bold">next quest milestone: {nextMilestone}</div>}</div>
+      <div className="flex items-center justify-around">
+        <div className="text-center"><div className="lok-display font-extrabold text-xl" style={{color:T.accent}}>{loks}</div><div className="text-[11px] opacity-60">balance</div></div>
+        <div className="text-center"><div className="lok-display font-extrabold text-xl">{totalEarned}</div><div className="text-[11px] opacity-60">earned all-time</div></div>
+        <div className="text-center"><div className="lok-display font-extrabold text-xl">{questsCompleted}</div><div className="text-[11px] opacity-60">quests done</div></div>
+      </div>
+    </section>)}
+    {!kids&&(<section className="mt-3 p-3 rounded-2xl" style={{border:`2px solid ${T.alt}`,background:T.card}}>
+      <div className="flex items-center gap-2 mb-1.5"><div className="lok-display font-extrabold text-sm" style={{color:T.alt}}>🌱 Ink Garden</div><span className="text-xs opacity-50">{garden.length}/6 planted</span></div>
+      <div className="grid grid-cols-3 gap-2">{Array.from({length:6}).map((_,i)=>{const plant=garden[i];return(<div key={i} className="rounded-xl flex items-center justify-center" style={{minHeight:60,border:`2px dashed ${plant?T.accent:T.shadow}`,background:plant?T.paper:"transparent",transition:"all .3s"}}>
+        {plant?<div className="text-center"><div className="text-lg">{plant.harvested?"🌸":plant.growth>=100?"🌻":"🌱"}</div><div className="text-[9px] font-bold mt-0.5">{plant.harvested?"done":plant.growth>=100?<button onClick={()=>{setGarden(g=>g.map((x,j)=>j===i?{...x,harvested:true}:x));setLoks(l=>l+8);say("Harvested! +8 Loks","success");}} className="underline" style={{color:T.accent}}>harvest</button>:`${Math.round(plant.growth)}%`}</div></div>
+        :<button onClick={()=>{const names=["Doodle Dahlia","Riso Rose","Ink Ivy","Sketch Sun","Bloom Bud","Violet Vine"];setGarden(g=>{const n=[...g];n[i]={name:names[i]||`Plant ${i+1}`,planted:Date.now(),growth:5+Math.random()*15,harvested:false};return n;});say("Planted a seed!","success");}} className="text-xs font-bold opacity-50">+ plant</button>}
+      </div>);})}</div>
+      {garden.some(p=>p&&!p.harvested)&&<button onClick={()=>setGarden(g=>g.map(p=>p&&!p.harvested?{...p,growth:Math.min(100,p.growth+5+Math.random()*10)}:p))} className="lok-btn mt-1.5 w-full py-1.5 rounded-xl text-xs font-bold" style={{border:`2px solid ${T.ink}`,background:T.card}}>💧 Water all (+water each plant)</button>}
+    </section>)}
+    {showSettings&&(<div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,.35)"}} onClick={()=>setShowSettings(false)}>
+      <div className="w-full rounded-t-3xl p-5" style={{maxWidth:560,background:T.card,border:`3px solid ${T.ink}`,animation:"lokrise .25s ease"}} onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3"><div className="lok-display text-lg font-extrabold">Settings</div><button onClick={()=>setShowSettings(false)} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Close settings">✕</button></div>
+        <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${T.ink}`,background:T.paper}}>
+          <div className="lok-display font-extrabold text-sm">📱 Add Lok to your home screen</div>
+          <div className="text-xs opacity-70 mt-1 leading-snug">{isIOS?"Tap the Share button in Safari, then \u201CAdd to Home Screen\u201D. Lok opens full-screen like a native app.":"Install Lok as an app — it gets its own icon and opens full-screen, no browser bars."}</div>
+          {!isIOS&&<button onClick={()=>onInstall&&onInstall()} className="lok-btn lok-display mt-2 w-full py-2.5 rounded-xl font-extrabold" style={{background:canInstall?T.accent:T.shadow,color:canInstall?T.onAccent:T.ink,border:`3px solid ${T.ink}`,opacity:canInstall?1:0.7}} aria-label="Install Lok as an app">{canInstall?"Install Lok":"Install via browser menu →"}</button>}
+        </div>
+        <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${founder?T.alt:T.ink}`,background:T.paper}}>
+          <div className="lok-display font-extrabold text-sm">🏆 Founders' test server{founder&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>FOUNDER</span>}</div>
+          <div className="text-xs opacity-70 mt-1 leading-snug">{founder?"You're in. Your gallery, Loks and LilLok are backed up long-term on LokServices.":"Join the test server and your progress gets backed up long-term — founders keep everything into beta."}</div>
+          {!founder&&(<>
+            <input value={fHandle} onChange={e=>setFHandle(e.target.value)} placeholder="Handle" aria-label="Founder handle" className="mt-2 w-full px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/>
+            <input value={fEmail} onChange={e=>setFEmail(e.target.value)} placeholder="Email (optional — for beta invite)" aria-label="Founder email" className="mt-1.5 w-full px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/>
+            <button onClick={joinFounders} disabled={fBusy} className="lok-btn lok-display mt-2 w-full py-2.5 rounded-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,opacity:fBusy?0.6:1}}>{fBusy?"Joining…":"Join as a founder"}</button>
+          </>)}
+        </div>
+        <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${sessionPin?T.accent:T.ink}`,background:T.paper}}>
+          <div className="lok-display font-extrabold text-sm">🔒 Session lock{sessionPin&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>ACTIVE</span>}</div>
+          <div className="text-xs opacity-70 mt-0.5 leading-snug">Set a 4-6 digit PIN to lock LokBook on startup.</div>
+          <div className="mt-2 flex gap-1.5">
+            {!sessionPin?(<><input type="password" maxLength={6} inputMode="numeric" value={pinInput} onChange={e=>setPinInput(e.target.value)} placeholder="Set PIN" aria-label="Set session PIN" className="flex-1 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/><button onClick={()=>{if(pinInput.length>=4){setSessionPin(pinInput);setPinInput("");say("PIN set");}else say("Need 4-6 digits")}} className="lok-btn px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:T.accent,color:T.onAccent,border:`2.5px solid ${T.ink}`}}>Set</button></>):(<button onClick={()=>{setSessionPin(null);setPinUnlocked(true);say("PIN removed");}} className="lok-btn px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:T.ink,color:T.paper}}>Remove PIN</button>)}
+          </div>
+          <label className="mt-2 flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={verified} onChange={e=>setVerified(e.target.checked)} style={{accentColor:T.accent}}/> Verified creator badge {verified&&<span style={{color:T.alt}}>✓</span>}</label>
+        </div>
+        <div className="p-3 rounded-2xl mb-2" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>
+          <div className="font-bold text-sm">Feed pacing</div>
+          <div className="mt-1.5 grid grid-cols-4 gap-1.5">{Object.entries(PACE_PRESETS).map(([id,p])=>(
+            <button key={id} onClick={()=>{setPace&&setPace(id);say(`${p.name} pacing`);}} aria-pressed={pace===id} title={p.desc} className="lok-btn py-1.5 rounded-xl text-[10px] font-extrabold" style={{border:`2.5px solid ${pace===id?T.accent:T.ink}`,background:pace===id?T.ink:T.card,color:pace===id?T.paper:T.ink}}>{p.name}</button>))}</div>
+          <label className="mt-2 flex items-center gap-2 text-xs font-bold" style={{color:T.ink}}>Speed {speed.toFixed(1)}×<input type="range" min="0.5" max="2" step="0.1" value={speed} onChange={e=>setSpeed&&setSpeed(+e.target.value)} className="flex-1" style={{accentColor:T.accent}} aria-label="Animation speed"/></label>
+        </div>
+        {soundLab&&(<div className="p-3 rounded-2xl mb-2" style={{border:`3px dashed ${T.accent}`,background:T.paper}}>
+          <div className="lok-display font-extrabold text-sm" style={{color:T.accent}}>🔊 Sound Lab</div>
+          <div className="text-xs opacity-70 mt-0.5 leading-snug">Hidden sandbox. Drop an MP3, YouTube or Spotify URL — plays under the app.</div>
+          <div className="mt-2 flex gap-1.5">
+            <input value={slUrl} onChange={e=>setSlUrl(e.target.value)} placeholder="Paste a URL…" aria-label="Sound Lab URL" className="flex-1 px-3 py-2 rounded-xl font-bold text-sm min-w-0" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/>
+            <button onClick={slAdd} className="lok-btn px-3 py-2 rounded-xl font-extrabold text-sm shrink-0" style={{background:T.ink,color:T.paper}}>Queue</button>
+          </div>
+          {soundQueue.length>0&&(<div className="mt-2 flex flex-col gap-1.5">{soundQueue.map(item=>(
+            <div key={item.id} className="flex items-center gap-2 px-2 py-1.5 rounded-xl text-xs" style={{border:`1.5px solid ${T.shadow}`,background:T.card}}>
+              <span className="font-extrabold shrink-0" style={{color:T.alt}}>{item.kind==="youtube"?"▶ YT":item.kind==="spotify"?"♫ SP":"♪ MP3"}</span>
+              <span className="flex-1 truncate opacity-70">{item.url}</span>
+              {slPlaying===item.id?<button onClick={slStop} className="lok-btn font-bold shrink-0" style={{color:T.accent}}>stop</button>:<button onClick={()=>slPlay(item)} className="lok-btn font-bold shrink-0" style={{color:T.ink}}>play</button>}
+              <button onClick={()=>{if(slPlaying===item.id)slStop();setSoundQueue(q=>q.filter(x=>x.id!==item.id));}} className="lok-btn font-bold shrink-0 opacity-60">✕</button>
+            </div>))}
+          </div>)}
+          {soundQueue.some(i=>i.kind==="youtube"&&slPlaying===i.id)&&(()=>{const it=soundQueue.find(i=>i.id===slPlaying);const id=it&&(it.url.match(/(?:youtu\.be\/|v=|shorts\/)([\w-]{11})/)||[])[1];return id?<iframe title="soundlab-yt" width="0" height="0" style={{position:"absolute",width:1,height:1,opacity:0,pointerEvents:"none"}} src={`https://www.youtube.com/embed/${id}?autoplay=1`} allow="autoplay"/>:null;})()}
+          {soundQueue.some(i=>i.kind==="spotify"&&slPlaying===i.id)&&(()=>{const it=soundQueue.find(i=>i.id===slPlaying);const m=it&&it.url.match(/spotify\.com\/(track|album|playlist)\/([\w]+)/);return m?<iframe title="soundlab-sp" style={{width:"100%",height:80,border:0,borderRadius:12,marginTop:8}} src={`https://open.spotify.com/embed/${m[1]}/${m[2]}`} allow="autoplay; encrypted-media"/>:null;})()}
+        </div>)}
+        <div className="p-3 rounded-2xl" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>
+          <div className="font-bold text-sm">About</div>
+          <div className="text-xs opacity-70 mt-0.5 leading-snug select-none" onClick={versionTap} style={{cursor:"default"}}>LokBook + Lok N Slide · <span style={{fontWeight:700}}>alpha v1.2</span> · Your gallery and LilLok save automatically on this device. Lok Juniors mode is in the Shop.</div>
+        </div>
+        <div className="mt-2 p-3 rounded-2xl" style={{border:`2px solid ${T.shadow}`,background:T.card}}>
+          <div className="flex items-center gap-2 mb-1"><span className="lok-display font-extrabold text-sm">📊 Activity</span><span className="text-[10px] opacity-50">past 2 weeks</span></div>
+          <div className="flex gap-0.5">{Array.from({length:14}).map((_,i)=>{const v=heatmapData[i]||0;const h=i===13?3:Math.floor(Math.sin(i*1.2)*3+4);const bh=Math.min(8,v||Math.max(0,h));return(<div key={i} className="flex-1 rounded-sm" style={{height:12,border:`1px solid ${T.shadow}`,background:v>0?T.accent:"transparent",transition:"all .3s"}}/>);})}</div>
+          <div className="flex items-center justify-between mt-1"><span className="text-[9px] opacity-30">{new Date(Date.now()-13*864e5).toLocaleDateString()}</span><span className="text-[9px] opacity-30">today</span></div>
+          <div className="flex items-center gap-2 mt-1.5"><span className="text-xs font-bold">🔗 Collab Room</span><code className="text-[11px] font-mono px-2 py-0.5 rounded" style={{background:T.paper,border:`1.5px solid ${T.ink}`}}>{Math.random().toString(36).slice(2,8).toUpperCase()}</code><button onClick={()=>{navigator.clipboard?.writeText("lokbook-room-"+Math.random().toString(36).slice(2,8));say("Room code copied");}} className="lok-btn text-[10px] font-bold px-2 py-0.5 rounded" style={{border:`1.5px solid ${T.ink}`}}>copy</button></div>
+          <div className="text-[9px] opacity-40 mt-0.5">Share this code with friends to collab in real time!</div>
+        </div>
+      </div>
+    </div>)}
+    {editing&&(<div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,.35)"}} onClick={()=>setEditing(false)}>
+      <div className="w-full rounded-t-3xl p-5" style={{maxWidth:560,background:T.card,border:`3px solid ${T.ink}`,animation:"lokrise .25s ease"}} onClick={e=>e.stopPropagation()}>
+        <div className="lok-display text-lg font-extrabold mb-3">Edit profile</div>
+        <div className="flex items-center gap-3 mb-3"><img src={renderAvatar(draft.avatarSeed)} alt="" className="w-16 h-16 rounded-full" style={{border:`3px solid ${T.ink}`}}/><button onClick={()=>setDraft(d=>({...d,avatarSeed:Math.floor(Math.random()*9999)}))} className="lok-btn px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`}} aria-label="Re-roll avatar">Re-roll avatar</button></div>
+        <input value={draft.name} onChange={e=>setDraft(d=>({...d,name:e.target.value}))} placeholder="Handle" aria-label="Display name" className="w-full px-3 py-2.5 rounded-xl font-bold mb-2" style={{border:`3px solid ${T.ink}`,background:T.paper,color:T.ink}}/>
+        <textarea value={draft.bio} onChange={e=>setDraft(d=>({...d,bio:e.target.value}))} placeholder="What's your gallery about?" rows={3} aria-label="Bio" className="w-full px-3 py-2.5 rounded-xl text-sm mb-3" style={{border:`3px solid ${T.ink}`,background:T.paper,color:T.ink}}/>
+        <button onClick={()=>{setProfile(draft);setEditing(false);say("Profile saved");}} className="lok-btn lok-display w-full py-3 rounded-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}} aria-label="Save profile">Save</button>
+      </div>
+    </div>)}
+    {view!=="gallery"?(<div className="mt-5">
+      <h2 className="lok-display text-lg font-extrabold mb-2 capitalize">{view==="lokdin"?"Lok'd in with you":view==="lokd"?"You Lok'd":"Your bookmarks"}</h2>
+      {view==="bookmarks"?(bookmarked.length?<div className="grid grid-cols-2 gap-3">{bookmarked.map(p=><PostCard key={p.id} p={p} onOpen={onOpen}/>)}</div>:<EmptyState icon="bookmarks" title="No bookmarks yet" subtitle="Lok in to pieces from the viewer to save them here."/>):view==="lokd"?(following.length?following.map(n=><PersonRow key={n} name={n}/>):<EmptyState icon="follow" title="No one Lok'd yet" subtitle="Lok artists you love and they'll show here."/>):["pixel.pluto","inkwell_iz","doodlebug"].map(n=><PersonRow key={n} name={n} note="Lok'd in"/>)}
+    </div>):(<>
+      <div className="mt-5 flex items-center gap-2 overflow-x-auto pb-1">
+        <h2 className="lok-display text-lg font-extrabold mr-1">Gallery</h2>
+        {[["newest","Newest"],["loks","Most Lok'd"],["views","Most viewed"],["battle","Battles"],["series","Series"],["weekly","This week"]].map(([id,label])=>(<button key={id} onClick={()=>setFilter(id)} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${T.ink}`,background:filter===id?T.ink:T.card,color:filter===id?T.paper:T.ink}}>{label}</button>))}
+        <button onClick={()=>setTimeMachineIdx(t=>t<0?posts.length-1:-1)} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${timeMachineIdx>=0?T.accent:T.ink}`,background:timeMachineIdx>=0?T.ink:T.card,color:timeMachineIdx>=0?T.paper:T.ink}}>🕐 Time Machine</button>
+      </div>
+      <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search your flips…" aria-label="Search gallery" className="mt-2 w-full px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/>
+      {filtered.length?<div className="mt-2 grid grid-cols-2 gap-3">{filtered.map(p=><PostCard key={p.id} p={p} onOpen={onOpen}/>)}</div>:<EmptyState icon="search" title={searchQ?"No flips match":"No pieces match"} subtitle={searchQ?"Try different words":"Try a different filter or publish your first flip!"}/>}
+      {timeMachineIdx>=0&&posts[timeMachineIdx]&&(<div className="mt-3 rounded-2xl p-3" style={{border:`3px solid ${T.alt}`,background:T.card}}>
+        <div className="flex items-center justify-between mb-1"><div className="lok-display font-extrabold text-sm">🕐 Time Machine</div><button onClick={()=>setTimeMachineIdx(-1)} className="lok-btn text-xs font-bold px-2 py-0.5 rounded" style={{border:`1.5px solid ${T.ink}`}}>✕</button></div>
+        <input type="range" min="0" max={posts.length-1} value={timeMachineIdx} onChange={e=>setTimeMachineIdx(+e.target.value)} className="w-full" style={{accentColor:T.accent}} aria-label="Scroll through your flips timeline"/>
+        <div className="flex items-center gap-2 mt-1"><img src={posts[timeMachineIdx]?.frames?.[0]} alt="" className="w-12 rounded-lg shrink-0" style={{aspectRatio:"4/5",objectFit:"cover",border:`2px solid ${T.ink}`}}/><div className="min-w-0"><div className="font-bold text-sm truncate">{posts[timeMachineIdx]?.title}</div><div className="text-xs opacity-60">{timeMachineIdx+1} of {posts.length} · {posts[timeMachineIdx]?.votes} votes</div></div></div>
+      </div>)}
+    </>)}
+  </div>);
+}
+
+export default function LokApp(){
+  const lilLokPhase = (s) => { if (s.stasis) return "stasis"; if (s.ink < 15) return "critical"; if (s.ink < 35) return "decaying"; return "thriving"; };
+  const getLilLokLine = (phase = "thriving", ctx = "") => { if (!ctx) { const h = new Date().getHours(); if (phase === "thriving" && h >= 5 && h < 10) return "Good morning. First lines of the day."; if (phase === "thriving" && h >= 21) return "Late-night drawing session?"; } const pool = (ctx && LILLOK_SPEECH[ctx]) ? LILLOK_SPEECH[ctx] : (LILLOK_SPEECH[phase] || LILLOK_SPEECH.thriving); return pool[Math.floor(Math.random() * pool.length)]; };
+  const[ready,setReady]=useState(false);const[tab,setTab]=useState("feed");const[openIdx,setOpenIdx]=useState(null);const[posts,setPosts]=useState([]);const[toasts,setToasts]=useState([]);
   const[questsCompleted,setQuestsCompleted]=useState(0);const[totalEarned,setTotalEarned]=useState(0);const[traceHinted,setTraceHinted]=useState(false);const[fabBubble,setFabBubble]=useState("");const[adIdx,setAdIdx]=useState(0);const[installEvt,setInstallEvt]=useState(null);const[showSettings,setShowSettings]=useState(false);
-  const[loks,setLoks]=useState(260);const[pace,setPace]=useState("sweep");const[speed,setSpeed]=useState(1);const[soundLab,setSoundLab]=useState(false);const[soundQueue,setSoundQueue]=useState([]);const[founder,setFounder]=useState(false);const[totalSpent,setTotalSpent]=useState(0);const[fodHistory,setFodHistory]=useState([]);const[lokPass,setLokPass]=useState(false);const[lokPassBusy,setLokPassBusy]=useState(false);const[uiTheme,setUiTheme]=useState("riso");const[ownedThemes,setOwnedThemes]=useState(["riso"]);const[effect,setEffect]=useState("none");const[ownedEffects,setOwnedEffects]=useState(["none"]);const[sky,setSky]=useState("clear");const[ownedSkies,setOwnedSkies]=useState(["clear"]);const[studioModules,setStudioModules]=useState(["layers_10","brush_ink"]);const[bigBattleOwned,setBigBattleOwned]=useState(false);const[wins,setWins]=useState(0);const[offlineBonusDay,setOfflineBonusDay]=useState("");
-  const[tides,setTides]=useState({candidates:[],voted:false,myVote:"",results:null,loaded:false});
-  const[eventClaimed,setEventClaimed]=useState("");
-  const activeEvent=useMemo(()=>getActiveEvent(),[]);
-  const[profile,setProfile]=useState(()=>{const seed=Math.floor(Math.random()*9999);return{name:starterHandle(seed),bio:"",avatarSeed:seed,links:[{label:"Lok page",url:"coming soon"}]};});
-  const[bookmarks,setBookmarks]=useState([]);const[following,setFollowing]=useState(["moss.ink"]);const[lokdInCount]=useState(2300);const[lillok,setLillok]=useState({ink:80,bond:30,stasis:false,name:"Blot",lastSeen:Date.now()});const[customLilLok,setCustomLilLok]=useState(null);const[cosmetics,setCosmetics]=useState({nameColor:"default",frame:"none",reactionPack:"base",avatarAccent:"none",blotBorder:"none",paper:"plain",lillokGear:"none"});const[owned,setOwned]=useState({nameColor:["default"],frame:["none"],reactionPack:["base"],avatarAccent:["none"],blotBorder:["none"],paper:["plain"],lillokGear:["none"]});const[kids,setKids]=useState(false);  const[showLilLok,setShowLilLok]=useState(false);const[onboarded,setOnboarded]=useState(false);const[showOnboard,setShowOnboard]=useState(false);const[showHint,setShowHint]=useState(false);const[showBadges,setShowBadges]=useState(false);const[sound,setSound]=useState(false);const[feedMode,setFeedMode]=useState("discover");const[daily,setDaily]=useState({day:null,streak:0,claimed:false,prompt:""});const[xp,setXp]=useState(0);const[quests,setQuests]=useState(null);const[feedCursor,setFeedCursor]=useState(null);const[loadingMore,setLoadingMore]=useState(false);  const[flair,setFlair]=useState("");const[compactDensity,setCompactDensity]=useState(false);const[adVisible,setAdVisible]=useState(true);const[notifications,setNotifications]=useState([]);const[notifUnread,setNotifUnread]=useState(0);
-  const[myRooms,setMyRooms]=useState([]);const[pendingRoomCode,setPendingRoomCode]=useState(null);const[account,setAccount]=useState(null);const[tips,setTips]=useState({});const[artistView,setArtistView]=useState(null);const[botPosted,setBotPosted]=useState([]);const[online,setOnline]=useState(typeof navigator!=="undefined"?navigator.onLine:true);
-  const {blip,hap}=useFeedback(sound);
-  const adScrollTimer=useRef(null);const earnLog=useRef({ts:Date.now(),total:0});const audioCtx=useRef(null);const lastCloudPush=useRef(0);const lastSeenRef=useRef(Date.now());
+  const[loks,setLoks]=useState(260);const[pace,setPace]=useState("sweep");const[speed,setSpeed]=useState(1);const[soundLab,setSoundLab]=useState(false);const[soundQueue,setSoundQueue]=useState([]);const[founder,setFounder]=useState(false);const[totalSpent,setTotalSpent]=useState(0);const[fodHistory,setFodHistory]=useState([]);const[lokPass,setLokPass]=useState(false);const[uiTheme,setUiTheme]=useState("riso");const[ownedThemes,setOwnedThemes]=useState(["riso"]);const[effect,setEffect]=useState("none");const[ownedEffects,setOwnedEffects]=useState(["none"]);const[ownedTiers,setOwnedTiers]=useState([10]);const[ccTier,setCcTier]=useState(false);const[bigBattleOwned,setBigBattleOwned]=useState(false);const[wins,setWins]=useState(0);
+  const[profile,setProfile]=useState({name:"moss.ink",bio:"I draw small loops about gravity, plants, and things that fly. Slide down any post to play it.",avatarSeed:42,links:[{label:"Lok page",url:"coming soon"}]});
+  const[focusMode,setFocusMode]=useState(false);const[featureFlags,setFeatureFlags]=useState({dynamicLoader:false,compactUi:false,vibe:"default"});
+  const[bookmarks,setBookmarks]=useState([]);const[following,setFollowing]=useState([]);const[lokdInCount]=useState(2300);const[lillok,setLillok]=useState({ink:80,bond:30,stasis:false,name:"Blot",lastSeen:Date.now()});const[customLilLok,setCustomLilLok]=useState(null);const[cosmetics,setCosmetics]=useState({nameColor:"default",frame:"none",reactionPack:"base",avatarAccent:"none",blotBorder:"none"});const[owned,setOwned]=useState({nameColor:["default"],frame:["none"],reactionPack:["base"],avatarAccent:["none"],blotBorder:["none"]});const[kids,setKids]=useState(false);const[showLilLok,setShowLilLok]=useState(false);const[onboarded,setOnboarded]=useState(false);const[showOnboard,setShowOnboard]=useState(false);const[showHint,setShowHint]=useState(false);const[sound,setSound]=useState(false);const[feedMode,setFeedMode]=useState("discover");const[daily,setDaily]=useState({day:null,streak:0,claimed:false,prompt:""});const[xp,setXp]=useState(0);const[quests,setQuests]=useState(null);const[flair,setFlair]=useState("");const[adVisible,setAdVisible]=useState(true);const[notifications,setNotifications]=useState([]);const[notifUnread,setNotifUnread]=useState(0);
+  const[sessionPin,setSessionPin]=useState(null);const[pinInput,setPinInput]=useState("");const[pinError,setPinError]=useState("");const[pinUnlocked,setPinUnlocked]=useState(true);
+  const[moodTags,setMoodTags]=useState({});const[moodFilter,setMoodFilter]=useState("all");
+  const[garden,setGarden]=useState([]);const[gardenTimer,setGardenTimer]=useState(0);
+  const[reportedPosts,setReportedPosts]=useState([]);
+  const[verified,setVerified]=useState(false);
+  const[petEvo,setPetEvo]=useState(0);
+  const[modules,setModules]=useState(["layers_10","brush_ink"]);const[sky,setSky]=useState(null);const[ownedSkies,setOwnedSkies]=useState(["clear"]);const[animFx,setAnimFx]=useState("none");const[ownedAnimFx,setOwnedAnimFx]=useState(["none"]);const[fontPack,setFontPack]=useState("default");const[cursorPack,setCursorPack]=useState("default");const[musicPack,setMusicPack]=useState("none");const[stickerPack,setStickerPack]=useState("emoji");const[postExport,setPostExport]=useState("png");
+  const[timeMachineIdx,setTimeMachineIdx]=useState(-1);
+  const[wordTwister,setWordTwister]=useState({word:"",shuffled:"",found:false,revealed:false});
+  const[stickers,setStickers]=useState([]);
+  const[heatmapData,setHeatmapData]=useState([]);
+  const[battleRoyaleCount,setBattleRoyaleCount]=useState(0);
+  const[fourthWall,setFourthWall]=useState(100);const[hapticGrammar,setHapticGrammar]=useState("default");
+  const adScrollTimer=useRef(null);const earnLog=useRef({ts:Date.now(),total:0});const audioCtx=useRef(null);
+  const{blip,hap}=useFeedback(sound);
   const T=THEMES[uiTheme];const phase=lilLokPhase(lillok);const level=Math.floor(xp/100)+1;
+  const evoStage=lillok.bond>=75?3:lillok.bond>=50?2:lillok.bond>=25?1:0;
+  useEffect(()=>{setPetEvo(evoStage);},[evoStage]);
+  const evoEmojis=["🌱","🌿","🌳","👑"];
   const flipOfDay=useMemo(()=>{const c=posts.filter(p=>p.frames?.length>=2);if(!c.length)return null;
     const today=new Date().toDateString();const cutoff=Date.now()-FOD_WINDOW_DAYS*86400000;
     const recent=new Set(fodHistory.filter(h=>h.ts>cutoff&&h.day!==today).map(h=>h.id));
     const sorted=[...c].sort((a,b)=>b.votes-a.votes);
     return sorted.find(p=>!recent.has(p.id))||sorted[0];},[posts,fodHistory]);
-  const badgeStats=useMemo(()=>({
-    posts:posts.length,
-    series:posts.filter(p=>p.style==="series").length,
-    views:posts.reduce((s,p)=>s+(p.views||0),0),
-    receivedVotes:posts.reduce((s,p)=>s+(p.votes||0),0),
-    revivals:posts.filter(p=>p.from==="revival").length,
-    streak:daily.streak,lokd:following.length,
-    founder:founder,offlineBonuses:offlineBonusDay?1:0,
-    votes:voteCount,
-  }),[posts,daily.streak,founder,offlineBonusDay,voteCount,following.length]);
-  const badges=useMemo(()=>BADGES.map(b=>({...b,unlocked:b.check(badgeStats)})),[badgeStats]);
-  const unlockedCount=useMemo(()=>badges.filter(b=>b.unlocked).length,[badges]);
   useEffect(()=>{if(!ready||!flipOfDay)return;const today=new Date().toDateString();
     setFodHistory(h=>{if(h.some(x=>x.day===today))return h;return[...h.filter(x=>x.ts>Date.now()-FOD_WINDOW_DAYS*86400000),{id:flipOfDay.id,day:today,ts:Date.now()}];});},[ready,flipOfDay]);
   useEffect(()=>{const onScroll=()=>{setAdVisible(false);clearTimeout(adScrollTimer.current);adScrollTimer.current=setTimeout(()=>setAdVisible(true),1200);};window.addEventListener("scroll",onScroll,{passive:true});return()=>window.removeEventListener("scroll",onScroll);},[]);
   const guardedAddLoks=useCallback(n=>{const now=Date.now();if(now-earnLog.current.ts>3600000){earnLog.current={ts:now,total:0};}if(earnLog.current.total+n>120){return;}earnLog.current.total+=n;setLoks(l=>l+n);setTotalEarned(t=>t+n);},[]);
   const addLoks=guardedAddLoks;
   const pushNotif=useCallback((msg,type="info")=>{setNotifications(ns=>[...ns.slice(-49),{id:Date.now(),msg,type,ts:Date.now()}]);setNotifUnread(n=>n+1);},[]);
-  const say=useCallback((m,type="default")=>{const id=Date.now()+Math.random();setToasts(t=>[...t.slice(-2),{id,msg:m,type}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),2600);},[]);
-  const showLine=useCallback((ctx="")=>{setFabBubble(getLilLokLine(lilLokPhase(lillok),ctx,{name:lillok.name,ink:lillok.ink,bond:lillok.bond,wins,streak:daily.streak,loks}));setTimeout(()=>setFabBubble(""),3500);},[lillok,wins,daily.streak,loks]);
+  const say=useCallback((m,type="default")=>{const id=Date.now()+Math.random();setToasts(t=>[...t.slice(-4),{id,msg:m,type}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),2600);},[]);
+  const showLine=useCallback((ctx="")=>{const s={name:lillok.name,wins,loks,ink:lillok.ink,bond:lillok.bond};setFabBubble(getLilLokLine(lilLokPhase(lillok),ctx,s,fourthWall));setTimeout(()=>setFabBubble(""),3500);},[lillok,wins,loks,fourthWall]);
   const gainXp=useCallback(n=>setXp(x=>{const before=Math.floor(x/100);const nx=x+n;if(Math.floor(nx/100)>before){setTimeout(()=>say(`Level ${Math.floor(nx/100)+1}! New flair unlocked`),300);}return nx;}),[say]);
   const questTick=useCallback((track,amt=1)=>{setQuests(q=>{if(!q)return q;let paid=0,msg=null,doneCount=0;const items=q.items.map(it=>{if(it.track!==track||it.done)return it;const progress=Math.min(it.goal,it.progress+amt);const done=progress>=it.goal;if(done){paid+=it.reward;doneCount++;msg=`Quest done: ${it.label} · +${it.reward}`;}return{...it,progress,done};});if(paid){setLoks(l=>l+paid);setTotalEarned(t=>t+paid);gainXp(paid);setTimeout(()=>say(msg,"success"),250);setQuestsCompleted(c=>{const nc=c+doneCount;const m=[10,25,50,100].find(x=>c<x&&nc>=x);if(m){const bonus=m*2;setLoks(l=>l+bonus);setTotalEarned(t=>t+bonus);setTimeout(()=>{say(`🎖 ${m} quests done · +${bonus} bonus Loks`,"success");hap([200,100,200,100,200]);},700);}return nc;});}return{...q,items};});},[gainXp,say,hap]);
   useEffect(()=>{(async()=>{
     const dayOfYear=d=>Math.floor((d-new Date(d.getFullYear(),0,0))/86400000);const todayPromptIdx=(new Date().getFullYear()*366+dayOfYear(new Date()))%PROMPTS.length;
     const makeSeedLazy=(drawFn,n,id,meta)=>({...meta,id,frames:[],_pendingDraw:drawFn,_pendingN:n,paceMs:meta.paceMs});
-    const seed=[
-      makeSeedLazy(drawBounce,14,"seed1",{title:"Bounce study",author:"moss.ink",paceMs:110,votes:41,voted:false,viewed:false,reactions:{splat:12,heart:30,drip:5,humhah:6,bomhogwah:3},from:"studio",mode:"A",style:"bold",views:312,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawBloom,12,"seed2",{title:"Bloom",author:"moss.ink",paceMs:150,votes:67,voted:false,viewed:false,reactions:{splat:8,heart:52,drip:9,humhah:14,bomhogwah:4},from:"studio",mode:"B",style:"series",views:540,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawNight,13,"seed3",{title:"Night flight",author:"moss.ink",paceMs:130,votes:29,voted:false,viewed:false,reactions:{splat:21,heart:14,drip:11,humhah:3,bomhogwah:8},from:"studio",mode:"A",style:"bold",views:188,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawWave,14,"seed4",{title:"Harbor loop",author:"moss.ink",paceMs:130,loop:true,votes:38,voted:false,viewed:false,reactions:{splat:6,heart:27,drip:4,humhah:9,bomhogwah:2},from:"studio",mode:"A",style:"bold",views:265,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawOrbit,16,"seed5",{title:"Orbit study",author:"inkwell_iz",paceMs:100,loop:true,votes:53,voted:false,viewed:false,reactions:{splat:9,heart:35,drip:7,humhah:7,bomhogwah:5},from:"studio",mode:"A",style:"bold",views:410,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawWalk,12,"seed6",{title:"Little walker",author:"sketchram",paceMs:120,votes:34,voted:false,viewed:false,reactions:{splat:11,heart:19,drip:3,humhah:11,bomhogwah:2},from:"studio",mode:"A",style:"bold",views:230,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawFish,14,"seed7",{title:"Koi drift",author:"tinta",paceMs:140,loop:true,votes:72,voted:false,viewed:false,reactions:{splat:5,heart:61,drip:12,humhah:8,bomhogwah:6},from:"studio",mode:"A",style:"bold",views:598,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawBurst,12,"seed8",{title:"FIREWORKS!!",author:"mooncrayon",paceMs:110,votes:45,voted:false,viewed:false,reactions:{splat:30,heart:22,drip:2,humhah:5,bomhogwah:15},from:"studio",mode:"A",style:"bold",views:340,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawRain,12,"seed9",{title:"Rain window",author:"pixel.pluto",paceMs:150,votes:26,voted:false,viewed:false,reactions:{splat:7,heart:16,drip:14,humhah:4,bomhogwah:9},from:"studio",mode:"B",style:"series",views:172,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawSpiral,14,"seed10",{title:"Golden spiral",author:"moss.ink",paceMs:130,loop:true,votes:48,voted:false,viewed:false,reactions:{splat:4,heart:36,drip:8,humhah:10,bomhogwah:3},from:"studio",mode:"A",style:"bold",views:295,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawPulse,13,"seed11",{title:"Heartbeat",author:"inkwell_iz",paceMs:120,loop:true,votes:56,voted:false,viewed:false,reactions:{splat:3,heart:65,drip:2,humhah:7,bomhogwah:4},from:"studio",mode:"A",style:"bold",views:445,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawFirework,14,"seed12",{title:"Burst city",author:"mooncrayon",paceMs:110,votes:39,voted:false,viewed:false,reactions:{splat:42,heart:18,drip:2,humhah:6,bomhogwah:12},from:"studio",mode:"A",style:"bold",views:290,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawMorph,13,"seed13",{title:"Shape shifter",author:"tinta",paceMs:140,loop:true,votes:33,voted:false,viewed:false,reactions:{splat:5,heart:22,drip:7,humhah:12,bomhogwah:5},from:"studio",mode:"B",style:"series",views:205,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(BOT_STYLES["sketchram"](777).painter,12,"seed14",{title:"Leap study",author:"sketchram",paceMs:100,votes:51,voted:false,viewed:false,reactions:{splat:28,heart:33,drip:6,humhah:9,bomhogwah:10},from:"studio",mode:"A",style:"bold",views:375,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy(drawNautilus,12,"seed15",{title:"Nautilus dream",author:"moss.ink",paceMs:150,loop:true,votes:44,voted:false,viewed:false,reactions:{splat:6,heart:29,drip:10,humhah:8,bomhogwah:7},from:"studio",mode:"B",style:"series",views:320,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy((()=>{const p=makeDoodlePainter(420);return(c,t)=>p(c,t);})(),11,"seed16",{title:"Doodle garden",author:"inkwell_iz",paceMs:130,votes:37,voted:false,viewed:false,reactions:{splat:9,heart:24,drip:13,humhah:14,bomhogwah:5},from:"studio",mode:"A",style:"bold",views:255,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-      makeSeedLazy((()=>{const p=makeDoodlePainter(999);return(c,t)=>p(c,t);})(),12,"seed17",{title:"Night scribble",author:"sketchram",paceMs:140,votes:31,voted:false,viewed:false,reactions:{splat:14,heart:18,drip:8,humhah:6,bomhogwah:11},from:"studio",mode:"B",style:"series",views:198,echoedAt:null,echoCount:0,echoParent:null,echoExpiresAt:null}),
-    ];
-    const save=await store.get(SAVE_KEY);const savedGallery=await store.get(GALLERY_KEY);const todayKey=new Date().toDateString();
-    let loadedDaily={day:todayKey,streak:1,claimed:false,prompt:activeEvent?activeEvent.prompt:PROMPTS[todayPromptIdx]};
-    if(save){setLoks(save.loks??60);setLokPass(!!save.lokPass);setUiTheme(save.uiTheme||"riso");setOwnedThemes(save.ownedThemes||["riso"]);setEffect(save.effect||"none");setOwnedEffects(save.ownedEffects||["none"]);setSky(save.sky||"clear");setOwnedSkies(save.ownedSkies||["clear"]);setStudioModules(save.studioModules||migrateLegacyModules(save));setBigBattleOwned(!!save.bigBattleOwned);setWins(save.wins??0);if(save.profile)setProfile(p=>({...save.profile,name:save.profile.name||starterHandle(save.profile.avatarSeed??p.avatarSeed)}));setBookmarks(save.bookmarks||[]);setFollowing(save.following||[]);setKids(!!save.kids);if(save.customLilLok)setCustomLilLok(save.customLilLok);if(save.cosmetics)setCosmetics({nameColor:"default",frame:"none",reactionPack:"base",avatarAccent:"none",blotBorder:"none",paper:"plain",lillokGear:"none",...save.cosmetics});if(save.owned)setOwned({nameColor:["default"],frame:["none"],reactionPack:["base"],avatarAccent:["none"],blotBorder:["none"],paper:["plain"],lillokGear:["none"],...save.owned});setOnboarded(!!save.onboarded);setSound(!!save.sound);setXp(save.xp??0);setFlair(save.flair||"");setQuestsCompleted(save.questsCompleted??0);setTotalEarned(save.totalEarned??0);setTraceHinted(!!save.traceHinted);setPace(save.pace||"sweep");setSpeed(save.speed??1);setSoundLab(!!save.soundLab);setSoundQueue(save.soundQueue||[]);setFounder(!!save.founder);setTotalSpent(save.totalSpent??0);setFodHistory(save.fodHistory||[]);setAccount(save.account||null);setTips(save.tips||{});setBotPosted(save.botPosted||[]);setMyRooms(save.myRooms||[]);setOfflineBonusDay(save.offlineBonusDay||"");setEventClaimed(save.eventClaimed||"");if(!save.onboarded)setShowHint(false);else setShowHint(true);
-    if(save.daily?.day){if(save.daily.day===todayKey)loadedDaily=save.daily;else{const diff=Math.round((new Date(todayKey)-new Date(new Date(save.daily.day).toDateString()))/86400000);loadedDaily={day:todayKey,streak:diff===1?(save.daily.streak||0)+1:diff<=7?(save.daily.streak||0):1,claimed:false,prompt:activeEvent?activeEvent.prompt:PROMPTS[todayPromptIdx]};}}
-    const gap=Date.now()-(save.lillok?.lastSeen||Date.now());const ll=save.lillok||lillok;lastSeenRef.current=save.lillok?.lastSeen||Date.now();const buffer=1-((ll.bond||0)/100)*0.5;const inkDrain=Math.min(ll.ink,Math.floor(gap/60000)*1.2*buffer);const newInk=Math.max(0,ll.ink-inkDrain);setLillok({...ll,stasis:ll.stasis||(newInk===0&&gap>600000),ink:newInk,inkZeroAt:null,lastSeen:Date.now()});}
+    const seed=[makeSeedLazy(drawBounce,14,"seed1",{title:"Bounce study",votes:41,voted:false,viewed:false,reactions:{splat:12,heart:30,drip:5},from:"studio",mode:"A",style:"bold",views:312}),makeSeedLazy(drawBloom,12,"seed2",{title:"Bloom",votes:67,voted:false,viewed:false,reactions:{splat:8,heart:52,drip:9},from:"studio",mode:"B",style:"series",views:540}),makeSeedLazy(drawNight,13,"seed3",{title:"Night flight",votes:29,voted:false,viewed:false,reactions:{splat:21,heart:14,drip:11},from:"studio",mode:"A",style:"bold",views:188})];
+    const save=await store.get(SAVE_KEY);const savedGallery=await store.get(GALLERY_KEY);const flags=await store.get("lok:flags");if(flags)setFeatureFlags(f=>({...f,...flags}));const todayKey=new Date().toDateString();
+    let loadedDaily={day:todayKey,streak:1,claimed:false,prompt:PROMPTS[todayPromptIdx]};
+    if(save){setLoks(save.loks??60);setLokPass(!!save.lokPass);setUiTheme(save.uiTheme||"riso");setOwnedThemes(save.ownedThemes||["riso"]);setEffect(save.effect||"none");setOwnedEffects(save.ownedEffects||["none"]);setOwnedTiers(save.ownedTiers||[10]);setCcTier(!!save.ccTier);setBigBattleOwned(!!save.bigBattleOwned);setWins(save.wins??0);if(save.profile)setProfile(save.profile);setBookmarks(save.bookmarks||[]);setFollowing(save.following||[]);setKids(!!save.kids);if(save.customLilLok)setCustomLilLok(save.customLilLok);if(save.cosmetics)setCosmetics({nameColor:"default",frame:"none",reactionPack:"base",avatarAccent:"none",blotBorder:"none",paper:"plain",gear:"none",...save.cosmetics});if(save.owned){const migrated=Object.fromEntries(Object.entries(save.owned).map(([k,v])=>[k,v.map(i=>typeof i==="string"?{id:i,ts:0}:i)]));setOwned({nameColor:[{id:"default",ts:0}],frame:[{id:"none",ts:0}],reactionPack:[{id:"base",ts:0}],avatarAccent:[{id:"none",ts:0}],blotBorder:[{id:"none",ts:0}],paper:[{id:"plain",ts:0}],gear:[{id:"none",ts:0}],...migrated});}setOnboarded(!!save.onboarded);setSound(!!save.sound);setXp(save.xp??0);setFlair(save.flair||"");setQuestsCompleted(save.questsCompleted??0);setTotalEarned(save.totalEarned??0);setTraceHinted(!!save.traceHinted);setPace(save.pace||"sweep");setSpeed(save.speed??1);setSoundLab(!!save.soundLab);setSoundQueue(save.soundQueue||[]);setFounder(!!save.founder);setTotalSpent(save.totalSpent??0);setFodHistory(save.fodHistory||[]);setHapticGrammar(save.hapticGrammar||"default");setFourthWall(save.fourthWall??100);if(!save.onboarded)setShowHint(false);else setShowHint(true);
+    if(save.sessionPin)setSessionPin(save.sessionPin);if(save.sessionPin)setPinUnlocked(false);
+    if(save.moodTags)setMoodTags(save.moodTags);if(save.garden)setGarden(save.garden);
+    if(save.reportedPosts)setReportedPosts(save.reportedPosts);
+    if(save.verified)setVerified(true);
+    if(save.petEvo)setPetEvo(save.petEvo);
+    if(save.stickers)setStickers(save.stickers);
+    if(save.modules)setModules(save.modules);if(save.sky)setSky(save.sky);if(save.ownedSkies)setOwnedSkies(save.ownedSkies);if(save.animFx)setAnimFx(save.animFx);if(save.ownedAnimFx)setOwnedAnimFx(save.ownedAnimFx);if(save.fontPack)setFontPack(save.fontPack);if(save.cursorPack)setCursorPack(save.cursorPack);if(save.musicPack)setMusicPack(save.musicPack);if(save.stickerPack)setStickerPack(save.stickerPack);if(save.postExport)setPostExport(save.postExport);
+    if(save.daily?.day){if(save.daily.day===todayKey)loadedDaily=save.daily;else{const diff=Math.round((new Date(todayKey)-new Date(new Date(save.daily.day).toDateString()))/86400000);loadedDaily={day:todayKey,streak:diff===1?(save.daily.streak||0)+1:1,claimed:false,prompt:PROMPTS[todayPromptIdx]};}}
+    const gap=Date.now()-(save.lillok?.lastSeen||Date.now());const ll=save.lillok||lillok;const buffer=1-((ll.bond||0)/100)*0.5;const inkDrain=Math.min(ll.ink,Math.floor(gap/60000)*1.2*buffer);const newInk=Math.max(0,ll.ink-inkDrain);setLillok({...ll,stasis:ll.stasis||(newInk===0&&gap>600000),ink:newInk,inkZeroAt:null,lastSeen:Date.now()});}
     setDaily(loadedDaily);const savedQ=save?.quests&&save.quests.day===todayKey?save.quests:{day:todayKey,items:makeQuests()};setQuests(savedQ);
-    const tidePool=PROMPTS.filter(p=>p!==loadedDaily.prompt).sort(()=>Math.random()-0.5).slice(0,TIDE_CANDIDATE_COUNT);const savedTide=localStorage.getItem("lok:tide:"+todayKey);setTides({candidates:tidePool,voted:!!savedTide,myVote:savedTide||"",results:null,loaded:true});
-    const userPosts=(savedGallery||[]).map(p=>({...p,voted:false,viewed:false}));setPosts([...userPosts,...seed]);if(!save||!save.onboarded)setShowOnboard(true);
-    onInit(async session => {
-      if (session?.user) {
-        setAccount(session.user.email || session.user.id);
-        if (!save) {
-          const remoteSave = await lokApi.fetchAuthSave(session.user.id);
-          if (remoteSave) {
-            Object.assign(save || {}, remoteSave);
-            setLoks(remoteSave.loks??260);
-            setLokPass(!!remoteSave.lokPass);
-            setUiTheme(remoteSave.uiTheme||"riso");
-            setEffect(remoteSave.effect||"none");setOwnedEffects(remoteSave.ownedEffects||["none"]);
-            setSky(remoteSave.sky||"clear");setOwnedSkies(remoteSave.ownedSkies||["clear"]);
-            if(remoteSave.profile)setProfile(remoteSave.profile);
-            if(remoteSave.cosmetics)setCosmetics({nameColor:"default",frame:"none",reactionPack:"base",avatarAccent:"none",blotBorder:"none",paper:"plain",lillokGear:"none",...remoteSave.cosmetics});
-            if(remoteSave.owned)setOwned({nameColor:["default"],frame:["none"],reactionPack:["base"],avatarAccent:["none"],blotBorder:["none"],paper:["plain"],lillokGear:["none"],...remoteSave.owned});
-          }
-        }
-      } else if (save?.account) {
-        setAccount(save.account);
-      }
-    });
-    const params=new URLSearchParams(window.location.search);const sid=params.get("session_id");
-    if(sid){window.history.replaceState({},"",window.location.pathname);
-      try{const r=await fetch(`${SUPA_URL}/functions/v1/verify-checkout`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:sid})});
-        if(r.ok){const{verified}=await r.json();if(verified&&!lokPass){setLokPass(true);setOwnedThemes(Object.keys(THEMES));say("LokPass verified!","success");pushNotif("LokPass purchase confirmed!","success");}}
-      }catch(e){console.warn("Verify failed",e);}}
-    setReady(true);
-    // Cloud pull on mount: recover progress from server if localStorage was cleared
-    if(save?.account){lokApi.fetchSave(save.account).then(cloud=>{if(cloud&&JSON.stringify(cloud)!==JSON.stringify(save)){store.set(SAVE_KEY,{...cloud,account:save.account});location.reload();}});}
-    seed.forEach((s,i)=>{if(!s._pendingDraw)return;setTimeout(()=>{const frames=renderSequence(s._pendingDraw,s._pendingN);setPosts(ps=>ps.map(p=>p.id===s.id?{...p,frames,paceMs:s.paceMs||140}:p));},i*80+50);});
+    const userPosts=(savedGallery||[]).map(p=>({...p,voted:false,viewed:false}));setPosts([...userPosts,...seed]);if(!save||!save.onboarded)setShowOnboard(true);setReady(true);
+    seed.forEach((s,i)=>{if(!s._pendingDraw)return;setTimeout(()=>{const frames=renderSequence(s._pendingDraw,s._pendingN);const paceMs=[110,150,130][i];setPosts(ps=>ps.map(p=>p.id===s.id?{...p,frames,paceMs}:p));},i*80+50);});
   })();},[]);
-  // Sync following and bookmarks from server on mount (social graph restore)
-  useEffect(()=>{if(!ready||!account)return;(async()=>{try{const[followRows,bookRows]=await Promise.all([lokApi.fetchFollowing(account),lokApi.fetchBookmarks(account)]);if(followRows?.length)setFollowing(followRows.map(r=>r.followee));if(bookRows?.length)setBookmarks(bookRows.map(r=>r.post_id));}catch{}})();},[ready,account]);
-  useEffect(()=>{if(!ready)return;const t=setTimeout(()=>{const blob={loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,sky,ownedSkies,studioModules,bigBattleOwned,wins,offlineBonusDay,tides,eventClaimed,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,account,tips,compactDensity,botPosted,myRooms,lillok:{...lillok,lastSeen:Date.now()}};store.set(SAVE_KEY,blob);if(account&&Date.now()-lastCloudPush.current>15000){lastCloudPush.current=Date.now();lokApi.pushSave(account,blob,auth.getUserId());if(following&&following.length){fetch(`${SUPA_URL}/rest/v1/lok_accounts?handle=eq.${encodeURIComponent(account)}`,{method:"PATCH",headers:{"Content-Type":"application/json",apikey:SUPA_KEY,Authorization:`Bearer ${auth.getApiToken()}`},body:JSON.stringify({following})}).catch(()=>{});}if(bookmarks&&bookmarks.length){fetch(`${SUPA_URL}/rest/v1/lok_accounts?handle=eq.${encodeURIComponent(account)}`,{method:"PATCH",headers:{"Content-Type":"application/json",apikey:SUPA_KEY,Authorization:`Bearer ${auth.getApiToken()}`},body:JSON.stringify({bookmarks})}).catch(()=>{});}}},400);return()=>clearTimeout(t);},[ready,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,sky,ownedSkies,studioModules,bigBattleOwned,wins,offlineBonusDay,tides,eventClaimed,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,account,tips,compactDensity,botPosted,myRooms,lillok]);
-  // Living feed: resident artists drop 1-2 fresh generated flips per session, never repeating a seed on this device.
-  useEffect(()=>{if(!ready)return;const picks=pickAmbientPosts(botPosted,2);if(!picks.length)return;setBotPosted(b=>[...b,...picks.map(x=>x.key)].slice(-400));picks.forEach((pk,i)=>{setTimeout(()=>{try{const post=generateBotPost(pk.bot,pk.seed);if(post)setPosts(ps=>ps.some(x=>x.id===post.id)?ps:[...ps.slice(0,3),post,...ps.slice(3)]);}catch(e){console.warn("botArt",e);}},1600+i*900);});},[ready]);
-  useEffect(()=>{if(!ready)return;const userPosts=posts.filter(p=>!p.id?.startsWith("seed")&&!p.id?.startsWith("bot:")&&!p.remote);const t=setTimeout(()=>{store.set(GALLERY_KEY,userPosts).then(ok=>{if(!ok)say("Gallery too big");});},500);return()=>clearTimeout(t);},[ready,posts]);
+  useEffect(()=>{if(!ready)return;const t=setTimeout(()=>{store.set(SAVE_KEY,{loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,petEvo,stickers,lillok:{...lillok,lastSeen:Date.now()},modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport});},400);return()=>clearTimeout(t);},[ready,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,petEvo,stickers,lillok,modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport]);
+  useEffect(()=>{if(!ready)return;const userPosts=posts.filter(p=>!p.id?.startsWith("seed"));const t=setTimeout(()=>{store.set(GALLERY_KEY,userPosts).then(ok=>{if(!ok)say("Gallery too big");});},500);return()=>clearTimeout(t);},[ready,posts]);
   useEffect(()=>{if(!ready||kids)return;let interval=null;const startDecay=()=>{interval=setInterval(()=>setLillok(s=>{if(s.stasis)return s;if(s.ink===0){if(!s.inkZeroAt)return{...s,inkZeroAt:Date.now()};if(Date.now()-s.inkZeroAt>120000)return{...s,stasis:true,inkZeroAt:null};return s;}const buffer=1-(s.bond/100)*0.5;return{...s,ink:Math.max(0,s.ink-1.4*buffer)};}),12000);};const stopDecay=()=>{clearInterval(interval);interval=null;};const onVisible=()=>{if(document.visibilityState==="hidden")stopDecay();else startDecay();};startDecay();document.addEventListener("visibilitychange",onVisible);return()=>{stopDecay();document.removeEventListener("visibilitychange",onVisible);};},[ready,kids]);
-  useEffect(()=>{if(!ready)return;const gap=Date.now()-lastSeenRef.current;const todayKey=new Date().toDateString();if(gap>OFFLINE_BONUS_HOURS*3600000&&offlineBonusDay!==todayKey&&lastSeenRef.current!==Date.now()){addLoks(OFFLINE_BONUS_LOKS);gainXp(10);setOfflineBonusDay(todayKey);setTimeout(()=>say(`Welcome back! +${OFFLINE_BONUS_LOKS} Loks · +10 XP`,"success"),600);feedLilLok(20,"revival");}},[ready]);
-  useEffect(()=>{try{const rc=new URLSearchParams(location.search).get("room");if(rc){setPendingRoomCode(rc);setTab("rooms");history.replaceState({},"",location.pathname);}}catch{}},[]);
   useEffect(()=>{const h=e=>{e.preventDefault();setInstallEvt(e);};window.addEventListener("beforeinstallprompt",h);return()=>window.removeEventListener("beforeinstallprompt",h);},[]);
-  useEffect(()=>{const goOnline=()=>setOnline(true);const goOffline=()=>setOnline(false);window.addEventListener("online",goOnline);window.addEventListener("offline",goOffline);setOnline(navigator.onLine);return()=>{window.removeEventListener("online",goOnline);window.removeEventListener("offline",goOffline);};},[]);
-  useEffect(()=>{if(lokPass||kids||AD_PROVIDER!=="placeholder")return;const t=setInterval(()=>setAdIdx(i=>(i+1)%ADS.length),8000);return()=>clearInterval(t);},[lokPass,kids]);
+  useEffect(()=>{if(lokPass||kids)return;const t=setInterval(()=>setAdIdx(i=>(i+1)%ADS.length),8000);return()=>clearInterval(t);},[lokPass,kids]);
   useEffect(()=>{if(!ready)return;const t1=setTimeout(()=>showLine(),4000);const t2=setInterval(()=>{if(!showLilLok)showLine();},60000);return()=>{clearTimeout(t1);clearInterval(t2);};},[ready]);
-  const onCheat=useCallback(code=>{const c=resolveCheat(code);if(!c){say("The ink doesn't recognize that…","error");return;}
-    if(c.fx==="merci"){setLoks(l=>l+1000);setTotalEarned(t=>t+1000);hap([80,40,80,40,160]);blip("C6");say("💖 Merci, merci · +1000 Loks","success");pushNotif("BadBleep: gratitude accepted · +1000 Loks","success");}
-    if(c.fx==="supableep"){setLokPass(true);setOwnedThemes(Object.keys(THEMES));setOwnedEffects(EFFECTS.map(e=>e.id));setOwnedSkies(SKIES.map(x=>x.id));setStudioModules([...new Set(STUDIO_MODULES.map(m=>m.id))]);setOwned({nameColor:NAME_COLORS.map(x=>x.id),frame:FRAMES.map(x=>x.id),reactionPack:REACTION_PACKS.map(x=>x.id),avatarAccent:AVATAR_ACCENTS.map(x=>x.id),blotBorder:BLOT_BORDERS.map(x=>x.id),paper:PAPERS.map(x=>x.id),lillokGear:LILLOK_GEAR.map(x=>x.id)});setBigBattleOwned(true);setSoundLab(true);setLoks(l=>l+9999);setTotalEarned(t=>t+9999);hap([200,80,200,80,300]);blip("C6");say("🫧 SUPABLEEP · everything unlocked (dev)","success");pushNotif("SupaBleepMode active — all content unlocked for testing","success");}
-  },[say,hap,blip,pushNotif]);
-    const patchPost=(id,patch)=>setPosts(ps=>ps.map(p=>(p.id===id?{...p,...patch}:p)));
-  const boostPost=(id,label)=>{if(loks<20){say("Need 20 Loks to boost","error");return false;}setLoks(l=>l-20);setTotalSpent(t=>t+20);patchPost(id,{boostedAt:Date.now()});say(`"${label}" boosted · −20 Loks`,"success");return true;};
+  const patchPost=(id,patch)=>setPosts(ps=>ps.map(p=>(p.id===id?{...p,...patch}:p)));
   const spend=(cost,ok,label)=>{if(loks<cost){say(`Need ${cost} Loks`);return false;}setLoks(l=>l-cost);setTotalSpent(t=>t+cost);ok();say(`${label} · −${cost} Loks`);return true;};
   const animatedToken=totalSpent>=ANIMATED_AVATAR_SPEND;
   const feedLilLok=(amt=20,ctx="direct")=>{setLillok(s=>{const wasStasis=s.stasis;const cap=wasStasis?40:100;const bondGain=ctx==="revival"?8:ctx==="creation"?3:2;return{...s,ink:Math.min(cap,s.ink+amt),bond:Math.min(100,s.bond+bondGain),stasis:false,inkZeroAt:null,lastSeen:Date.now()};});hap([40]);};
-  // publish locally + to the shared party feed (frames JPEG-compressed for storage & upload)
-  const publishPost=useCallback(async post=>{
-    let frames=post.frames;try{frames=await Promise.all(post.frames.map(f=>compressFrame(f)));}catch{}
-    const p={...post,frames,author:profile.name};
-    setPosts(ps=>[p,...ps]);
-    lokApi.publishPost(toDbPost(p,profile.name)).then(ok=>{if(ok)say("Shared to the party feed ✦","success");});
-    if(!account&&!tips.saveNudge){setTips(t=>({...t,saveNudge:true}));setTimeout(()=>say("✨ Nice one — sign in (You → ⚙) so your art is saved forever"),2200);}
-    return p;
-  },[profile.name,say,account,tips.saveNudge]);
-  const syncFeed=useCallback(async()=>{try{const rows=await lokApi.fetchPosts();if(!rows.length)return;
-    setPosts(ps=>{const have=new Set(ps.map(p=>p.id));const fresh=rows.filter(r=>!have.has(r.id)&&r.author!==profile.name).map(fromDbPost);
-      const updated=ps.map(p=>{if(!p.remote)return p;const r=rows.find(x=>x.id===p.id);return r&&r.votes>p.votes?{...p,votes:r.votes}:p;});
-      if(fresh.length)setFeedCursor(rows[rows.length-1]?.created_at||null);
-      return fresh.length?[...fresh,...updated]:updated;});}catch{}},[profile.name]);
-  const loadMore=useCallback(async()=>{if(loadingMore||!feedCursor)return;setLoadingMore(true);try{const rows=await lokApi.fetchPosts(60,feedCursor);if(!rows.length){setFeedCursor(null);return;}setPosts(ps=>{const have=new Set(ps.map(p=>p.id));const older=rows.filter(r=>!have.has(r.id)&&r.author!==profile.name).map(fromDbPost);setFeedCursor(rows[rows.length-1]?.created_at||null);return older.length?[...ps,...older]:ps;});}catch{}setLoadingMore(false);},[feedCursor,loadingMore,profile.name]);
-  useEffect(()=>{if(!ready)return;syncFeed();let channel;try{channel=supabase.channel("public:lok_posts").on("postgres_changes",{event:"INSERT",schema:"public",table:"lok_posts"},p=>{const n=fromDbPost(p.new);if(n.author!==profile.name)setPosts(ps=>ps.some(x=>x.id===n.id)?ps:[n,...ps]);}).on("postgres_changes",{event:"UPDATE",schema:"public",table:"lok_posts"},p=>{const u=p.new;setPosts(ps=>ps.map(x=>x.id===u.id&&x.remote?{...x,votes:u.votes}:x));}).subscribe();}catch(e){console.warn("Realtime unavailable",e);}const t=setInterval(()=>{if(document.visibilityState==="visible")syncFeed();},60000);return()=>{try{channel?.unsubscribe();}catch{}clearInterval(t);};},[ready,syncFeed,profile.name]);
-  const doSignup=useCallback(async(handle,pin)=>{const blob=await store.get(SAVE_KEY);await lokApi.signup(handle,pin,blob);setAccount(handle);setProfile(p=>({...p,name:handle}));pushNotif(`Account @${handle} created — cloud backup on`,"success");say(`Welcome, ${handle}! Backed up ✓`,"success");},[pushNotif,say]);
-  const doLogin=useCallback(async(handle,pin)=>{const row=await lokApi.login(handle,pin);if(row.save_blob){await store.set(SAVE_KEY,{...row.save_blob,account:row.handle});say("Account found — restoring…","success");setTimeout(()=>location.reload(),600);}else{setAccount(row.handle);setProfile(p=>({...p,name:row.handle}));}},[say]);
-  const echoPost=useCallback(async post=>{patchPost(post.id,{echoCount:(post.echoCount||0)+1,echoedAt:Date.now(),echoExpiresAt:Date.now()+ECHO_EXPIRY_HOURS*3600000});const echo={id:post.id+"_e"+Date.now(),title:post.title+(post.title.endsWith("(echo)")?"":" (echo)"),frames:post.frames,frameDurations:post.frameDurations,paceMs:post.paceMs,mode:post.mode,style:post.style,loop:post.loop,votes:0,voted:false,viewed:false,views:0,reactions:{...post.reactions},echoedAt:Date.now(),echoCount:0,echoParent:post.id,echoExpiresAt:Date.now()+ECHO_EXPIRY_HOURS*3600000,from:"echo",author:post.author,remote:false};setPosts(ps=>[echo,...ps]);const url=`https://lok.app/echo/${post.id}`;try{if(navigator.share){await navigator.share({title:post.title,text:ECHO_SHARE_TEXT,url});}else{await navigator.clipboard.writeText(url+" — "+ECHO_SHARE_TEXT);say("Link copied — ");}say("Echo sent! Fades in "+ECHO_EXPIRY_HOURS+"h","success");blip("F5");hap([20,10]);}catch{}},[say]);
-  const voteTide=useCallback(prompt=>{if(tides.voted)return;const todayKey=new Date().toDateString();setTides(t=>({...t,voted:true,myVote:prompt}));try{localStorage.setItem("lok:tide:"+todayKey,prompt);}catch{}blip("B4");hap([15]);say("Tide vote saved! Results tomorrow","info");},[tides.voted]);
-  const claimEvent=useCallback(()=>{if(!activeEvent||eventClaimed===activeEvent.id)return;setEventClaimed(activeEvent.id);addLoks(activeEvent.reward);gainXp(50);feedLilLok(30,"creation");blip("C6");hap([50,30,80]);say(`${activeEvent.name} reward claimed · +${activeEvent.reward} Loks`,"success");pushNotif(`🎉 ${activeEvent.name} reward collected! +${activeEvent.reward} Loks`,"success");},[activeEvent,eventClaimed]);
-  useEffect(()=>{if(!ready)return;const t=setInterval(()=>{const now=Date.now();setPosts(ps=>ps.filter(p=>!p.echoExpiresAt||p.echoExpiresAt>now));},30000);return()=>clearInterval(t);},[ready]);
-  const[mx,setMx]=useState(0);const[my,setMy]=useState(0);const logoRef=useRef(null);const handleMove=e=>{const r=logoRef.current?.getBoundingClientRect();if(r){setMx((e.clientX-r.left-r.width/2)/r.width*2);setMy((e.clientY-r.top-r.height/2)/r.height*2);}};const handleLeave=()=>{setMx(0);setMy(0);};const trans=(dx,dy)=>`translate(${mx*dx}px,${my*dy}px)`;
-  if(!ready)return(<div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:ART.paper,color:ART.ink,fontFamily:"'Bricolage Grotesque',system-ui,sans-serif"}}>
-    <style>{`@keyframes inkdrop{0%{transform:scaleY(0.2) scaleX(0.8);opacity:0}40%{transform:scaleY(1.1) scaleX(0.95);opacity:1}60%{transform:scaleY(0.9) scaleX(1.05)}100%{transform:scale(1);opacity:1}} @keyframes inkfade{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}} @keyframes inkpulse{0%,100%{opacity:.4}50%{opacity:1}}`}</style>
-    <div ref={logoRef} onMouseMove={handleMove} onMouseLeave={handleLeave} style={{position:"relative",width:80,height:80,marginBottom:20,animation:"inkdrop .7s cubic-bezier(.34,1.56,.64,1) forwards"}}>
-      <div style={{position:"absolute",left:6,top:4,transform:trans(6,-4),transition:"transform .35s cubic-bezier(.22,1,.36,1)"}}><svg width="64" height="64" viewBox="0 0 64 64"><ellipse cx="37" cy="37" rx="18" ry="18" fill={ART.pink} opacity="0.55"/></svg></div>
-      <div style={{position:"absolute",left:0,top:0,transform:trans(-4,6),transition:"transform .35s cubic-bezier(.22,1,.36,1)"}}><svg width="64" height="64" viewBox="0 0 64 64"><path d="M32 8 C32 8 52 28 52 40 C52 51 43 58 32 58 C21 58 12 51 12 40 C12 28 32 8 32 8Z" fill="none" stroke={ART.ink} strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M32 8 C32 8 52 28 52 40 C52 51 43 58 32 58 C21 58 12 51 12 40 C12 28 32 8 32 8Z" fill={ART.ink} opacity="0.08"/></svg></div>
-    </div>
-    <div style={{fontWeight:800,fontSize:26,letterSpacing:"-0.02em",animation:"inkfade .5s .3s ease both"}}>LokBook</div>
-    <div style={{fontSize:13,opacity:0.5,marginTop:6,animation:"inkfade .5s .5s ease both"}}>loading your ink…</div>
-    <div style={{display:"flex",gap:6,marginTop:20,animation:"inkfade .5s .7s ease both"}}>{[0,1,2].map(i=><div key={i} style={{width:7,height:7,borderRadius:"50%",background:ART.ink,animation:`inkpulse 1.2s ${i*0.2}s ease-in-out infinite`}}/>)}</div>
+  const sharePost=useCallback(async post=>{const url=`https://lok.app/post/${post.id}`;try{if(navigator.share){await navigator.share({title:post.title,text:`Check out "${post.title}" on LokBook`,url});}else{await navigator.clipboard.writeText(url);say("Link copied!");}}catch{}},[say]);
+  if(sessionPin&&!pinUnlocked)return(<div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:ART.paper,color:ART.ink,fontFamily:"'Bricolage Grotesque',system-ui,sans-serif",gap:16,padding:24}}>
+    <style>{`@keyframes inkdrop{0%{transform:scaleY(0.2) scaleX(0.8);opacity:0}40%{transform:scaleY(1.1) scaleX(0.95);opacity:1}60%{transform:scaleY(0.9) scaleX(1.05)}100%{transform:scale(1);opacity:1}} @keyframes inkfade{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}}`}</style>
+    <div style={{fontWeight:800,fontSize:26,letterSpacing:"-0.02em",animation:"inkdrop .7s cubic-bezier(.34,1.56,.64,1) forwards"}}>LokBook</div>
+    <div style={{fontSize:13,opacity:0.5,animation:"inkfade .5s .3s ease both"}}>Session locked — enter PIN</div>
+    <input type="password" maxLength={6} inputMode="numeric" autoFocus value={pinInput} onChange={e=>{setPinInput(e.target.value);setPinError("");}} onKeyDown={e=>{if(e.key==="Enter"){if(pinInput===sessionPin){setPinUnlocked(true);setPinInput("");setPinError("");}else{setPinError("Wrong PIN");setPinInput("");}}}} className="w-full rounded-xl px-4 py-3 text-center text-2xl font-extrabold tracking-widest" style={{maxWidth:220,border:`3px solid ${pinError?"#C23B22":ART.ink}`,background:"#fff",color:ART.ink,outline:"none",animation:"inkfade .5s .5s ease both"}} aria-label="Enter PIN"/>
+    {pinError&&<div style={{color:"#C23B22",fontSize:13,fontWeight:700}}>{pinError}</div>}
   </div>);
-  return(<ErrorBoundary><ThemeCtx.Provider value={T}>
-    <div className={"min-h-screen w-full"+(compactDensity?" lok-compact":"")} style={{background:T.paper,color:T.ink,fontFamily:"'Schibsted Grotesk',system-ui,sans-serif",animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none"}}>
-      <GlobalStyle T={T} pace={pace} speed={speed}/><ThemeBackdrop themeId={uiTheme} pace={pace}/><SkyEffect sky={sky} paper={T.paper}/><PageEffect effect={effect}/>
-      <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3" style={{background:T.paper,borderBottom:`3px solid ${T.ink}`}}>
+  if(!ready)return(<Loader dynamic={featureFlags.dynamicLoader}/>);
+  return(<ThemeCtx.Provider value={T}>
+    <div className={`min-h-screen w-full ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:"'Schibsted Grotesk',system-ui,sans-serif",animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none"}}>
+      <GlobalStyle T={T} pace={pace} speed={speed}/><PageEffect effect={effect}/>
+      {!focusMode && <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3" style={{background:T.paper,borderBottom:`3px solid ${T.ink}`}}>
         <button onClick={()=>setTab("feed")} aria-label="Go to feed" className="lok-btn lok-display relative text-2xl font-extrabold tracking-tight select-none" style={{background:"transparent",border:"none",padding:0}}>
           <span className="absolute" style={{color:T.accent,left:3,top:2}}>Lok{kids?" Juniors":tab==="battle"?" N Slide":"Book"}</span>
           <span className="relative">Lok{kids?" Juniors":tab==="battle"?" N Slide":"Book"}</span>
@@ -263,59 +809,88 @@ function LokApp(){
         <div className="flex items-center gap-2">
           {kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.alt,color:"#fff"}}>SAFE</span>}
           {lokPass&&!kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.accent,color:T.onAccent}}>PASS</span>}
-          {!online&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:"#C23B22",color:"#fff"}} aria-label="Offline">✕ wifi</span>}
           <button onClick={()=>setSound(s=>!s)} aria-label={sound?"Mute sound":"Enable sound"} className="lok-btn w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:sound?T.ink:T.card,color:sound?T.paper:T.ink}}>{sound?"♪":"♪̸"}</button>
-          <span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.ink,color:T.paper}} aria-label={`Level ${level}`}>Lv {level}</span>
+          <span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.ink,color:T.paper}} aria-label={`Level ${level}`}>Lv {level}{verified&&<span style={{color:"#E8B14B",marginLeft:2}}>✦</span>}</span>
           <div className="flex items-center gap-2 px-3 py-1 rounded-full font-bold" style={{border:`2.5px solid ${T.ink}`,background:T.card}} aria-label={`${loks} Loks`}>
             <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="11" cy="11" r="8" fill={T.accent}/><circle cx="9" cy="9" r="8" fill="none" stroke={T.ink} strokeWidth="2.4"/><path d="M7 5.5 V12.5 H12" fill="none" stroke={T.ink} strokeWidth="2.4" strokeLinecap="round"/></svg>
             {loks}
           </div>
         </div>
-      </header>
+      </header>}
       <main className="mx-auto w-full px-4 pb-40" style={{maxWidth:560}}>
-        <Suspense fallback={<div className="flex items-center justify-center py-12 text-sm opacity-50">Loading…</div>}>
         <div key={tab} className="lok-tabin">
-                       {tab==="feed"&&<AuthGate><Feed posts={posts} bookmarks={bookmarks} following={following} feedMode={feedMode} setFeedMode={setFeedMode} cosmetics={cosmetics} daily={daily} streak={daily.streak} dailyClaimed={daily.claimed} flipOfDay={flipOfDay} onLine={showLine} onClaimDaily={()=>{if(daily.claimed)return;const wk=daily.streak%7===0&&daily.streak>0?20:0;const mo=daily.streak%30===0&&daily.streak>0?100:0;const bonus=10+Math.min(daily.streak,7)*5+wk+mo;setDaily(d=>({...d,claimed:true}));addLoks(bonus);gainXp(20);feedLilLok(15,"creation");blip("E5");hap([30,20,60]);say(`Day ${daily.streak} claimed · +${bonus} Loks`,"success");}} onOpen={id=>setOpenIdx(posts.findIndex(p=>p.id===id))} onVote={id=>{const p=posts.find(x=>x.id===id);if(p.voted)return;patchPost(id,{voted:true,votes:p.votes+1});if(p.remote)lokApi.votePost(id,p.votes+1);addLoks(5);gainXp(5);questTick("vote");blip("C5");hap([30]);setVoteCount(c=>c+1);say("Vote stamped · +5 Loks","success");if(id.startsWith("seed")){addLoks(5);pushNotif("Your flip got a vote · +5 Loks (creator)","success");}else{pushNotif("You voted · creator notified","success");}}} onLok={name=>{setFollowing(f=>{const next=f.includes(name)?f:[...f,name];if(account)lokApi.follow(account,name).catch(()=>{});return next;});questTick("lok");blip("G5");hap([20,10,20]);say(`Lok'd ${name}`);}} onBookmark={id=>{setBookmarks(b=>{const had=b.includes(id);const next=had?b.filter(x=>x!==id):[...b,id];if(account){if(had)lokApi.unbookmark(account,id).catch(()=>{});else lokApi.bookmark(account,id).catch(()=>{});}return next;});blip("A4");hap([20]);say(bookmarks.includes(id)?"Bookmark removed":"Lok'd in to bookmarks");}} onArtist={setArtistView} onReact={(id,type)=>{const p=posts.find(x=>x.id===id);patchPost(id,{reactions:{...p.reactions,[type]:p.reactions[type]+1}});blip("D5");hap([15]);if(account)lokApi.react(account,id,type).catch(()=>{});}} onEcho={echoPost} tides={tides} onVoteTide={voteTide} activeEvent={activeEvent} eventClaimed={eventClaimed} onClaimEvent={claimEvent} say={say} loadingMore={loadingMore} onLoadMore={loadMore}/></AuthGate>}
-          {tab==="gallery"&&<AuthGate><Profile posts={posts} profile={profile} setProfile={setProfile} onCheat={onCheat} wins={wins} lokPass={lokPass} kids={kids} cosmetics={cosmetics} level={level} xp={xp} quests={quests} following={following} lokdInCount={lokdInCount} bookmarks={bookmarks} notifications={notifications} notifUnread={notifUnread} loks={loks} totalEarned={totalEarned} questsCompleted={questsCompleted} canInstall={!!installEvt} onInstall={async()=>{if(installEvt){installEvt.prompt();try{const r=await installEvt.userChoice;if(r.outcome==="accepted")say("Lok added to your home screen!","success");}catch{}setInstallEvt(null);}else{say("Open your browser menu → Install app / Add to Home Screen");}}} onClearNotifs={()=>setNotifUnread(0)} onOpen={id=>setOpenIdx(posts.findIndex(p=>p.id===id))} onDelete={id=>setPosts(ps=>ps.filter(p=>p.id!==id))} onRename={(id,title)=>patchPost(id,{title})} say={say} account={account} pace={pace} setPace={setPace} speed={speed} setSpeed={setSpeed} soundLab={soundLab} onUnlockSoundLab={()=>setSoundLab(true)} soundQueue={soundQueue} setSoundQueue={setSoundQueue} founder={founder} onFounderJoin={async(handle,email)=>{await founderSignup(handle,email,{loks,wins,xp,profile,questsCompleted,totalEarned,gallerySize:posts.filter(p=>!p.id?.startsWith("seed")).length,lillok:{ink:lillok.ink,bond:lillok.bond,name:lillok.name}});setFounder(true);pushNotif("Founder status secured on LokServices 🏆","success");}} badges={badges} showBadges={showBadges} setShowBadges={setShowBadges} unlockedCount={unlockedCount} compactDensity={compactDensity} setCompactDensity={setCompactDensity} onClearData={()=>{if(!window.confirm("Clear all local data? This cannot be undone."))return;store.remove(SAVE_KEY);store.remove(GALLERY_KEY);localStorage.clear();location.reload();}}/></AuthGate>}
-          {tab==="studio"&&<Studio modules={studioModules} say={say} kids={kids} dailyPrompt={daily.prompt} paper={cosmetics.paper||"plain"} onboarded={onboarded} postCount={posts.length} onPublish={post=>{publishPost(post);setTab("gallery");gainXp(25);questTick("publish");blip("C6");hap([50,30,100]);say("Published to your gallery");}}/>}
-          {tab==="battle"&&<Battle modules={studioModules} wins={wins} bigBattleOwned={bigBattleOwned} kids={kids} phase={phase} lillok={lillok} customLilLok={customLilLok} say={say} blip={blip} hap={hap} onLine={showLine} onUnlockBig={()=>spend(50,()=>setBigBattleOwned(true),"Big Battle unlocked")} profile={profile} onResult={(battle)=>{const {won,mult=1,prompt,format,pages,strokes,blocked}=battle||{};addLoks((won?25:5)*mult);gainXp(won?25:8);questTick("battle");if(won){setWins(w=>w+1);hap([200,100,200]);pushNotif(`You won a battle! +${25*mult} Loks${mult>1?" · ✦ 3× featured":""}`,"success");feedLilLok(5,"creation");}setLillok(s=>s.stasis?s:({...s,ink:Math.max(0,s.ink-6)}));if(profile?.name&&(won||prompt)){lokApi.recordBattle({author:profile.name,won,score:(won?100:10)*(mult>1?1.5:1),prompt:prompt||null,format:format||null,pages:pages||0,strokes:strokes||0,blocked:blocked||0,featured:mult>1,week_start:getWeekStart(new Date())});}}} onPublish={post=>publishPost(post)}/>}
+          {tab==="feed"&&<Feed posts={posts} bookmarks={bookmarks} following={following} feedMode={feedMode} setFeedMode={setFeedMode} cosmetics={cosmetics} daily={daily} streak={daily.streak} dailyClaimed={daily.claimed} flipOfDay={flipOfDay} onLine={showLine} onClaimDaily={()=>{if(daily.claimed)return;const wk=daily.streak%7===0&&daily.streak>0?20:0;const mo=daily.streak%30===0&&daily.streak>0?100:0;const bonus=10+Math.min(daily.streak,7)*5+wk+mo;setDaily(d=>({...d,claimed:true}));addLoks(bonus);gainXp(20);feedLilLok(15,"creation");blip("E5");hap([30,20,60]);say(`Day ${daily.streak} claimed · +${bonus} Loks`,"success");}} onOpen={id=>setOpenIdx(posts.findIndex(p=>p.id===id))} onVote={id=>{const p=posts.find(x=>x.id===id);if(p.voted)return;patchPost(id,{voted:true,votes:p.votes+1});addLoks(5);gainXp(5);questTick("vote");blip("C5");hap([30]);say("Vote stamped · +5 Loks","success");if(id.startsWith("seed")){addLoks(5);pushNotif("Your flip got a vote · +5 Loks (creator)","success");}else{pushNotif("You voted · creator notified","success");}}} onLok={name=>{setFollowing(f=>f.includes(name)?f:[...f,name]);questTick("lok");blip("G5");hap([20,10,20]);say(`Lok'd ${name}`);}} onBookmark={id=>{setBookmarks(b=>b.includes(id)?b.filter(x=>x!==id):[...b,id]);blip("A4");hap([20]);say(bookmarks.includes(id)?"Bookmark removed":"Lok'd in to bookmarks");}} say={say} moodFilter={moodFilter} setMoodFilter={setMoodFilter} moodTags={moodTags} reportedPosts={reportedPosts} onReport={id=>{setReportedPosts(r=>[...r,id]);patchPost(id,{hidden:true});say("Post hidden")}}/>}
+          {tab==="gallery"&&<Profile posts={posts} profile={profile} setProfile={setProfile} wins={wins} lokPass={lokPass} kids={kids} cosmetics={cosmetics} owned={owned} onBuyCosmetic={(cat,item)=>{if(owned[cat]?.some(o=>o.id===item.id)){setCosmetics(c=>({...c,[cat]:item.id}));say(`Equipped ${item.name}`);}else spend(item.price,()=>{setOwned(o=>({...o,[cat]:[...(o[cat]||[]),{id:item.id,ts:Date.now()}]}));setCosmetics(c=>({...c,[cat]:item.id}));},`${item.name} unlocked`);}} level={level} xp={xp} quests={quests} following={following} lokdInCount={lokdInCount} bookmarks={bookmarks} notifications={notifications} notifUnread={notifUnread} loks={loks} totalEarned={totalEarned} questsCompleted={questsCompleted} canInstall={!!installEvt} onInstall={async()=>{if(installEvt){installEvt.prompt();try{const r=await installEvt.userChoice;if(r.outcome==="accepted")say("Lok added to your home screen!","success");}catch{}setInstallEvt(null);}else{say("Open your browser menu → Install app / Add to Home Screen");}}} onClearNotifs={()=>setNotifUnread(0)} onOpen={id=>setOpenIdx(posts.findIndex(p=>p.id===id))} onDelete={id=>setPosts(ps=>ps.filter(p=>p.id!==id))} onRename={(id,title)=>patchPost(id,{title})} say={say} pace={pace} setPace={setPace} speed={speed} setSpeed={setSpeed} soundLab={soundLab} onUnlockSoundLab={()=>setSoundLab(true)} soundQueue={soundQueue} setSoundQueue={setSoundQueue} founder={founder} onFounderJoin={async(handle,email)=>{await founderSignup(handle,email,{loks,wins,xp,profile,questsCompleted,totalEarned,gallerySize:posts.filter(p=>!p.id?.startsWith("seed")).length,lillok:{ink:lillok.ink,bond:lillok.bond,name:lillok.name}});setFounder(true);pushNotif("Founder status secured on LokServices 🏆","success");}} animatedToken={animatedToken} focusMode={focusMode} setFocusMode={setFocusMode} showSettings={showSettings} setShowSettings={setShowSettings} featureFlags={featureFlags} onSetFlag={(k,v)=>{setFeatureFlags(f=>({...f,[k]:v}));store.set("lok:flags",{...featureFlags,[k]:v});}} hapticGrammar={hapticGrammar} setHapticGrammar={setHapticGrammar} fourthWall={fourthWall} setFourthWall={setFourthWall} garden={garden} setGarden={setGarden} wordTwister={wordTwister} setWordTwister={setWordTwister} timeMachineIdx={timeMachineIdx} setTimeMachineIdx={setTimeMachineIdx} heatmapData={heatmapData} sessionPin={sessionPin} setSessionPin={setSessionPin} pinInput={pinInput} setPinInput={setPinInput} verified={verified} setVerified={setVerified}/>}
+          {tab==="studio"&&<><div className="flex items-center gap-1.5 mb-1 overflow-x-auto pb-0.5">{stickers.map((s,i)=><button key={i} onClick={()=>setStickers(ss=>ss.filter((_,j)=>j!==i))} className="text-lg" title={`Remove ${s}`}>{s}</button>)}<button onClick={()=>{const emoS=["😎","🔥","🎨","💀","👾","✨","🌈","🍕","💎","🌸","🦋","🧠","⚡","🫶","🌟","🔮","🌀","💫","🦄","🍀","🎮","🖤","💚","💜","👑","🤖","👻","🎪","💥","🪐"];setStickers(ss=>{const pick=emoS[Math.floor(Math.random()*emoS.length)];return [...ss,pick];});say("Sticker added!");}} className="lok-btn shrink-0 text-xs font-bold px-2 py-0.5 rounded-full" style={{border:`1.5px solid ${T.ink}`}}>🎴 +sticker</button><span className="text-[10px] opacity-40 ml-auto">{stickers.length} stickers</span></div>
+          <Studio ownedTiers={ownedTiers} ccTier={ccTier} say={say} kids={kids} dailyPrompt={daily.prompt} onPublish={post=>{setPosts(ps=>[post,...ps]);setTab("gallery");gainXp(25);questTick("publish");blip("C6");hap([50,30,100]);say("Published to your gallery");}}/></>}
+          {tab==="battle"&&<><div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
+            <span className="lok-display font-extrabold text-sm" style={{color:battleRoyaleCount>=5?T.accent:T.ink}}>🔥 Battle Royale</span>
+            <div className="flex items-center gap-1">{Array.from({length:5}).map((_,i)=>(<button key={i} onClick={()=>{setBattleRoyaleCount(c=>c+1);if(i===4){addLoks(30);say("Battle Royale hype! +30 Loks","success");}}} className="lok-btn w-6 h-6 rounded-full text-[9px] font-bold flex items-center justify-center" style={{border:`2px solid ${i<battleRoyaleCount?T.accent:T.shadow}`,background:i<battleRoyaleCount?T.accent:"transparent",color:i<battleRoyaleCount?T.onAccent:T.ink}} aria-label={i<battleRoyaleCount?"Hype unlocked":"Add hype"}>{i<battleRoyaleCount?"🔥":"+"}</button>))}</div>
+            {battleRoyaleCount>=5&&<span className="text-xs font-bold" style={{color:T.accent}}>READY!</span>}
+          </div>
+          <Battle ownedTiers={ownedTiers} ccTier={ccTier} wins={wins} bigBattleOwned={bigBattleOwned} kids={kids} phase={phase} lillok={lillok} customLilLok={customLilLok} say={say} blip={blip} hap={hap} onLine={showLine} onUnlockBig={()=>spend(50,()=>setBigBattleOwned(true),"Big Battle unlocked")} onResult={(won,mult=1)=>{addLoks((won?25:5)*mult);gainXp(won?25:8);questTick("battle");if(won){setWins(w=>w+1);hap([200,100,200]);pushNotif(`You won a battle! +${25*mult} Loks${mult>1?" · ✦ 3× featured":""}`,"success");feedLilLok(5,"creation");}setLillok(s=>s.stasis?s:({...s,ink:Math.max(0,s.ink-6)}));}} onPublish={post=>setPosts(ps=>[post,...ps])}/></>}
           {tab==="front"&&<OpenFront kids={kids} loks={loks} dailyPrompt={daily.prompt} hinted={traceHinted} onHinted={()=>setTraceHinted(true)} onWager={amt=>{if(loks<amt)return false;setLoks(l=>l-amt);setTotalSpent(t=>t+amt);return true;}} onEarn={n=>{addLoks(n);questTick("front",Math.max(1,Math.round(n/5)));gainXp(n);setLillok(s=>s.stasis?s:({...s,ink:Math.max(0,s.ink-3)}));}} blip={blip} say={say}/>}
-          {tab==="rooms"&&<Rooms profile={profile} userId={auth.getUserId()||("local:"+profile.name)} myRooms={myRooms} setMyRooms={setMyRooms} pendingCode={pendingRoomCode} onPendingCodeUsed={()=>setPendingRoomCode(null)} onArtist={setArtistView} say={say} blip={blip} hap={hap}/>}
-          {tab==="shop"&&<Shop loks={loks} lokPass={lokPass} lokPassBusy={lokPassBusy} kids={kids} uiTheme={uiTheme} ownedThemes={ownedThemes} effect={effect} ownedEffects={ownedEffects} sky={sky} ownedSkies={ownedSkies} modules={studioModules} onBuyModule={item=>spend(item.price,()=>{if(item.id==="module_uber"){const all=STUDIO_MODULES.filter(m=>m.type!=="achievement").map(m=>m.id);setStudioModules(m=>[...new Set([...m,...all])]);}else{setStudioModules(m=>[...new Set([...m,item.id])]);}blip("C6");},`${item.name} unlocked`)} cosmetics={cosmetics} owned={owned} setKids={setKids} say={say} founder={founder} onFounderJoin={async(handle,email)=>{await founderSignup(handle,email,{loks,wins,xp,profile,questsCompleted,totalEarned,gallerySize:posts.filter(p=>!p.id?.startsWith("seed")).length,lillok:{ink:lillok.ink,bond:lillok.bond,name:lillok.name}});setFounder(true);pushNotif("Founder status secured on LokServices 🏆","success");}} onBuyCosmetic={(cat,item)=>{if((owned[cat]||[]).includes(item.id)){setCosmetics(c=>({...c,[cat]:item.id}));blip("D5");say(`Equipped ${item.name}`);}else spend(item.price,()=>{setOwned(o=>({...o,[cat]:[...(o[cat]||[]),item.id]}));setCosmetics(c=>({...c,[cat]:item.id}));blip("C6");},`${item.name} unlocked`);}} onBuyPass={async()=>{setLokPassBusy(true);try{const res=await fetch(`${SUPA_URL}/functions/v1/stripe-checkout`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${auth.getApiToken()}`},body:JSON.stringify({userId:auth.getUserId()||"local",email:auth.getEmail()||"",priceId:"lokpass_299",successUrl:window.location.origin+"/?session_id={CHECKOUT_SESSION_ID}",cancelUrl:window.location.origin})});if(res.ok){const{url}=await res.json();if(url){window.location.href=url;return;}say("Stripe returned no URL","error");}else{const err=await res.text();say(`Checkout failed: ${err}`,"error");}}catch(e){console.warn("Stripe checkout unavailable",e);setLokPass(true);setOwnedThemes(Object.keys(THEMES));blip("C6");say("LokPass active! (local)");}setLokPassBusy(false);}} onTheme={id=>{if(ownedThemes.includes(id)){setUiTheme(id);say(`Equipped ${THEMES[id].name}`);}else spend(THEMES[id].price,()=>{setOwnedThemes(o=>[...o,id]);setUiTheme(id);},`${THEMES[id].name} unlocked`);}} onEffect={(id,e)=>{if(ownedEffects.includes(id)){setEffect(id);say(id==="none"?"Effects off":`${e.name} equipped`);}else spend(e.price,()=>{setOwnedEffects(o=>[...o,id]);setEffect(id);},`${e.name} unlocked`);}} onSky={(id,s)=>{if(ownedSkies.includes(id)){setSky(id);say(id==="clear"?"Sky off":`${s.name} equipped`);}else spend(s.price,()=>{setOwnedSkies(o=>[...o,id]);setSky(id);},`${s.name} unlocked`);}}/>}
+          {tab==="shop"&&<Shop modules={modules} onBuyModule={m=>{if(modules.includes(m.id)){say("Already owned");return;}spend(m.price,()=>{setModules(o=>[...o,m.id]);blip("C6");},`${m.name} unlocked`);}} loks={loks} lokPass={lokPass} kids={kids} uiTheme={uiTheme} ownedThemes={ownedThemes} effect={effect} ownedEffects={ownedEffects} sky={sky} ownedSkies={ownedSkies} onSky={(id,s)=>{if(ownedSkies.includes(id)){setSky(id);say(`Equipped ${s.name}`);}else spend(s.price,()=>{setOwnedSkies(o=>[...o,id]);setSky(id);},`${s.name} unlocked`);}} animFx={animFx} ownedAnimFx={ownedAnimFx} onAnimFx={(id,f)=>{if(ownedAnimFx.includes(id)){setAnimFx(id);say(id==="none"?"FX off":`${f.name} equipped`);}else spend(f.price,()=>{setOwnedAnimFx(o=>[...o,id]);setAnimFx(id);},`${f.name} unlocked`);}} fontPack={fontPack} onFontPack={(id,f)=>spend(f.price,()=>{setOwned(o=>({...o,fontPack:[...(o.fontPack||[]),id]}));setFontPack(id);},`${f.name} set`)} cursorPack={cursorPack} onCursorPack={(id,c)=>spend(c.price,()=>{setOwned(o=>({...o,cursorPack:[...(o.cursorPack||[]),id]}));setCursorPack(id);},`${c.name} set`)} musicPack={musicPack} onMusicPack={(id,m)=>spend(m.price,()=>{setOwned(o=>({...o,musicPack:[...(o.musicPack||[]),id]}));setMusicPack(id);},`${m.name} set`)} stickerPack={stickerPack} onStickerPack={(id,s)=>spend(s.price,()=>{setOwned(o=>({...o,stickerPack:[...(o.stickerPack||[]),id]}));setStickerPack(id);},`${s.name} set`)} postExport={postExport} onPostExport={(id,e)=>spend(e.price,()=>{setOwned(o=>({...o,postExport:[...(o.postExport||[]),id]}));setPostExport(id);},`${e.name} set`)} cosmetics={cosmetics} owned={owned} setKids={setKids} onBuyCosmetic={(cat,item)=>{if((owned[cat]||[]).includes(item.id)){setCosmetics(c=>({...c,[cat]:item.id}));blip("D5");say(`Equipped ${item.name}`);}else spend(item.price,()=>{setOwned(o=>({...o,[cat]:[...(o[cat]||[]),item.id]}));setCosmetics(c=>({...c,[cat]:item.id}));blip("C6");},`${item.name} unlocked`);}} onBuyPass={()=>{setLokPass(true);setOwnedThemes(Object.keys(THEMES));blip("C6");say("LokPass active!");}} onTheme={id=>{if(ownedThemes.includes(id)){setUiTheme(id);say(`Equipped ${THEMES[id].name}`);}else spend(THEMES[id].price,()=>{setOwnedThemes(o=>[...o,id]);setUiTheme(id);},`${THEMES[id].name} unlocked`);}} onEffect={(id,e)=>{if(ownedEffects.includes(id)){setEffect(id);say(id==="none"?"Effects off":`${e.name} equipped`);}else spend(e.price,()=>{setOwnedEffects(o=>[...o,id]);setEffect(id);},`${e.name} unlocked`);}} onTier={t=>spend(t.price,()=>setOwnedTiers(o=>[...o,t.layers]),`${t.label} unlocked`)} onCc={()=>spend(120,()=>setCcTier(true),"Studio Pro unlocked")}/>}
         </div>
-        </Suspense>
       </main>
-      {!lokPass&&!kids&&AD_PROVIDER!=="off"&&(<div className="fixed inset-x-0 z-40 flex items-center gap-2 px-4 py-1.5 text-xs font-bold" style={{bottom:62,background:T.card,borderTop:`2px dashed ${T.ink}`,color:T.ink,opacity:adVisible?1:0,transition:"opacity .3s ease",pointerEvents:adVisible?"auto":"none"}}>
-        {AD_PROVIDER==="placeholder"&&<span className="opacity-70 truncate flex-1" key={adIdx} style={{animation:"lokrise .3s ease"}}>Ad · {ADS[adIdx].text}</span>}
-        {AD_PROVIDER==="ethicalads"&&<div data-ea-publisher={ETHICALADS_PUBLISHER} data-ea-type="text" className="flex-1"/>}
-        {AD_PROVIDER==="custom"&&<div className="flex-1" dangerouslySetInnerHTML={{__html:CUSTOM_AD_HTML}}/>}
+      {!focusMode && !lokPass&&!kids&&(<div className="fixed inset-x-0 z-40 flex items-center justify-between gap-2 px-4 py-1.5 text-xs font-bold" data-ad-slot={ADS[adIdx].slot} data-ad-format="banner" style={{bottom:62,background:T.card,borderTop:`2px dashed ${T.ink}`,color:T.ink,opacity:adVisible?1:0,transition:"opacity .3s ease",pointerEvents:adVisible?"auto":"none"}}>
+        {/* AdSense: replace inner span with <ins class="adsbygoogle"> at deploy; slot id in data-ad-slot */}
+        <span className="opacity-70 truncate" key={adIdx} style={{animation:"lokrise .3s ease"}}>Ad · {ADS[adIdx].text}</span>
         <button onClick={()=>setTab("shop")} aria-label="Remove ads with LokPass" className="underline shrink-0" style={{color:T.accent}}>Remove with LokPass</button>
       </div>)}
-      <nav className="fixed bottom-0 inset-x-0 z-40 flex" style={{background:T.paper,borderTop:`3px solid ${T.ink}`,paddingBottom:"env(safe-area-inset-bottom)"}} role="navigation" aria-label="Main navigation">
-        {[["feed",kids?"Home":"Feed",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>],["gallery",kids?"You":"You",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>],["studio","Studio",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><circle cx="11" cy="11" r="2"/></svg>],["battle",kids?"Draw":"Battle",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M2 2l20 20"/></svg>],["rooms","Rooms",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 12h18M12 3v18" opacity=".45"/><circle cx="7.5" cy="7.5" r="1.6" fill="currentColor"/><path d="M14 16c1.5-2 4-2 5 0" /></svg>],["front","Rush",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>],["shop","Shop",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>]].map(([id,label,icon])=>{const on=tab===id;return(<button key={id} onClick={()=>setTab(id)} aria-label={`Go to ${label}`} aria-current={on?"page":undefined} className="lok-btn lok-display relative flex-1 py-2.5 text-xs font-bold flex flex-col items-center gap-0.5" style={{color:on?T.accent:T.ink,transition:"color .2s ease"}}>
+      {!focusMode && <nav className="fixed bottom-0 inset-x-0 z-40 flex" style={{background:T.paper,borderTop:`3px solid ${T.ink}`,paddingBottom:"env(safe-area-inset-bottom)"}} role="navigation" aria-label="Main navigation">
+        {[["feed",kids?"Home":"Feed",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>],["gallery",kids?"You":"You",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>],["studio","Studio",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><circle cx="11" cy="11" r="2"/></svg>],["battle",kids?"Draw":"Battle",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M2 2l20 20"/></svg>],["front","Rush",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>],["shop","Shop",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>]].map(([id,label,icon])=>{const on=tab===id;return(<button key={id} onClick={()=>setTab(id)} aria-label={`Go to ${label}`} aria-current={on?"page":undefined} className="lok-btn lok-display relative flex-1 py-2.5 text-xs font-bold flex flex-col items-center gap-0.5" style={{color:on?T.accent:T.ink,transition:"color .2s ease"}}>
           {on&&<span className="absolute left-1/2 rounded-full" style={{top:4,width:22,height:3,transform:"translateX(-50%)",background:T.accent}} aria-hidden="true"/>}
           <span style={{opacity:on?1:0.6}} aria-hidden="true">{icon}</span>
           <span style={{opacity:on?1:0.7,fontSize:10}}>{label}</span>
-          {id==="gallery"&&<span onClick={founder?undefined:e=>{e.stopPropagation();setTab("shop");}} className="absolute" style={{top:-6,right:-2,background:founder?T.alt:T.accent,color:founder?"#fff":T.onAccent,fontSize:9,fontWeight:900,lineHeight:1,padding:"2px 6px",borderRadius:999,border:`1.5px solid ${T.paper}`,boxShadow:`2px 2px 0 ${T.shadow}`,whiteSpace:"nowrap",cursor:founder?"default":"pointer",animation:founder?"none":"lokpulse 1.6s ease-in-out infinite",transition:"all .3s ease",transform:tab==="gallery"&&!founder?"scale(1.1)":"scale(1)"}}>{founder?"🏆 Founder":"Become a Founder!"}</span>}
         </button>);})}
-      </nav>
-      {!showLilLok&&(<div className="fixed z-40" style={{right:14,bottom:116}}>
+      </nav>}
+      {!focusMode && !showLilLok&&(<div className="fixed z-40" style={{right:14,bottom:116, transition: 'bottom 0.3s ease'}}>
         {fabBubble&&<LilLokBubble text={fabBubble} ink={T.ink} paper={T.paper}/>}
         <button onClick={()=>{setShowLilLok(true);setFabBubble("");}} aria-label={`Open LilLok — ${lillok.name} is ${phase}`} className="lok-btn rounded-full flex items-center justify-center" style={{width:60,height:60,background:T.card,...(cosmetics.blotBorder&&cosmetics.blotBorder!=="none"?blotBorderStyle(cosmetics.blotBorder,T):{border:`3px solid ${phase==="critical"?T.accent:phase==="decaying"?"#8E93A8":phase==="stasis"?"#9A9286":T.accent}`,boxShadow:`3px 3px 0 ${T.shadow}`}),animation:phase==="critical"&&!reduceMotion?"lokpulse 1.6s ease-in-out infinite":"none"}}>
-          <LilLokSprite phase={phase} ink={lillok.ink} size={46} custom={customLilLok?.art} gear={cosmetics.lillokGear}/>
+          <LilLokSprite phase={phase} ink={lillok.ink} size={46} custom={customLilLok?.art}/>
           {phase!=="thriving"&&!kids&&<span className="absolute -top-1 -right-1 w-4 h-4 rounded-full" aria-hidden="true" style={{background:phase==="critical"?"#C23B22":T.accent,border:`2px solid ${T.card}`}}/>}
+          {evoStage>0&&<span className="absolute -bottom-1 -left-1 text-xs" style={{filter:"drop-shadow(0 1px 2px rgba(0,0,0,.3))"}} title={`Evolution stage ${evoStage}`}>{evoEmojis[evoStage]}</span>}
         </button>
       </div>)}
-      {showLilLok&&<LilLokPanel lillok={lillok} phase={phase} kids={kids} custom={customLilLok} loks={loks} gear={cosmetics.lillokGear} onFeed={feedLilLok} onFlask={()=>{if(loks<10){say("Need 10 Loks","error");return false;}setLoks(l=>l-10);setTotalSpent(t=>t+10);feedLilLok(40,"flask");say("Ink flask · −10 Loks","success");return true;}} onClose={()=>setShowLilLok(false)} say={say} setLillok={setLillok} onPublish={post=>{publishPost(post);say("Revival animation published","success");}} onSaveCustom={c=>{setCustomLilLok(c);setLillok(s=>({...s,name:c.name}));say(`${c.name} is now your LilLok`,"success");}}/>}
-      {artistView&&<ArtistPage name={artistView} posts={posts} following={following} onOpenPost={post=>{const i=posts.findIndex(x=>x.id===post.id);if(i>=0){setOpenIdx(i);}else{setPosts(ps=>ps.some(x=>x.id===post.id)?ps:[post,...ps]);setTimeout(()=>setOpenIdx(0),80);}}} onLok={name=>{setFollowing(f=>{const next=f.includes(name)?f:[...f,name];if(account)lokApi.follow(account,name).catch(()=>{});return next;});questTick("lok");blip("G5");hap([20,10,20]);say(`Lok'd ${name}`);}} onOpen={id=>setOpenIdx(posts.findIndex(p=>p.id===id))} onClose={()=>setArtistView(null)}/>}
-      {openIdx!==null&&posts[openIdx]&&(<Viewer posts={posts} index={openIdx} bookmarks={bookmarks} cosmetics={cosmetics} onBookmark={id=>{setBookmarks(b=>{const had=b.includes(id);const next=had?b.filter(x=>x!==id):[...b,id];if(account){if(had)lokApi.unbookmark(account,id).catch(()=>{});else lokApi.bookmark(account,id).catch(()=>{});}return next;});hap([20]);say(bookmarks.includes(id)?"Bookmark removed":"Lok'd in");}} onClose={()=>setOpenIdx(null)} onNav={d=>setOpenIdx(i=>Math.min(posts.length-1,Math.max(0,i+d)))} onVote={id=>{const p=posts.find(x=>x.id===id);if(p.voted)return;patchPost(id,{voted:true,votes:p.votes+1});if(p.remote)lokApi.votePost(id,p.votes+1);addLoks(5);gainXp(5);questTick("vote");blip("C5");hap([30]);setVoteCount(c=>c+1);say("Vote stamped");}} onReact={(id,type)=>{const p=posts.find(x=>x.id===id);patchPost(id,{reactions:{...p.reactions,[type]:p.reactions[type]+1}});blip("D5");hap([15]);if(account)lokApi.react(account,id,type).catch(()=>{});}} onViewed={id=>{const p=posts.find(x=>x.id===id);if(p.viewed)return;patchPost(id,{viewed:true,views:(p.views||0)+1});addLoks(3);gainXp(3);questTick("view");say("Full slide-through · +3 Loks");}} onEcho={echoPost} onBoost={boostPost} onDelete={id=>{setPosts(ps=>ps.filter(p=>p.id!==id));setOpenIdx(null);say("Post deleted");}} onRename={(id,title)=>patchPost(id,{title})} onArtist={n=>{setOpenIdx(null);setArtistView(n);}} myName={profile.name}/>)}
-      {(()=>{const TIP_TEXT={studio:"✏️ Draw → Capture → repeat. 2+ pages makes it move",battle:"⚔ Same prompt, same clock. Tap LOK BLOCK when a rival attacks!",gallery:account?null:"💾 Tap ⚙ → Lok account to keep your data forever",shop:"🛍 Everything here costs Loks you earn by playing — no real money except LokPass"};
-        return !showOnboard&&TIP_TEXT[tab]&&!tips[tab]?(<button onClick={()=>setTips(t=>({...t,[tab]:true}))} className="fixed left-1/2 z-50 px-4 py-2.5 rounded-2xl text-sm font-bold text-center lok-btn" style={{bottom:150,transform:"translateX(-50%)",background:T.ink,color:T.paper,border:`3px solid ${T.accent}`,boxShadow:`4px 4px 0 ${T.accent}`,maxWidth:"90vw",animation:"lokrise .4s ease"}} aria-label="Dismiss tip">{TIP_TEXT[tab]} · tap to dismiss</button>):null;})()}
+      {showLilLok&&<LilLokPanel lillok={lillok} phase={phase} kids={kids} custom={customLilLok} loks={loks} onFeed={feedLilLok} onFlask={()=>{if(loks<10){say("Need 10 Loks","error");return false;}setLoks(l=>l-10);setTotalSpent(t=>t+10);feedLilLok(40,"flask");say("Ink flask · −10 Loks","success");return true;}} onClose={()=>setShowLilLok(false)} say={say} setLillok={setLillok} onPublish={post=>{setPosts(ps=>[post,...ps]);say("Revival animation published","success");}} onSaveCustom={c=>{setCustomLilLok(c);setLillok(s=>({...s,name:c.name}));say(`${c.name} is now your LilLok`,"success");}}/>}
+      {openIdx!==null&&posts[openIdx]&&(<Viewer posts={posts} index={openIdx} bookmarks={bookmarks} cosmetics={cosmetics} onBookmark={id=>{setBookmarks(b=>b.includes(id)?b.filter(x=>x!==id):[...b,id]);hap([20]);say(bookmarks.includes(id)?"Bookmark removed":"Lok'd in");}} onClose={()=>setOpenIdx(null)} onNav={d=>setOpenIdx(i=>Math.min(posts.length-1,Math.max(0,i+d)))} onVote={id=>{const p=posts.find(x=>x.id===id);if(p.voted)return;patchPost(id,{voted:true,votes:p.votes+1});addLoks(5);gainXp(5);questTick("vote");blip("C5");hap([30]);say("Vote stamped");}} onReact={(id,type)=>{const p=posts.find(x=>x.id===id);patchPost(id,{reactions:{...p.reactions,[type]:p.reactions[type]+1}});blip("D5");hap([15]);}} onViewed={id=>{const p=posts.find(x=>x.id===id);if(p.viewed)return;patchPost(id,{viewed:true,views:(p.views||0)+1});addLoks(3);gainXp(3);questTick("view");say("Full slide-through · +3 Loks");}} onShare={sharePost} onDelete={id=>{setPosts(ps=>ps.filter(p=>p.id!==id));setOpenIdx(null);say("Post deleted");}} onRename={(id,title)=>patchPost(id,{title})} myName={profile.name} onRemix={post=>{setPosts(ps=>[{id:"new-remix-"+Date.now(),title:"Remix: "+post.title,frames:[...post.frames],paceMs:post.paceMs||160,mode:post.mode||"A",style:post.style||"bold",loop:post.loop,from:"studio",votes:0,voted:false,viewed:false,views:0,reactions:{splat:0,heart:0,drip:0}},...ps]);setOpenIdx(null);setTab("gallery");say("Remix created — open in Studio");}}/>)}
       {showHint&&tab==="feed"&&(<button onClick={()=>setShowHint(false)} className="fixed left-1/2 z-50 px-4 py-2.5 rounded-2xl text-sm font-bold text-center lok-btn" style={{bottom:150,transform:"translateX(-50%)",background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,boxShadow:`4px 4px 0 ${T.ink}`,maxWidth:"90vw",animation:"lokrise .4s ease"}} aria-label="Dismiss hint">Slide a post down to play it · ▲ to vote · tap to dismiss</button>)}
-      {showOnboard&&<Onboard defaultName={profile.name} onName={n=>{const clean=(n||"").trim();if(!clean)return;if(isReservedName(clean)){const alt=suggestHandle(clean,profile.avatarSeed);say(`"${clean}" is a Lok artist — how about ${alt}?`,"error");setProfile(p=>({...p,name:alt}));return;}setProfile(p=>({...p,name:clean}));}} onDone={()=>{setShowOnboard(false);setOnboarded(true);setShowHint(true);addLoks(50);gainXp(20);blip("C6");say("Welcome · +50 Loks to start");}}/>}
-      <div className="fixed left-1/2 z-50 flex flex-col-reverse items-center gap-1.5" style={{bottom:100,transform:"translateX(-50%)",pointerEvents:"none"}}>
-        {toasts.map((t,i)=>(<div key={t.id} className="px-4 py-2 rounded-xl font-bold text-center" style={{background:t.type==="success"?T.alt:t.type==="error"?"#C23B22":T.ink,color:T.paper,border:`2.5px solid ${t.type==="success"?T.alt:T.accent}`,animation:"lokrise .2s ease",opacity:1-i*0.18,transform:`scale(${1-i*0.04})`,maxWidth:"88vw",fontSize:13}}>{t.msg}</div>))}
+      {showOnboard&&<Onboard onDone={()=>{setShowOnboard(false);setOnboarded(true);setShowHint(true);addLoks(50);gainXp(20);blip("C6");say("Welcome · +50 Loks to start");}}/>}
+      <div className="fixed left-1/2 z-50 flex flex-col-reverse items-center gap-2" style={{bottom:focusMode?20:100,transform:"translateX(-50%)",pointerEvents:"none",transition:"bottom .3s ease"}}>
+        {toasts.map((t,i)=>(<div key={t.id} className="px-4 py-2 rounded-xl font-bold text-center" style={{background:t.type==="success"?T.alt:t.type==="error"?"#C23B22":T.ink,color:T.paper,border:`2.5px solid ${t.type==="success"?T.alt:T.accent}`,animation:"lokrise .2s ease",opacity:1-i*0.18,transform:`scale(${1-i*0.04}) translateY(${i*-4}px)`,maxWidth:"88vw",fontSize:13}}>{t.msg}</div>))}
       </div>
     </div>
-  </ThemeCtx.Provider></ErrorBoundary>);
+  </ThemeCtx.Provider>);
+}
+
+function Loader({dynamic}){
+  const logoRef=useRef(null);const pos=useRef({x:0,y:0,vx:0,vy:0,down:false});
+  useEffect(()=>{if(!dynamic)return;const el=logoRef.current;if(!el)return;
+    const onMove=e=>{pos.current.x=e.clientX;pos.current.y=e.clientY;};
+    const onDown=()=>{pos.current.down=true;};const onUp=()=>{pos.current.down=false;};
+    window.addEventListener("pointermove",onMove);window.addEventListener("pointerdown",onDown);window.addEventListener("pointerup",onUp);
+    let frame;const tick=()=>{
+      const {x,y,vx,vy,down}=pos.current;const rect=el.getBoundingClientRect();
+      const targetX=x-rect.left-rect.width/2;const targetY=y-rect.top-rect.height/2;
+      const ax=(targetX-vx)*0.1;const ay=(targetY-vy)*0.1;
+      pos.current.vx+=ax;pos.current.vy+=ay;pos.current.vx*=0.86;pos.current.vy*=0.86;
+      const scale=down?0.9:1;
+      el.style.transform=`perspective(500px) rotateY(${pos.current.vx/12}deg) rotateX(${-pos.current.vy/12}deg) scale(${scale})`;
+      frame=requestAnimationFrame(tick);
+    };
+    tick();
+    return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerdown",onDown);window.removeEventListener("pointerup",onUp);cancelAnimationFrame(frame);};
+  },[dynamic]);
+
+  return(<div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:ART.paper,color:ART.ink,fontFamily:"'Bricolage Grotesque',system-ui,sans-serif"}}>
+    <style>{`@keyframes inkdrop{0%{transform:scaleY(0.2) scaleX(0.8);opacity:0}40%{transform:scaleY(1.1) scaleX(0.95);opacity:1}60%{transform:scaleY(0.9) scaleX(1.05)}100%{transform:scale(1);opacity:1}} @keyframes inkfade{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}} @keyframes inkpulse{0%,100%{opacity:.4}50%{opacity:1}}`}</style>
+    <div ref={logoRef} className="relative" style={{animation:"inkdrop .7s cubic-bezier(.34,1.56,.64,1) forwards",marginBottom:20, width: 64, height: 64, transition: 'transform 0.1s ease-out'}}>
+      <div className="absolute" style={{left: 5, top: 5}}><svg width="64" height="64" viewBox="0 0 64 64"><ellipse cx="37" cy="37" rx="18" ry="18" fill={ART.pink} opacity="0.55"/></svg></div>
+      <div className="absolute"><svg width="64" height="64" viewBox="0 0 64 64"><path d="M32 8 C32 8 52 28 52 40 C52 51 43 58 32 58 C21 58 12 51 12 40 C12 28 32 8 32 8Z" fill="none" stroke={ART.ink} strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M32 8 C32 8 52 28 52 40 C52 51 43 58 32 58 C21 58 12 51 12 40 C12 28 32 8 32 8Z" fill={ART.ink} opacity="0.08"/></svg></div>
+    </div>
+    <div style={{fontWeight:800,fontSize:26,letterSpacing:"-0.02em",animation:"inkfade .5s .3s ease both"}}>LokBook</div>
+    <div style={{fontSize:13,opacity:0.5,marginTop:6,animation:"inkfade .5s .5s ease both"}}>loading your ink…</div>
+    <div style={{display:"flex",gap:6,marginTop:20,animation:"inkfade .5s .7s ease both"}}>{[0,1,2].map(i=><div key={i} style={{width:7,height:7,borderRadius:"50%",background:ART.ink,animation:`inkpulse 1.2s ${i*0.2}s ease-in-out infinite`}}/>)}</div>
+  </div>);
 }

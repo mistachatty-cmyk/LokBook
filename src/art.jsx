@@ -81,6 +81,18 @@ export function PageEffect({ effect }) {
   return null;
 }
 
+export function AnimFX({ fx }) {
+  if (!fx || fx === "none") return null;
+  if (fx === "sparkle_trail") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 61 }}>{Array.from({ length: 25 }).map((_, i) => (<div key={i} className="absolute rounded-full" style={{ left: `${(i * 13 + 7) % 100}%`, top: `${(i * 23 + 11) % 100}%`, width: 4 + i % 3, height: 4 + i % 3, background: ["#FF5DA2", "#FFD700", "#E8B14B", "#fff"][i % 4], animation: reduceMotion ? "none" : `loktwinkle ${1.2 + (i % 5) * 0.4}s ease-in-out infinite alternate`, animationDelay: `${(i % 8) * 0.15}s`, opacity: 0.7 }} />))}</div>);
+  if (fx === "neon_pulse") return (<div className="pointer-events-none fixed inset-0" style={{ zIndex: 61, background: "rgba(0,255,255,.035)", animation: reduceMotion ? "none" : "lokpulse 2.2s ease-in-out infinite", pointerEvents: "none" }} />);
+  if (fx === "ink_splatter") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 61 }}>{Array.from({ length: 12 }).map((_, i) => (<div key={i} className="absolute rounded-full" style={{ left: `${(i * 29 + 5) % 100}%`, top: `${(i * 17 + 3) % 100}%`, width: 3 + i * 2, height: 3 + i * 2, background: "rgba(35,48,107,.12)", animation: reduceMotion ? "none" : `loksplat ${4 + (i % 3)}s ease-out infinite`, animationDelay: `${i * 0.3}s`, borderRadius: "40% 60% 50% 50%" }} />))}</div>);
+  if (fx === "smoke_rise") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 61 }}>{Array.from({ length: 18 }).map((_, i) => (<div key={i} className="absolute rounded-full" style={{ left: `${(i * 37 + 13) % 100}%`, bottom: -8, width: 8 + (i % 4) * 4, height: 8 + (i % 4) * 4, background: "rgba(200,200,200,.15)", animation: reduceMotion ? "none" : `lokember ${5 + (i % 4)}s ease-in infinite`, animationDelay: `${(i % 6) * 0.5}s` }} />))}</div>);
+  if (fx === "fire_embers") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 61 }}>{Array.from({ length: 20 }).map((_, i) => (<div key={i} className="absolute rounded-full" style={{ left: `${(i * 41 + 3) % 100}%`, bottom: -4, width: 3 + i % 3, height: 3 + i % 3, background: i % 3 === 0 ? "#FF8A5C" : i % 3 === 1 ? "#FFD700" : "#FF5DA2", animation: reduceMotion ? "none" : `lokember ${2.5 + (i % 4)}s ease-in infinite`, animationDelay: `${(i % 7) * 0.3}s`, boxShadow: "0 0 4px rgba(255,138,92,.4)" }} />))}</div>);
+  if (fx === "water_ripple") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 61 }}>{Array.from({ length: 8 }).map((_, i) => (<div key={i} className="absolute rounded-full" style={{ left: `${20 + (i * 10) % 60}%`, top: `${15 + (i * 13) % 70}%`, width: 20 + i * 6, height: 20 + i * 6, border: "2px solid rgba(47,169,160,.15)", animation: reduceMotion ? "none" : `lokripple ${3 + (i % 3)}s ease-out infinite`, animationDelay: `${i * 0.4}s` }} />))}</div>);
+  if (fx === "galaxy_swirl") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 61 }}><div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(122,79,191,.08) 0%, rgba(47,169,160,.04) 40%, transparent 70%)", animation: reduceMotion ? "none" : "lokspin 20s linear infinite" }} />{Array.from({ length: 30 }).map((_, i) => (<div key={i} className="absolute rounded-full" style={{ left: `${(i * 23 + 7) % 100}%`, top: `${(i * 19 + 11) % 100}%`, width: 1 + i % 2, height: 1 + i % 2, background: "#fff", opacity: 0.3 + (i % 5) * 0.1, animation: reduceMotion ? "none" : `loktwinkle ${2 + (i % 3)}s ease-in-out infinite alternate` }} />))}</div>);
+  return null;
+}
+
 export function SmileDecoration({ variant = "smile1", size = 32, color = "#F39C12", stroke = "#4A3728" }) {
   const v = SMILE_VARIANTS.find(s => s.id === variant) || SMILE_VARIANTS[0];
   return (<svg width={size} height={size} viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill={color} stroke={stroke} strokeWidth="2" opacity=".9"/><path d={v.path} fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round"/></svg>);
@@ -116,6 +128,8 @@ export function GlobalStyle({ T, pace = "sweep", speed = 1 }) {
   @keyframes loksheen{from{background-position:200% 0}to{background-position:-50% 0}}
   @keyframes inkdrop{0%{transform:scaleY(0.2) scaleX(0.8);opacity:0}40%{transform:scaleY(1.1) scaleX(0.95);opacity:1}60%{transform:scaleY(0.9) scaleX(1.05)}100%{transform:scale(1);opacity:1}}
   @keyframes fireanim{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+  @keyframes lokripple{from{transform:scale(0);opacity:1}to{transform:scale(3);opacity:0}}
+  @keyframes loksplat{0%{transform:scale(0) rotate(0);opacity:.6}50%{opacity:.4}100%{transform:scale(1.8) rotate(30deg);opacity:0}}
   @keyframes iceanim{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
   @keyframes inkfade{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}}
   @keyframes inkpulse{0%,100%{opacity:.4}50%{opacity:1}}

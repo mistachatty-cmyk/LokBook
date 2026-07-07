@@ -254,7 +254,7 @@ function Profile({posts,profile,setProfile,onCheat,wins,lokPass,kids,cosmetics={
         <div className="min-w-0 flex-1"><div className="lok-display text-xl font-extrabold leading-tight flex items-center gap-2 flex-wrap"><NameTag name={profile.name} color={cosmetics.nameColor} style={{color:T.ink}}/>{lokPass&&!kids&&<span className="text-xs px-1.5 py-0.5 rounded" style={{background:T.accent,color:T.onAccent}}>PASS</span>}</div><div className="text-sm opacity-70">{posts.length} flips · {wins} {wins===1?"win":"wins"}</div></div>
         <div className="flex gap-1.5">
           {notifUnread>0&&<button onClick={()=>{setShowNotifs(v=>!v);onClearNotifs&&onClearNotifs();}} className="lok-btn relative px-2 py-1.5 rounded-full text-xs font-bold" style={{border:`2px solid ${T.accent}`,background:T.accent,color:"#fff"}} aria-label={`${notifUnread} notifications`}>🔔 {notifUnread}</button>}
-          <button onClick={()=>{setDraft(profile);setEditing(true);}} className="lok-btn px-3 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Edit profile">Edit</button>
+          <button onClick={()=>{setDraft(profile);setEditing(true);}} className="lok-btn px-3 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Edit profile">✎</button>
           <button onClick={()=>setShowSettings(true)} className="lok-btn px-2.5 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Settings">⚙</button>
         </div>
       </div>
@@ -376,7 +376,101 @@ function Profile({posts,profile,setProfile,onCheat,wins,lokPass,kids,cosmetics={
       </div>
       <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search your flips…" aria-label="Search gallery" className="mt-2 w-full px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/>
       {filtered.length?<div className="mt-2 grid grid-cols-2 gap-3">{filtered.map(p=><PostCard key={p.id} p={p} onOpen={onOpen} onDelete={onDelete}/>)}</div>:<EmptyState icon="search" title={searchQ?"No flips match":"No pieces match"} subtitle={searchQ?"Try different words":"Try a different filter or publish your first flip!"}/>}
+      {view==="stuff"&&<MyStuff owned={owned} cosmetics={cosmetics} onEquip={onBuyCosmetic} T={T}/>}
     </>)}
+  </div>);
+}
+
+function MyStuff({owned,cosmetics,onEquip,T}){
+  const [cat, setCat] = useState("colors"); const [sort, setSort] = useState("default"); const [search, setSearch] = useState("");
+  const sampleAvatar=useMemo(()=>renderAvatar(42),[T]);
+  const has=(cat,id)=>owned[cat]?.some(o=>o.id===id);const eq=(cat,id)=>cosmetics[cat]===id;
+  const getOwned = (cat, constList) => {
+    const ownedIds = new Set(owned[cat]?.map(o => o.id));
+    const items = constList.filter(c => ownedIds.has(c.id));
+    if (sort === "recent") return items.sort((a, b) => (owned[cat].find(o => o.id === b.id)?.ts || 0) - (owned[cat].find(o => o.id === a.id)?.ts || 0));
+    return items.filter(i => !search || i.name.toLowerCase().includes(search.toLowerCase()));
+  };
+
+  const cats = [
+    { id: "colors", label: "Colors", items: getOwned("nameColor", NAME_COLORS), all: NAME_COLORS },
+    { id: "frames", label: "Frames", items: getOwned("frame", FRAMES), all: FRAMES },
+    { id: "accents", label: "Accents", items: getOwned("avatarAccent", AVATAR_ACCENTS), all: AVATAR_ACCENTS },
+    { id: "papers", label: "Papers", items: getOwned("paper", PAPERS), all: PAPERS },
+    { id: "reactions", label: "Reactions", items: getOwned("reactionPack", REACTION_PACKS), all: REACTION_PACKS },
+    { id: "borders", label: "Borders", items: getOwned("blotBorder", BLOT_BORDERS), all: BLOT_BORDERS },
+    { id: "gear", label: "Gear", items: getOwned("gear", LILLOK_GEAR), all: LILLOK_GEAR },
+  ].filter(c => c.items.length > 0);
+
+  return(<div className="mt-5">
+    <div className="flex items-center justify-between mb-2"><h2 className="lok-display text-lg font-extrabold">My Stuff</h2><div className="flex items-center gap-2"><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" className="lok-btn px-2 py-1 rounded-full text-[11px] font-bold w-24" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}/><select value={sort} onChange={e=>setSort(e.target.value)} className="lok-btn px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}><option value="default">Default</option><option value="recent">Recent</option></select></div></div>
+    <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2">{cats.map(c => (<button key={c.id} onClick={() => setCat(c.id)} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold" style={{ border: `2.5px solid ${cat === c.id ? T.accent : T.ink}`, background: cat === c.id ? T.ink : T.card, color: cat === c.id ? T.paper : T.ink, boxShadow: cat === c.id && featureFlags.prominentTabs ? `2px 2px 0 ${T.accent}` : 'none', transform: cat === c.id && featureFlags.prominentTabs ? 'scale(1.05)' : 'none' }}>{c.label} <span className="opacity-60">{owned[c.id.slice(0, -1)]?.length || c.items.length}/{c.all.length}</span></button>))}</div>
+    <div className="grid grid-cols-2 gap-2">
+      {cat === "colors" && getOwned("nameColor", NAME_COLORS).map(c => (<button key={c.id} onClick={() => onEquip("nameColor", c)} className="lok-btn p-3 rounded-xl" style={{ border: `2.5px solid ${eq("nameColor", c.id) ? T.accent : T.ink}`, background: T.card }}><NameTag name={c.name} color={c.id} className="font-bold text-sm" style={{ color: T.ink }} />{eq("nameColor", c.id) && <span className="text-xs ml-2" style={{ color: T.alt }}>✓</span>}</button>))}
+      {cat === "frames" && getOwned("frame", FRAMES).map(f => (<button key={f.id} onClick={() => onEquip("frame", f)} className="lok-btn p-2 rounded-xl flex items-center gap-2" style={{ border: `2.5px solid ${eq("frame", f.id) ? T.accent : T.ink}`, background: T.card }}><FramedAvatar src={sampleAvatar} size={32} frame={f.id} ink={T.ink} acc={T.accent} /><span className="font-bold text-sm">{f.name}</span>{eq("frame", f.id) && <span className="text-xs ml-auto" style={{ color: T.alt }}>✓</span>}</button>))}
+      {cat === "accents" && getOwned("avatarAccent", AVATAR_ACCENTS).map(a => (<button key={a.id} onClick={() => onEquip("avatarAccent", a)} className="lok-btn p-2 rounded-xl flex items-center gap-2" style={{ border: `2.5px solid ${eq("avatarAccent", a.id) ? T.accent : T.ink}`, background: T.card }}><FramedAvatar src={sampleAvatar} size={32} accent={a.id} ink={T.ink} acc={T.accent} /><span className="font-bold text-sm">{a.name}</span>{eq("avatarAccent", a.id) && <span className="text-xs ml-auto" style={{ color: T.alt }}>✓</span>}</button>))}
+      {cat === "papers" && getOwned("paper", PAPERS).map(p => (<button key={p.id} onClick={() => onEquip("paper", p)} className="lok-btn p-3 rounded-xl" style={{ border: `2.5px solid ${eq("paper", p.id) ? T.accent : T.ink}`, background: T.card }}><span className="font-bold text-sm">{p.name}</span>{eq("paper", p.id) && <span className="text-xs ml-2" style={{ color: T.alt }}>✓</span>}</button>))}
+      {cat === "reactions" && getOwned("reactionPack", REACTION_PACKS).map(r => (<button key={r.id} onClick={() => onEquip("reactionPack", r)} className="lok-btn p-2 rounded-xl" style={{ border: `2.5px solid ${eq("reactionPack", r.id) ? T.accent : T.ink}`, background: T.card }}><div className="font-bold text-sm">{r.name}</div><div className="flex items-center justify-center gap-1.5 mt-1">{(REACTION_SETS[r.id] || []).map(t => <ReactionIcon key={t} type={t} size={20} />)}</div>{eq("reactionPack", r.id) && <div className="text-xs text-right mt-1" style={{ color: T.alt }}>✓ Equipped</div>}</button>))}
+      {cat === "borders" && getOwned("blotBorder", BLOT_BORDERS).map(b => (<button key={b.id} onClick={() => onEquip("blotBorder", b)} className="lok-btn p-2 rounded-xl flex items-center gap-2" style={{ border: `2.5px solid ${eq("blotBorder", b.id) ? T.accent : T.ink}`, background: T.card }}><div className="rounded-full" style={{ width: 32, height: 32, background: T.paper, ...blotBorderStyle(b.id, T) }} /><span className="font-bold text-sm">{b.name}</span>{eq("blotBorder", b.id) && <span className="text-xs ml-auto" style={{ color: T.alt }}>✓</span>}</button>))}
+      {cat === "gear" && getOwned("gear", LILLOK_GEAR).map(g => (<button key={g.id} onClick={() => onEquip("gear", g)} className="lok-btn p-3 rounded-xl" style={{ border: `2.5px solid ${eq("gear", g.id) ? T.accent : T.ink}`, background: T.card }}><span className="font-bold text-sm">{g.name}</span>{eq("gear", g.id) && <span className="text-xs ml-2" style={{ color: T.alt }}>✓</span>}</button>))}
+    </div>
+  </div>);
+}
+
+function SettingsPanel({show,onClose,say,isIOS,canInstall,onInstall,founder,onFounderJoin,pace,setPace,speed,setSpeed,soundLab,onUnlockSoundLab,soundQueue,setSoundQueue,focusMode,setFocusMode,featureFlags,onSetFlag,versionTap}){
+  const T=useT();const[fHandle,setFHandle]=useState("");const[fEmail,setFEmail]=useState("");const[fBusy,setFBusy]=useState(false);
+  const[devMode,setDevMode]=useState(false);const devTap=useRef(0);const devTimer=useRef(null);const[hapticGrammar,setHapticGrammar]=useState("default");const[fourthWall,setFourthWall]=useState(100);
+  const handleVersionTap=()=>{versionTap();devTap.current++;clearTimeout(devTimer.current);devTimer.current=setTimeout(()=>devTap.current=0,1200);if(devTap.current>=7){setDevMode(d=>!d);say(devMode?"Dev flags hidden":"Dev flags shown");devTap.current=0;}};
+  const joinFounders=async()=>{if(!fHandle.trim()||fHandle.trim().length<2){say("Enter a handle");return;}setFBusy(true);try{await onFounderJoin(fHandle.trim(),fEmail.trim());say("You're a founder! Data secured on the test server 🏆","success");}catch{say("Couldn't reach the server — try again","error");}setFBusy(false);};
+  if(!show)return null;
+  return(<div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,.35)"}} onClick={onClose}>
+    <div className="w-full rounded-t-3xl p-5 overflow-y-auto" style={{maxWidth:560,maxHeight:"92dvh",background:T.card,border:`3px solid ${T.ink}`,animation:"lokrise .25s ease"}} onClick={e=>e.stopPropagation()}>
+      <div className="flex items-center justify-between mb-3"><div className="lok-display text-lg font-extrabold">Settings</div><button onClick={onClose} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Close settings">✕</button></div>
+      <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${T.ink}`,background:T.paper}}>
+        <div className="lok-display font-extrabold text-sm">📱 Add Lok to your home screen</div>
+        <div className="text-xs opacity-70 mt-1 leading-snug">{isIOS?"Tap the Share button in Safari, then \u201CAdd to Home Screen\u201D. Lok opens full-screen like a native app.":"Install Lok as an app — it gets its own icon and opens full-screen, no browser bars."}</div>
+        {!isIOS&&<button onClick={()=>onInstall&&onInstall()} className="lok-btn lok-display mt-2 w-full py-2.5 rounded-xl font-extrabold" style={{background:canInstall?T.accent:T.shadow,color:canInstall?T.onAccent:T.ink,border:`3px solid ${T.ink}`,opacity:canInstall?1:0.7}} aria-label="Install Lok as an app">{canInstall?"Install Lok":"Install via browser menu →"}</button>}
+      </div>
+      <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${founder?T.alt:T.ink}`,background:T.paper}}>
+        <div className="lok-display font-extrabold text-sm">🏆 Founders' test server{founder&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>FOUNDER</span>}</div>
+        <div className="text-xs opacity-70 mt-1 leading-snug">{founder?"You're in. Your gallery, Loks and LilLok are backed up long-term on LokServices.":"Join the test server and your progress gets backed up long-term — founders keep everything into beta."}</div>
+        {!founder&&(<>
+          <input value={fHandle} onChange={e=>setFHandle(e.target.value)} placeholder="Handle" aria-label="Founder handle" className="mt-2 w-full px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/>
+          <input value={fEmail} onChange={e=>setFEmail(e.target.value)} placeholder="Email (optional — for beta invite)" aria-label="Founder email" className="mt-1.5 w-full px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/>
+          <button onClick={joinFounders} disabled={fBusy} className="lok-btn lok-display mt-2 w-full py-2.5 rounded-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,opacity:fBusy?0.6:1}}>{fBusy?"Joining…":"Join as a founder"}</button>
+        </>)}
+      </div>
+      <div className="p-3 rounded-2xl mb-2" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>
+        <div className="font-bold text-sm">Interface</div>
+        <label className="mt-1.5 flex items-center justify-between text-xs font-bold cursor-pointer"><span className="pr-4">Focus Mode (hides nav)</span><input type="checkbox" checked={focusMode} onChange={e=>setFocusMode(e.target.checked)} style={{accentColor:T.accent}}/></label>
+        <label className="mt-1.5 flex items-center justify-between text-xs font-bold cursor-pointer"><span className="pr-4">Compact Density</span><input type="checkbox" checked={featureFlags.compactUi} onChange={e=>onSetFlag("compactUi",e.target.checked)} style={{accentColor:T.accent}}/></label>
+        <label className="mt-1.5 flex items-center justify-between text-xs font-bold cursor-pointer"><span className="pr-4">Prominent Tabs</span><input type="checkbox" checked={featureFlags.prominentTabs} onChange={e=>onSetFlag("prominentTabs",e.target.checked)} style={{accentColor:T.accent}}/></label>
+      </div>
+      <div className="p-3 rounded-2xl mb-2" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>
+        <div className="font-bold text-sm">Feed pacing</div>
+        <div className="mt-1.5 grid grid-cols-4 gap-1.5">{Object.entries(PACE_PRESETS).map(([id,p])=>(<button key={id} onClick={()=>{setPace&&setPace(id);say(`${p.name} pacing`);}} aria-pressed={pace===id} title={p.desc} className="lok-btn py-1.5 rounded-xl text-[10px] font-extrabold" style={{border:`2.5px solid ${pace===id?T.accent:T.ink}`,background:pace===id?T.ink:T.card,color:pace===id?T.paper:T.ink}}>{p.name}</button>))}</div>
+        <label className="mt-2 flex items-center gap-2 text-xs font-bold" style={{color:T.ink}}>Speed {speed.toFixed(1)}×<input type="range" min="0.5" max="2" step="0.1" value={speed} onChange={e=>setSpeed&&setSpeed(+e.target.value)} className="flex-1" style={{accentColor:T.accent}} aria-label="Animation speed"/></label>
+      </div>
+      <div className="p-3 rounded-2xl mb-2" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>
+        <div className="font-bold text-sm">Sensory & Metaphysics</div>
+        <div className="mt-2 flex items-center justify-between"><label htmlFor="synesthesia-toggle" className="text-xs font-bold" style={{color:T.ink}}>Synesthesia Mode</label><button id="synesthesia-toggle" onClick={()=>say("Coming soon!")} className="lok-btn px-3 py-1 rounded-full text-xs font-bold" style={{border:`2px solid ${T.shadow}`,background:T.card,color:T.ink,opacity:0.6}}>Off</button></div>
+        <div className="mt-2 flex items-center justify-between"><label htmlFor="haptic-select" className="text-xs font-bold" style={{color:T.ink}}>Haptic Grammar</label><select id="haptic-select" value={hapticGrammar} onChange={e=>setHapticGrammar(e.target.value)} className="lok-btn px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}><option value="default">Default</option><option value="expressive">Expressive</option><option value="quiet">Quiet</option></select></div>
+        <div className="mt-2">
+          <div className="flex items-center justify-between text-xs font-bold" style={{color:T.ink}}><label htmlFor="fourth-wall-slider">Fourth Wall Integrity</label><span>{fourthWall}%</span></div>
+          <input id="fourth-wall-slider" type="range" min="0" max="100" step="1" value={fourthWall} onChange={e=>setFourthWall(+e.target.value)} className="w-full" style={{accentColor:T.accent}}/>
+        </div>
+      </div>
+      {devMode&&(<div className="p-3 rounded-2xl mb-2" style={{border:`3px dashed ${T.accent}`,background:T.paper}}>
+        <div className="lok-display font-extrabold text-sm" style={{color:T.accent}}>🔩 Dev Flags</div>
+        <div className="mt-2 flex flex-col gap-2">
+          <div className="flex items-center justify-between text-sm"><label htmlFor="flag-loader" className="font-bold">Dynamic Loader</label><input id="flag-loader" type="checkbox" checked={featureFlags.dynamicLoader} onChange={e=>onSetFlag("dynamicLoader",e.target.checked)} style={{accentColor:T.accent}}/></div>
+        </div>
+      </div>)}
+      <div className="p-3 rounded-2xl" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>
+        <div className="font-bold text-sm">About</div>
+        <div className="text-xs opacity-70 mt-0.5 leading-snug select-none" onClick={handleVersionTap} style={{cursor:"default"}}>LokBook + Lok N Slide · <span style={{fontWeight:700}}>alpha v1.3</span> · Your gallery and LilLok save automatically on this device. Lok Juniors mode is in the Shop.</div>
+      </div>
+    </div>
   </div>);
 }
 
