@@ -4,9 +4,14 @@ import { useT, ART } from "./theme/theme.js";
 import { MiniDraw } from "./engine/draw.jsx";
 import { getLilLokLine, lilLokPhase } from "./engine/lillok.js";
 
-export function LilLokBubble({ text, ink = ART.ink, paper = ART.paper }) {
+export function LilLokBubble({ text, ink = ART.ink, paper = ART.paper, voicePack = "default" }) {
   if (!text) return null;
-  return (<div className="lok-display" style={{ position: "absolute", bottom: "104%", left: "50%", transform: "translateX(-50%)", background: paper, border: `2.5px solid ${ink}`, borderRadius: 12, padding: "5px 11px", fontSize: 11, fontWeight: 700, color: ink, boxShadow: `2px 2px 0 ${ink}`, animation: "lokrise .2s ease", maxWidth: 180, textAlign: "center", zIndex: 99, pointerEvents: "none", whiteSpace: "normal", width: "max-content" }}>
+  const voiceStyle = {
+    whisper: { fontStyle: "italic", opacity: 0.75, letterSpacing: "0.02em" },
+    echo: { letterSpacing: "0.06em", textShadow: `2px 2px 0 ${ink}22, 4px 4px 0 ${ink}11` },
+    robot: { fontFamily: "monospace", letterSpacing: "0.03em", textTransform: "uppercase", fontSize: 10 },
+  }[voicePack] || {};
+  return (<div className="lok-display" style={{ position: "absolute", bottom: "104%", left: "50%", transform: "translateX(-50%)", background: paper, border: `2.5px solid ${ink}`, borderRadius: 12, padding: "5px 11px", fontSize: 11, fontWeight: 700, color: ink, boxShadow: `2px 2px 0 ${ink}`, animation: "lokrise .2s ease", maxWidth: 180, textAlign: "center", zIndex: 99, pointerEvents: "none", whiteSpace: "normal", width: "max-content", ...voiceStyle }}>
     {text}
     <div style={{ position: "absolute", bottom: -9, left: "50%", transform: "translateX(-50%)", borderLeft: "6px solid transparent", borderRight: "6px solid transparent", borderTop: `9px solid ${ink}` }} />
     <div style={{ position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)", borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `7px solid ${paper}` }} />
@@ -48,6 +53,10 @@ export function LilLokSprite({ phase, ink, size = 88, custom, gear, skin, aura, 
     {gear==="glasses"&&<ellipse cx={58} cy={50} rx={9} ry={7} fill="none" stroke={outlineCol} strokeWidth="2.5"/>}
     {gear==="glasses"&&<line x1={47} y1={49} x2={49} y2={49} stroke={outlineCol} strokeWidth="2.5"/>}
     {gear==="bowtie"&&<path d="M38 68 L48 62 L58 68 L48 74 Z" fill={ART.accent} stroke={outlineCol} strokeWidth="2.5" strokeLinejoin="round"/>}
+    {pet==="mini"&&!stone&&<g style={{animation:reduceMotion?"none":"lokbob 2s ease-in-out infinite .3s"}}>
+      <ellipse cx={82} cy={82} rx={11} ry={12} fill={ART.pink} stroke={ART.ink} strokeWidth="2.5"/>
+      <circle cx={78} cy={80} r="1.6" fill={ART.ink}/><circle cx={86} cy={80} r="1.6" fill={ART.ink}/>
+    </g>}
   </svg>);
 }
 
