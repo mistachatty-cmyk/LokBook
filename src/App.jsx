@@ -712,8 +712,9 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
           <div className="font-bold text-sm">About</div>
           <div className="text-xs opacity-70 mt-0.5 leading-snug select-none" onClick={e=>{versionTap();devTap.current++;clearTimeout(devTimer.current);devTimer.current=setTimeout(()=>devTap.current=0,1200);if(devTap.current>=7){devTap.current=0;setDevMode(d=>!d);say(devMode?"Dev mode off":"Dev mode on");}}} style={{cursor:"default"}}>LokBook + Lok N Slide · <span style={{fontWeight:700}}>alpha v1.2</span> · Your gallery and LilLok save automatically on this device. Lok Juniors mode is in the Shop.</div>
         </div>
-        <div className="p-3 rounded-2xl mb-2" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>
-          <div className="font-bold text-sm">App Icon</div>
+        {devMode&&(<div className="p-3 rounded-2xl mb-2" style={{border:`3px dashed ${T.accent}`,background:T.paper}}>
+          <div className="lok-display font-extrabold text-sm" style={{color:T.accent}}>🔩 Dev Flags</div>
+          <div className="mt-2 font-bold text-xs" style={{color:T.ink}}>App Icon</div>
           <div className="text-[10px] opacity-60 mt-0.5 mb-1.5 leading-snug">Changes the tab icon instantly. Home screen shortcuts may need removing &amp; re-adding to pick up a new icon (iOS/Android limitation).</div>
           <div className="grid grid-cols-2 gap-2">{LOGOS.map(l=>{
             const active=appLogo===l.id;
@@ -722,9 +723,6 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
               <div className="text-[10px] font-bold mt-1" style={{color:active?T.paper:T.ink}}>{l.name}</div>
             </button>);
           })}</div>
-        </div>
-        {devMode&&(<div className="p-3 rounded-2xl mb-2" style={{border:`3px dashed ${T.accent}`,background:T.paper}}>
-          <div className="lok-display font-extrabold text-sm" style={{color:T.accent}}>🔩 Dev Flags</div>
         </div>)}
         <div className="mt-2 p-3 rounded-2xl" style={{border:`2px solid ${T.shadow}`,background:T.card}}>
           <div className="flex items-center gap-2 mb-1"><span className="lok-display font-extrabold text-sm">📊 Activity</span><span className="text-[10px] opacity-50">past 2 weeks</span></div>
