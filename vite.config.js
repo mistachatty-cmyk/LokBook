@@ -6,6 +6,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   clearScreen: false,
   server: { port: 5173, strictPort: true },
+  optimizeDeps: {
+    exclude: ['@tauri-apps/api', '@tauri-apps/plugin-fs', '@tauri-apps/plugin-dialog', '@tauri-apps/plugin-shell', '@tauri-apps/plugin-process'],
+  },
   build: {
     chunkSizeWarningLimit: 600,
     rollupOptions: { output: { manualChunks: { vendor: ['react'], app: ['src/App.jsx'] } } },
