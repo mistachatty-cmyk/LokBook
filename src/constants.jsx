@@ -4,7 +4,83 @@ export { SUPA_URL, SUPA_KEY, supabase };
 export const W = 480;
 export const H = 600;
 
-export const PROMPTS = ["A creature made of weather","Your breakfast as a hero","A plant that shouldn't exist","Night swimming","A machine with feelings","The last lighthouse","Dancing mushrooms","A very smug cat","A city in a teacup","Something soft that bites","A tiny world inside a bottle","A map of somewhere imaginary","Two things that don't belong together","The smallest storm","An animal made of shadow"];
+export const PROMPT_META = [
+  // Animals (8)
+  { text:"A very smug cat", category:"animals", motion:"static" },
+  { text:"An animal made of shadow", category:"animals", motion:"transform" },
+  { text:"A fox who stole the moon", category:"animals", motion:"loop" },
+  { text:"A flock of paper cranes", category:"animals", motion:"loop" },
+  { text:"The slowest turtle", category:"animals", motion:"static" },
+  { text:"A snake made of rainbows", category:"animals", motion:"transform" },
+  { text:"A wolf howling at neon", category:"animals", motion:"loop" },
+  { text:"A jellyfish in zero gravity", category:"animals", motion:"loop" },
+  // Fantasy (10)
+  { text:"A creature made of weather", category:"fantasy", motion:"loop" },
+  { text:"Dancing mushrooms", category:"fantasy", motion:"loop" },
+  { text:"A magic tree that remembers everything", category:"fantasy", motion:"static" },
+  { text:"A tiny world inside a bottle", category:"fantasy", motion:"static" },
+  { text:"A dragon made of stained glass", category:"fantasy", motion:"transform" },
+  { text:"A ghost that knits", category:"fantasy", motion:"loop" },
+  { text:"A wizard's first spell", category:"fantasy", motion:"transform" },
+  { text:"A phoenix in the rain", category:"fantasy", motion:"loop" },
+  { text:"A door that leads to yesterday", category:"fantasy", motion:"static" },
+  { text:"The last unicorn's dream", category:"fantasy", motion:"loop" },
+  // Scenes & Places (8)
+  { text:"Night swimming", category:"scenes", motion:"static" },
+  { text:"The last lighthouse", category:"scenes", motion:"static" },
+  { text:"A city in a teacup", category:"scenes", motion:"static" },
+  { text:"A map of somewhere imaginary", category:"scenes", motion:"static" },
+  { text:"An abandoned amusement park", category:"scenes", motion:"static" },
+  { text:"The view from a giants shoulder", category:"scenes", motion:"loop" },
+  { text:"A secret garden at midnight", category:"scenes", motion:"static" },
+  { text:"A bridge between two worlds", category:"scenes", motion:"static" },
+  // Abstract & Emotion (6)
+  { text:"Something soft that bites", category:"abstract", motion:"transform" },
+  { text:"A feeling you can't name", category:"abstract", motion:"loop" },
+  { text:"The shape of a memory", category:"abstract", motion:"transform" },
+  { text:"A color that doesn't exist", category:"abstract", motion:"loop" },
+  { text:"The sound of a whisper", category:"abstract", motion:"loop" },
+  { text:"A knot that keeps tying itself", category:"abstract", motion:"loop" },
+  // Objects & Machines (6)
+  { text:"A machine with feelings", category:"objects", motion:"static" },
+  { text:"A plant that shouldn't exist", category:"objects", motion:"transform" },
+  { text:"The smallest storm", category:"objects", motion:"loop" },
+  { text:"Two things that don't belong together", category:"objects", motion:"static" },
+  { text:"Your breakfast as a hero", category:"objects", motion:"transform" },
+  { text:"A clock that runs backwards", category:"objects", motion:"loop" },
+  // Space & Sci-fi (6)
+  { text:"A spaceship powered by song", category:"space", motion:"loop" },
+  { text:"The edge of a known galaxy", category:"space", motion:"static" },
+  { text:"A robot learning to dream", category:"space", motion:"transform" },
+  { text:"An alien flower garden", category:"space", motion:"loop" },
+  { text:"A constellation that tells a story", category:"space", motion:"static" },
+  { text:"A black hole with a heart", category:"space", motion:"loop" },
+  // Underwater (5)
+  { text:"A coral city at dawn", category:"underwater", motion:"loop" },
+  { text:"A sea creature made of light", category:"underwater", motion:"loop" },
+  { text:"The deepest trench", category:"underwater", motion:"static" },
+  { text:"A message in a bottle", category:"underwater", motion:"static" },
+  { text:"A kelp forest dance", category:"underwater", motion:"loop" },
+  // Food (4)
+  { text:"A bakery for dreamers", category:"food", motion:"static" },
+  { text:"The last slice of infinity", category:"food", motion:"transform" },
+  { text:"A tea party on mercury", category:"food", motion:"loop" },
+  { text:"A recipe for courage", category:"food", motion:"static" },
+  // Characters (4)
+  { text:"A knight made of origami", category:"characters", motion:"transform" },
+  { text:"The quietest superhero", category:"characters", motion:"static" },
+  { text:"A pirate who maps feelings", category:"characters", motion:"static" },
+  { text:"A shadow that left its owner", category:"characters", motion:"loop" },
+  // Music & Sound (3)
+  { text:"A song painted on a wall", category:"music", motion:"loop" },
+  { text:"An instrument nobody plays", category:"music", motion:"static" },
+  { text:"A dance that creates the world", category:"music", motion:"loop" },
+];
+export const PROMPTS = PROMPT_META.map(p => p.text);
+export const CATEGORIES = [...new Set(PROMPT_META.map(p => p.category))];
+export const MOTION_TYPES = ["static","loop","transform"];
+export const CATEGORY_ICONS = { animals:"🐾", fantasy:"✨", scenes:"🏞️", abstract:"🌀", objects:"📦", space:"🚀", underwater:"🌊", food:"🍕", characters:"🎭", music:"🎵" };
+
 export const weekOfYear = d => Math.ceil((((d - new Date(d.getFullYear(), 0, 1)) / 86400000) + 1) / 7);
 export const WEEKLY_PROMPT = PROMPTS[(new Date().getFullYear() * 53 + weekOfYear(new Date())) % PROMPTS.length];
 

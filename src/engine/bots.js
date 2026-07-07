@@ -64,6 +64,11 @@ export const BOT_TYPES = [
   { id: "crecre", name: "CreCre", desc: "Chaotic nonsense doodles, prompt-blind. The classic bots." },
 ];
 
+function uniqueSeed(used){
+  let s;do{s=Math.floor(Math.random()*9000)+11;}while(used.has(s));
+  used.add(s);return s;
+}
+
 export function makeMatchBots(n, { kids = false, wins = 0, botType = "artist" } = {}) {
   if (kids) return Array.from({ length: n }, (_, i) => ({
     name: `buddy ${i + 1}`, seed: Math.floor(Math.random() * 9000) + i * 137 + 11,
@@ -71,9 +76,10 @@ export function makeMatchBots(n, { kids = false, wins = 0, botType = "artist" } 
   }));
   const d = battleDifficulty(wins);
   const pool = [...ROSTER].sort(() => Math.random() - 0.5).slice(0, n);
+  const usedSeeds=new Set();
   return pool.map(b => ({
     ...b,
-    seed: Math.floor(Math.random() * 9000) + 11,
+    seed: uniqueSeed(usedSeeds),
     // effective skill: personality baseline pulled toward the difficulty target, ±noise
     skill: Math.max(0.15, Math.min(0.98, b.skill * 0.45 + d * 0.55 + (Math.random() - 0.5) * 0.16)),
     type: botType,
@@ -98,10 +104,42 @@ export function botProgress(bot, t) {
 // Completeness of the final piece — weak bots visibly under-finish.
 export function botFinalT(bot) { return 0.45 + bot.skill * 0.55; }
 
+// Dynamic momentum — bots in danger of losing push harder (faster curve),
+// bots comfortably ahead take it easier (slower, more detailed curve).
+// pressure: -1 (losing) to 1 (winning), based on estimated progress delta.
+export function botMomentum(bot, rawT, pressure = 0) {
+  const base = botProgress(bot, rawT);
+  if (pressure < -0.2) { // losing — desperation push
+    const push = Math.min(1, (-pressure) * 0.6);
+    return base + (1 - base) * push * 0.35;
+  }
+  if (pressure > 0.3) { // winning — confident slowdown
+    return base * (1 - pressure * 0.08);
+  }
+  return base;
+}
+
 export function botLine(bot, moment) {
   if (!bot?.chat) return null;
   const pool = bot.chat[moment] || [];
   return pool.length ? `${bot.name}: "${pool[Math.floor(Math.random() * pool.length)]}"` : null;
+}
+
+// Themed mid-match reactions keyed by mood
+export const MID_MATCH_LINES = [
+  { threshold: 0.3, lines: ["Not bad, not bad…", "Getting interesting.", "I see what you're doing."] },
+  { threshold: 0.5, lines: ["Halfway there! Keep pushing.", "Oh, you're serious about this.", "The canvas is waking up."] },
+  { threshold: 0.7, lines: ["Time to finish strong!", "This is where it counts.", "Every stroke matters now."] },
+  { threshold: 0.9, lines: ["One last push!", "Final seconds — let's go!", "Almost done. Almost."] },
+];
+
+export function pickMidLine(fraction) {
+  for (const m of MID_MATCH_LINES) {
+    if (fraction >= m.threshold && Math.random() < 0.2) {
+      return m.lines[Math.floor(Math.random() * m.lines.length)];
+    }
+  }
+  return null;
 }
 
 // ---------- the vote — taste-based judging ----------

@@ -290,13 +290,65 @@ const genericFallback = (ctx, t, seed) => {
   if (t > 0.6) face(ctx, 240, 290, 90, "happy", 8, rng);
 };
 
-export function renderPromptArt(prompt, seed, t, skill = 0.6) {
+// Per-bot flourish — a small signature element each bot adds to any prompt
+const BOT_FLOURISH = {
+  "pixel.pluto": (ctx, rng) => {
+    ctx.strokeStyle = "rgba(35,48,107,0.12)"; ctx.lineWidth = 2;
+    for (let x = 48; x < W - 48; x += 32) { ctx.fillRect(x, 48, 2, 2); ctx.fillRect(x, H - 52, 2, 2); }
+    for (let y = 48; y < H - 48; y += 32) { ctx.fillRect(48, y, 2, 2); ctx.fillRect(W - 52, y, 2, 2); }
+  },
+  "inkwell_iz": (ctx, rng) => {
+    const cx = W - 60, cy = 60, R = 18;
+    ctx.strokeStyle = "rgba(47,169,160,0.3)"; ctx.lineWidth = 2;
+    for (let p = 0; p < 6; p++) {
+      const a = (p / 6) * Math.PI * 2;
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(35,48,107,0.15)"; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+  },
+  "tinta": (ctx, rng) => {
+    ctx.fillStyle = "rgba(255,93,162,0.12)";
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(60 + rng() * 40, H - 80 + rng() * 30, 4 + rng() * 6, 0, Math.PI * 2); ctx.fill(); }
+  },
+  "mooncrayon": (ctx, rng) => {
+    ctx.fillStyle = "rgba(232,177,75,0.15)";
+    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(50 + rng() * 380, 50 + rng() * 500, 8 + rng() * 12, 0, Math.PI * 2); ctx.fill(); }
+  },
+  "sketchram": (ctx, rng) => {
+    ctx.strokeStyle = "rgba(255,93,162,0.15)"; ctx.lineWidth = 3; ctx.lineCap = "round";
+    const x = 80 + rng() * 320, y = 80 + rng() * 440;
+    ctx.beginPath(); ctx.moveTo(x - 16, y + 20); ctx.lineTo(x, y); ctx.lineTo(x + 16, y + 20); ctx.stroke();
+  },
+  "doodlebug": (ctx, rng) => {
+    ctx.fillStyle = "rgba(35,48,107,0.08)";
+    for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc(40 + rng() * 400, 50 + rng() * 500, 3 + rng() * 8, 0, Math.PI * 2); ctx.fill(); }
+  },
+  "nib.ninja": (ctx, rng) => {
+    ctx.strokeStyle = "rgba(35,48,107,.18)"; ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(50 + rng() * 100, 40 + rng() * 80); ctx.quadraticCurveTo(W / 2 + (rng() - .5) * 150, H / 2, W - 50 - rng() * 100, H - 60 - rng() * 80); ctx.stroke();
+  },
+  "grafite": (ctx, rng) => {
+    ctx.fillStyle = "rgba(35,48,107,0.05)"; ctx.strokeStyle = "rgba(35,48,107,0.1)"; ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) { const x = 40 + rng() * 400, y = 40 + rng() * 500; ctx.beginPath(); ctx.arc(x, y, 20 + rng() * 20, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+  },
+  "blot.bot": (ctx, rng) => {
+    ctx.fillStyle = "rgba(255,93,162,0.08)";
+    for (let i = 0; i < 3; i++) { const x = 80 + rng() * 320, y = 80 + rng() * 440; ctx.beginPath(); ctx.arc(x + (rng() - .5) * 30, y + (rng() - .5) * 30, 12 + rng() * 18, 0, Math.PI * 2); ctx.fill(); }
+  },
+};
+
+export function renderPromptArt(prompt, seed, t, skill = 0.6, botName) {
   const c = document.createElement("canvas"); c.width = W; c.height = H;
   const ctx = c.getContext("2d");
   paperBase(ctx, null);
   const recipe = RECIPES[prompt] || genericFallback;
   try { recipe(ctx, Math.max(0, Math.min(1, t)), seed, Math.max(0.15, Math.min(1, skill))); }
   catch { genericFallback(ctx, t, seed); }
+  // apply bot-specific flourish
+  if (botName && BOT_FLOURISH[botName]) {
+    try { BOT_FLOURISH[botName](ctx, makeRng(seed * 97 + 7)); } catch {}
+  }
   return c.toDataURL("image/png");
 }
 

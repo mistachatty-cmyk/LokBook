@@ -52,5 +52,27 @@ Add restore in the load section:
 if(save?.feature!==undefined)setFeature(save.feature);
 ```
 
+## Session Log — July 2026 Quality Sweep
+
+Completed:
+- **C1** Nested `useEffect` extracted to top level (ambient bot posts now generate)
+- **C2** `dangerouslySetInnerHTML` replaced with React element split (XSS closed)
+- **C3** `post.frames.length` crash guarded with `post?.frames?.length??0`
+- **B1** Seed collision fixed via `Set` in `makeMatchBots`
+- **B2** `BOT_FLOURISH` per-bot overlay; `renderPromptArt` gets `botName` param
+- **B3** `botMomentum()` dynamic draw pace; `pickMidLine()` mid-match chat
+- **P1+P2** `PROMPT_META` with 60+ prompts across 10 categories, each with `"static"|"loop"|"transform"` motion type; toggle-chip filters in Battle lobby
+- **U1** Search bar in Feed — input, Supabase `ilike` query, results list, clear button
+- **U2** Echo/repost button in FeedCard — creates post copy with ↻ prefix, +2 Loks
+- **U3** Keyboard nav in Viewer — Escape closes, ArrowLeft/ArrowRight navigates
+- **U4** Backdrop click closes Viewer
+- **L2** `notifications` persisted in save blob
+- **L3** Supabase fetch on init pulls top 6 ranked `lok_posts`, merges with local gallery
+- **L4** `beforeunload` handler saves instantly on tab/window close
+
+Remaining (low priority):
+- D1–D3: Delete/annotate stale `src/pages/` files, unused constants, unused `draw.jsx` exports
+- L1: Feed seeding — now handled by C1, bots auto-post ambient flips
+
 ## About This File
 This file was created by the agent in the initial overhaul session (July 2026). It captures the codebase conventions for all future AI collaborators.
