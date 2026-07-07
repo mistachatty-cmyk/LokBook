@@ -4,6 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  clearScreen: false,
+  server: { port: 5173, strictPort: true },
   build: {
     chunkSizeWarningLimit: 600,
     rollupOptions: { output: { manualChunks: { vendor: ['react'], app: ['src/App.jsx'] } } },
@@ -13,12 +15,12 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icon.svg'],
+      includeAssets: ['favicon.svg', 'icon.svg', 'logos/*.svg'],
         manifest: {
           name: 'LokBook',
           short_name: 'LokBook',
           description: 'A home for tiny hand-drawn animations',
-          theme_color: '#F2EDE2',
+          theme_color: '#23306B',
           background_color: '#F2EDE2',
           display: 'standalone',
           orientation: 'portrait',
