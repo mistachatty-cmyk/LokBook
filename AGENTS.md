@@ -1,10 +1,21 @@
 # LokBook — Agent Instructions
 
-This file guides all AI agents working on the LokBook codebase.
+This file guides all AI agents working on the LokBook codebase (Claude, Gemini, opencode, and
+anyone else). **Read `docs/MASTERPLAN.md` before starting any session** — it has the active
+roadmap, task claiming protocol, and the incident writeup for the regression that motivated it.
 
 ## Golden Rules
 
-1. **App.jsx is the monolith.** All page components (Feed, Battle, Profile, Studio, Shop, Viewer, Onboard, OpenFront) are defined INSIDE App.jsx as local functions. The `src/pages/` files are legacy/stale — do NOT import them.
+1. **App.jsx is the monolith, with six named exceptions that ARE real imports.** All page
+   components (Feed, Battle, Profile, Studio, Shop, Viewer, Onboard, OpenFront) are defined INSIDE
+   App.jsx as local functions — most of `src/pages/` is genuinely stale, do NOT import from it.
+   **Exception:** `src/pages/Rooms.jsx`, `src/rooms/*`, `src/identity.js`, `src/engine/botArt.js`,
+   `src/theme/ThemeBackdrop.jsx`, and `src/engine/bleepbox.js` ARE imported by App.jsx and are
+   load-bearing features (Lok Rooms, own-identity/starter-handles, generative bot artists, animated
+   theme backdrops, the cheat-code engine). **Before treating any file as dead, run
+   `grep '^import' src/App.jsx` — do not trust a stale doc's claim that something is unused.** A
+   previous session wholesale-regenerated App.jsx from an old snapshot and silently deleted all six
+   of these; see MASTERPLAN.md §1 for the postmortem and how to avoid repeating it.
 2. **Drawing utilities import from `engine/draw.jsx`.** Functions like `paperBase`, `risoCircle`, `makeRng`, `renderSequence` are imported, not defined locally.
 3. **Constants live in `constants.jsx`.** Check before adding new ones.
 4. **`lok_live.jsx` is DEPRECATED.** Never edit it. It's for reference only.

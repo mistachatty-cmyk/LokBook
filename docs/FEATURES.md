@@ -598,8 +598,18 @@
 
 ## 16. LEGACY / STALE FEATURES (not in active App.jsx)
 
-These exist in `src/pages/` and `src/rooms/` files but are NOT imported:
-- **Collaborative Drawing Rooms** (Rooms.jsx): Supabase Realtime broadcast, infinite canvas, stamp system, bleep marks, permission roles, journals, QR codes
+> ⚠️ **Correction (see `docs/MASTERPLAN.md` §1):** this section was written while Rooms was
+> accidentally disconnected from App.jsx by a wholesale file regeneration. It has since been
+> recovered and IS live — `import Rooms from "./pages/Rooms.jsx"` in App.jsx is real and required.
+> Do not delete or "clean up" `src/pages/Rooms.jsx`, `src/rooms/*`, `src/identity.js`,
+> `src/engine/botArt.js`, `src/theme/ThemeBackdrop.jsx`, or `src/engine/bleepbox.js` — all six are
+> imported directly by App.jsx and load-bearing. Always `grep '^import' src/App.jsx` before
+> assuming any file is dead; this list goes stale fast.
+
+The remaining items below (Profile.jsx sub-features, Shop.jsx wave gates) are genuinely unused —
+`src/pages/Profile.jsx` and `src/pages/Shop.jsx` themselves are NOT imported by App.jsx (their
+functionality was rebuilt inline in the monolith); only the six files named above are exceptions.
+
 - **Game Manual** (Profile.jsx): 20-page retro Game Boy-style manual
 - **Badge Wall** (Profile.jsx): Full badge collection with category filters
 - **ArtistPage** (Profile.jsx): Full-screen artist profile overlay with remote posts
