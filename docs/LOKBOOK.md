@@ -82,9 +82,10 @@ No React Router — simple `tab` string state: `"feed" | "gallery" | "studio" | 
 │   │   └── AuthGate.jsx          # Sign-in UI (magic link, OAuth)
 │   ├── engine/
 │   │   ├── draw.jsx              # Drawing engine (paperBase, risoCircle, 14+ painters, MiniDraw)
-│   │   ├── bots.js               # Bot AI (10 personalities, skill curves, battle recording)
+│   │   ├── bots.js               # Bot AI (9 personalities, skill curves, adaptive difficulty, taste-based judging, battle recording)
+│   │   ├── promptArt.js          # Bots that draw the actual prompt: 23 seeded recipes covering PROMPTS+KID_PROMPTS ("Sketch Artists" bot style)
 │   │   ├── lillok.js             # LilLok AI (state machine, Blot Brain, smart dialogue)
-│   │   ├── botArt.js             # Parametric artist bots (8 seed-based painters)
+│   │   ├── botArt.js             # Parametric resident-artist feed posts (9 seed-based painters, distinct from Battle bots)
 │   │   └── gif.js                # Minimal GIF encoder (256-color, LZW)
 │   ├── theme/
 │   │   ├── theme.js              # 12 themes + ThemeCtx/useT hooks

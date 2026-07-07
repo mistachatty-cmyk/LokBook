@@ -240,11 +240,21 @@
 - LOK BLOCK! button to deflect for bonus
 - Phase-dependent (decaying = fumble, thriving = deflect)
 
-### Bot Opponents
-- 9 personalities: pixel.pluto, inkwell_iz, doodlebug, sketchram, tinta, mooncrayon, nib.ninja, grafite, blot.bot
-- Unique skill curves: burst, closer, streaky, steady
-- Adaptive difficulty (rubber-band: target 45-55% win rate)
-- Taste-based voting system
+### Bot Opponents (`src/engine/bots.js`)
+- 9 personalities: pixel.pluto, inkwell_iz, doodlebug, sketchram, tinta, mooncrayon, nib.ninja, grafite, blot.bot — each with a baseline `skill`, a `curve` (burst/closer/streaky/steady — how their thumbnail progress reveals over the clock), a `taste` vector (bold/detail/speed — what they vote for), and chat lines for start/mid/win/lose moments (`botLine()`)
+- Adaptive difficulty (`battleDifficulty()`): rubber-bands off your last 10 match results, target 45–55% win rate, grows slowly with lifetime wins
+- Taste-based voting (`judgeBattle()`): each bot juror scores your entry against its own taste vector, so the same piece can win one jury and lose another — real effort (stroke count, animation pages, blocked interventions, LilLok phase) reliably moves the needle. Never fully deterministic.
+- Rush racers (`makeRushRivals()`/`rushScore()`) share the same curve system for leaderboard pacing
+
+### Bot Style — what the bots actually draw (`src/engine/promptArt.js`)
+Selectable in the Battle lobby, hidden in Juniors mode (kids always get the real thing):
+
+| Style | Behavior |
+|---|---|
+| 🎨 **Sketch Artists** (default) | Bots genuinely attempt the match prompt. 23 hand-composed recipes cover every entry in `PROMPTS`/`KID_PROMPTS` (e.g. "A creature made of weather" → cloud-body with lightning-bolt limbs; "A very smug cat" → triangle ears + half-closed eyes + whiskers). Each recipe is seeded per bot (no two attempts identical), reveals progressively across the match clock via `botProgress()`, and scales roughness/completeness with the bot's `skill` — weak bots visibly under-finish and wobble more. |
+| 🌀 **CreCre** | The original fully-random doodle generator (`renderDoodle`/`makeDoodlePainter`) — chaotic, prompt-blind, kept on purpose as a throwback/silly option. Name reflects what it's always actually drawn: nonsense. |
+
+Unknown/future prompts fall back to a generic blob+face composition rather than erroring.
 
 ### Rewards
 | Outcome | Loks | XP |
