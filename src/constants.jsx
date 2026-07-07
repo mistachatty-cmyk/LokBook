@@ -91,6 +91,123 @@ export const getActiveEvent = () => { const n=new Date().toISOString().slice(0,1
 
 export const PX_PER_FRAME = 150;
 
+export const RARITY = {
+  common:    { name:"Common",    color:"#9CA3AF", glow:"0 0 0 transparent",         order:0, icon:"⬜" },
+  uncommon:  { name:"Uncommon",  color:"#22C55E", glow:"0 0 6px rgba(34,197,94,0.3)",  order:1, icon:"🟢" },
+  rare:      { name:"Rare",      color:"#3B82F6", glow:"0 0 8px rgba(59,130,246,0.35)", order:2, icon:"🔵" },
+  epic:      { name:"Epic",      color:"#A855F7", glow:"0 0 10px rgba(168,85,247,0.4)", order:3, icon:"🟣" },
+  legendary: { name:"Legendary", color:"#F59E0B", glow:"0 0 14px rgba(245,158,11,0.5)", order:4, icon:"🟠" },
+  mythic:    { name:"Mythic",    color:"transparent", glow:"0 0 20px rgba(255,93,162,0.5)", order:5, icon:"💎" },
+};
+
+export const MYTHIC_ITEMS = [
+  { id:"mythic_galaxy",  name:"Galaxy Veil",       desc:"A nebula of stars follows your brush. Every stroke is a galaxy.", price:2000, rarity:"mythic", type:"effect",         fxId:"galaxy" },
+  { id:"mythic_aurora",  name:"Aurora Cascade",     desc:"Living aurora pulses across the canvas as you draw.",           price:1800, rarity:"mythic", type:"effect",         fxId:"aurora" },
+  { id:"mythic_void",    name:"Void Walker",         desc:"Deep space in every line — watch the void bloom.",              price:2500, rarity:"mythic", type:"frame",          fxId:"void" },
+  { id:"mythic_ripple",  name:"Ripple Lord",         desc:"Every stroke sends ripples through the fabric of the page.",    price:1500, rarity:"mythic", type:"effect",         fxId:"ripple" },
+  { id:"mythic_cosmic",  name:"Cosmic Crown",        desc:"Celestial geometry frames your art in orbiting brilliance.",    price:3000, rarity:"mythic", type:"frame",          fxId:"cosmic" },
+  { id:"mythic_nebula",  name:"Nebula Veil",         desc:"Swirling cosmic dust drifts across your gallery.",              price:2200, rarity:"mythic", type:"paper",          fxId:"nebula" },
+  { id:"mythic_storm",   name:"Stormcaller",         desc:"Summon lightning with every stroke — ink that crackles.",       price:2800, rarity:"mythic", type:"animation_fx",   fxId:"storm" },
+  { id:"mythic_pixel",   name:"Prism Shard",         desc:"Light bends through your lines in a rainbow of refractions.",   price:1600, rarity:"mythic", type:"name_color",     fxId:"pixel" },
+  { id:"mythic_echo",    name:"Echo Bloom",          desc:"Rings of ink pulse outward from every mark you make.",           price:1900, rarity:"mythic", type:"animation_fx",   fxId:"echo" },
+  { id:"mythic_bloom",   name:"Bloom of Worlds",     desc:"A cosmic flower unfurls inside every frame you create.",         price:3500, rarity:"mythic", type:"effect",         fxId:"bloom" },
+];
+
+export const DAILY_ITEMS = [
+  { id:"d_frame_vintage",   name:"Vintage Film",      desc:"Old movie reel corners",     price:35,  rarity:"uncommon", type:"frame" },
+  { id:"d_frame_inkburst",  name:"Ink Burst",          desc:"Splatter-edged border",      price:50,  rarity:"rare",     type:"frame" },
+  { id:"d_frame_geometric", name:"Geometric Grid",     desc:"Tessellated frame pattern", price:60,  rarity:"epic",     type:"frame" },
+  { id:"d_frame_sketch",    name:"Sketchy Edge",       desc:"Hand-drawn rough border",    price:30,  rarity:"common",   type:"frame" },
+  { id:"d_frame_nebula",    name:"Nebula Haze",        desc:"Soft cosmic edge glow",      price:80,  rarity:"legendary",type:"frame" },
+  { id:"d_eff_fireflies",   name:"Fireflies",          desc:"Floating fireflies at dusk", price:45,  rarity:"rare",     type:"effect" },
+  { id:"d_eff_bubbles",     name:"Bubble Float",       desc:"Rising iridescent bubbles",  price:35,  rarity:"uncommon", type:"effect" },
+  { id:"d_eff_pollen",      name:"Golden Pollen",      desc:"Drifting flecks of light",   price:55,  rarity:"epic",     type:"effect" },
+  { id:"d_eff_fog",         name:"Morning Fog",        desc:"Lichen mist rolling in",      price:30,  rarity:"common",   type:"effect" },
+  { id:"d_eff_stardust",    name:"Stardust",           desc:"Cosmic dust in moonbeams",    price:85,  rarity:"legendary",type:"effect" },
+  { id:"d_name_ember",      name:"Ember Glow",         desc:"Warm orange flicker",        price:40,  rarity:"uncommon", type:"name_color", color:"#FF6B35" },
+  { id:"d_name_mint",       name:"Mint Leaf",          desc:"Fresh cool green",           price:40,  rarity:"uncommon", type:"name_color", color:"#2ECC71" },
+  { id:"d_name_coral",      name:"Coral Reef",         desc:"Ocean sunset pink",          price:50,  rarity:"rare",     type:"name_color", color:"#FF6F61" },
+  { id:"d_name_lavender",   name:"Lavender Dream",     desc:"Soft twilight purple",       price:55,  rarity:"epic",     type:"name_color", color:"#9B59B6" },
+  { id:"d_name_phantom",    name:"Phantom White",      desc:"Ghostly pale glow",          price:80,  rarity:"legendary",type:"name_color", color:"#ECF0F1" },
+  { id:"d_sky_twilight",    name:"Twilight Glow",      desc:"Purple-orange twilight",     price:40,  rarity:"uncommon", type:"sky" },
+  { id:"d_sky_thunder",     name:"Thunderhead",        desc:"Dark storm sky",              price:45,  rarity:"rare",     type:"sky" },
+  { id:"d_sky_milkyway",    name:"Milky Way",          desc:"Galactic star field",         price:65,  rarity:"epic",     type:"sky" },
+  { id:"d_sky_sunflare",    name:"Sun Flare",          desc:"Golden hour blaze",           price:35,  rarity:"common",   type:"sky" },
+  { id:"d_acc_crescent",    name:"Crescent Moon",      desc:"Sliver of moon behind head",  price:30,  rarity:"uncommon", type:"avatar_accent" },
+  { id:"d_acc_wings",       name:"Ink Wings",          desc:"Spread of ink feathers",      price:50,  rarity:"rare",     type:"avatar_accent" },
+  { id:"d_acc_clock",       name:"Clockwork",          desc:"Spinning gear halo",          price:65,  rarity:"epic",     type:"avatar_accent" },
+  { id:"d_acc_flame",       name:"Flame Crown",        desc:"Burning corona of fire",      price:90,  rarity:"legendary",type:"avatar_accent" },
+  { id:"d_paper_vinyl",     name:"Vinyl Grain",        desc:"Warm record crackle texture", price:40,  rarity:"uncommon", type:"paper" },
+  { id:"d_paper_linen",     name:"Linen Weave",        desc:"Fine woven fabric texture",   price:45,  rarity:"rare",     type:"paper" },
+  { id:"d_paper_metallic",  name:"Metallic Foil",      desc:"Shiny foil reflection",       price:70,  rarity:"epic",     type:"paper" },
+  { id:"d_paper_parchment", name:"Aged Parchment",     desc:"Ancient scroll texture",      price:50,  rarity:"rare",     type:"paper" },
+  { id:"d_cursor_flame",    name:"Flame Tip",          desc:"Cursor leaves a fire trail",  price:35,  rarity:"uncommon", type:"cursor" },
+  { id:"d_cursor_ghost",    name:"Ghost Glide",        desc:"See-through trailing cursor",price:40,  rarity:"rare",     type:"cursor" },
+  { id:"d_cursor_comet",    name:"Comet Streak",       desc:"Falling star cursor trail",   price:60,  rarity:"epic",     type:"cursor" },
+  { id:"d_reaction_magic",  name:"Arcane Pack",        desc:"✨🪄⚡ Mystic reaction icons", price:45,  rarity:"rare",     type:"reaction" },
+  { id:"d_reaction_sea",    name:"Ocean Pack",         desc:"🌊🐚🪸 Tidal reaction icons",price:40,  rarity:"uncommon", type:"reaction" },
+  { id:"d_sticker_gothic",  name:"Gothic Pack",        desc:"🦇🌹💀 Dark romantic",       price:50,  rarity:"epic",     type:"sticker" },
+  { id:"d_sticker_dream",   name:"Dream Pack",         desc:"💤🌙☁️ Soft dreamy",        price:40,  rarity:"uncommon", type:"sticker" },
+  { id:"d_border_chain",    name:"Chain Link",         desc:"Interlocking metal border",   price:55,  rarity:"rare",     type:"blot_border" },
+  { id:"d_border_neon",     name:"Neon Razor",         desc:"Sharp glowing edge",          price:75,  rarity:"epic",     type:"blot_border" },
+  { id:"d_border_bone",     name:"Bone Cage",          desc:"Barbed skeletal frame",       price:100, rarity:"legendary",type:"blot_border" },
+  { id:"d_border_tribal",   name:"Tribal Ink",         desc:"Ancient pattern border",      price:45,  rarity:"uncommon", type:"blot_border" },
+  { id:"d_font_script",     name:"Elegant Script",     desc:"Flowing cursive letters",     price:40,  rarity:"uncommon", type:"font", font:"'Great Vibes',cursive" },
+  { id:"d_font_gothic",     name:"Gothic Black",       desc:"Old English style",           price:50,  rarity:"rare",     type:"font", font:"'UnifrakturMaguntia',cursive" },
+  { id:"d_font_future",     name:"Neon Future",        desc:"Glowing cyber type",          price:65,  rarity:"epic",     type:"font", font:"'Orbitron',sans-serif" },
+  { id:"d_export_png_hd",   name:"PNG HD",            desc:"Double resolution PNG export",price:60,  rarity:"rare",     type:"export" },
+  { id:"d_export_json",     name:"JSON Frames",        desc:"Export frame data as JSON",   price:40,  rarity:"uncommon", type:"export" },
+  { id:"d_export_svg",      name:"SVG Trace",          desc:"Vector trace of your art",    price:90,  rarity:"epic",     type:"export" },
+  { id:"d_gear_crown",      name:"Tiny Crown",         desc:"Golden crown for LilLok",     price:35,  rarity:"rare",     type:"lillok_gear" },
+  { id:"d_gear_scarf",      name:"Cozy Scarf",         desc:"Knitted winter scarf",        price:25,  rarity:"common",   type:"lillok_gear" },
+  { id:"d_skin_phantom",    name:"Phantom",            desc:"Translucent ghost skin",      price:350, rarity:"legendary",type:"lillok_skin" },
+  { id:"d_pet_spark",       name:"Spark Blob",         desc:"Mini electric blob",          price:350, rarity:"epic",     type:"lillok_pet" },
+  { id:"d_voice_melody",    name:"Melody Pack",        desc:"Musical tone responses",      price:180, rarity:"rare",     type:"voice" },
+];
+
+export const WEEKLY_ITEMS = [
+  { id:"w_frame_solar",     name:"Solar Rings",        desc:"Concentric burning rings",      price:120, rarity:"legendary", type:"frame" },
+  { id:"w_frame_crystal",   name:"Crystal Shard",      desc:"Shattered glass edge",          price:90,  rarity:"epic",     type:"frame" },
+  { id:"w_frame_woven",     name:"Woven Thread",       desc:"Braided fiber border",          price:55,  rarity:"rare",     type:"frame" },
+  { id:"w_eff_snow",        name:"Snow Drift",         desc:"Gentle falling snow",           price:60,  rarity:"rare",     type:"effect" },
+  { id:"w_eff_plasma",      name:"Plasma Field",       desc:"Electric crackle effect",       price:100, rarity:"epic",     type:"effect" },
+  { id:"w_eff_rainbow",     name:"Rainbow Sheen",      desc:"Shifting rainbow overlay",      price:130, rarity:"legendary",type:"effect" },
+  { id:"w_name_abyss",      name:"Abyss Gaze",         desc:"Deep ocean blue-black",         price:70,  rarity:"epic",     type:"name_color", color:"#0B132B" },
+  { id:"w_name_sunstone",   name:"Sunstone",           desc:"Warm amber radiance",           price:95,  rarity:"legendary",type:"name_color", color:"#FF7F50" },
+  { id:"w_sky_comet",       name:"Comet Trail",        desc:"Streaking comet across sky",    price:70,  rarity:"rare",     type:"sky" },
+  { id:"w_sky_borealis",    name:"Borealis Pulse",     desc:"Pulsing northern lights",       price:100, rarity:"epic",     type:"sky" },
+  { id:"w_acc_stars",       name:"Star Chart",         desc:"Constellation map behind head", price:80,  rarity:"rare",     type:"avatar_accent" },
+  { id:"w_acc_galactic",    name:"Galactic Orbit",     desc:"Rings of stars orbiting you",   price:120, rarity:"legendary",type:"avatar_accent" },
+  { id:"w_paper_onyx",      name:"Onyx Slab",          desc:"Dark polished stone texture",   price:70,  rarity:"rare",     type:"paper" },
+  { id:"w_paper_iridescent",name:"Iridescent",         desc:"Shifting rainbow shimmer",      price:110, rarity:"epic",     type:"paper" },
+  { id:"w_cursor_phantom",  name:"Phantom Touch",      desc:"Ghostly afterimage trail",      price:65,  rarity:"rare",     type:"cursor" },
+  { id:"w_cursor_thunder",  name:"Thbolt Cursor",      desc:"Lightning bolt pointer",        price:90,  rarity:"epic",     type:"cursor" },
+  { id:"w_reaction_myth",   name:"Mythic Pack",        desc:"🐉🏛️⚡ Legendary reactions",    price:80,  rarity:"epic",     type:"reaction" },
+  { id:"w_sticker_cyber",   name:"Cyber Pack",         desc:"🤖💿🔧 Tech dystopia",          price:65,  rarity:"rare",     type:"sticker" },
+  { id:"w_border_rune",     name:"Rune Circle",        desc:"Ancient runic border",          price:90,  rarity:"epic",     type:"blot_border" },
+  { id:"w_border_void",     name:"Void Ring",          desc:"Empty black hole edge",         price:140, rarity:"legendary",type:"blot_border" },
+  { id:"w_font_runes",      name:"Runic Script",       desc:"Ancient rune lettering",         price:75,  rarity:"epic",     type:"font", font:"'Cinzel',serif" },
+  { id:"w_font_cyber",      name:"Cyber Gothic",       desc:"Digital glitch display font",   price:85,  rarity:"epic",     type:"font", font:"'Major Mono Display',monospace" },
+  { id:"w_skin_prism",      name:"Prism Scale",        desc:"Iridescent reptilian skin",     price:400, rarity:"legendary",type:"lillok_skin" },
+  { id:"w_pet_wisp",        name:"Wisp",               desc:"Floating light spirit",         price:500, rarity:"legendary",type:"lillok_pet" },
+  { id:"w_export_4k",       name:"4K Export",          desc:"Ultra HD frame export",         price:150, rarity:"legendary",type:"export" },
+];
+
+export function getDailyRotation() {
+  const dS = Math.floor(Date.now() / 86400000);
+  return DAILY_ITEMS.filter((_, i) => {
+    const idx = (dS + i) % DAILY_ITEMS.length;
+    return idx < 6;
+  }).map((item, i) => ({ ...item, rotationSlot: `daily_${i}` }));
+}
+export function getWeeklyRotation() {
+  const wS = Math.floor(Date.now() / 604800000);
+  return WEEKLY_ITEMS.filter((_, i) => {
+    const idx = (wS + i) % WEEKLY_ITEMS.length;
+    return idx < 5;
+  }).map((item, i) => ({ ...item, rotationSlot: `weekly_${i}` }));
+}
+
 export const BLENDS = ["source-over", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion", "hue", "saturation", "color", "luminosity"];
 export const TIERS=[{layers:10,label:"10 · Sketch",price:0},{layers:25,label:"25 · Studio",price:40},{layers:50,label:"50 · Pro",price:80},{layers:100,label:"100 · Marathon",price:150}];
 
@@ -198,10 +315,31 @@ export const NAME_COLORS = [{ id: "default", name: "Default", price: 0, color: n
 export const FRAMES = [{ id: "none", name: "None", price: 0 }, { id: "double", name: "Double rule", price: 25 }, { id: "dashed", name: "Dashed ink", price: 25 }, { id: "tape", name: "Washi corners", price: 40 }, { id: "glow", name: "Neon glow", price: 60 }, { id: "photo", name: "Photo Corners", price: 30 }, { id: "stamp", name: "Stamp Edge", price: 35 }, { id:"polaroid", name:"Polaroid border", price:35 }, { id:"filmstrip", name:"Film strip sprockets", price:45 }, { id:"torn", name:"Torn edge", price:30 }];
 export const REACTION_PACKS = [{ id: "base", name: "Ink set (splat · heart · drip)", price: 0 }, { id: "stars", name: "Stardust pack", price: 30 }, { id: "fire", name: "Hot streak pack", price: 30 }, { id: "zen", name: "Zen pack", price: 45 }, { id: "spooky", name: "Spooky Pack", price: 30 }, { id: "sweet", name: "Sweet Pack", price: 30 }];
 export const PAPERS = [{ id:"plain", name:"Plain paper", price:0 }, { id:"grid", name:"Grid guide", price:25 }, { id:"dots", name:"Dot grid", price:25 }, { id:"storyboard", name:"Storyboard · 3 panels", price:40 }, { id:"graphite", name:"Graphite texture", price:50 }];
-export const LILLOK_GEAR = [{ id:"none", name:"None", price:0 }, { id:"hat", name:"Tiny hat", price:25 }, { id:"glasses", name:"Round glasses", price:25 }, { id:"bowtie", name:"Bow tie", price:20 }];
-export const LILLOK_SKINS = [{ id:"none", name:"Default", price:0 }, { id:"galaxy", name:"Galaxy skin", price:300 }, { id:"gold", name:"Gold leaf", price:250 }];
-export const LILLOK_AURAS = [{ id:"none", name:"No aura", price:0 }, { id:"glow", name:"Aura glow", price:200 }];
-export const LILLOK_PETS = [{ id:"none", name:"No pet", price:0 }, { id:"mini", name:"Mini LilLok", price:400 }];
+export const LILLOK_GEAR = [{ id:"none", name:"None", price:0 }, { id:"hat", name:"Tiny hat", price:25 }, { id:"glasses", name:"Round glasses", price:25 }, { id:"bowtie", name:"Bow tie", price:20 },
+  { id:"crown", name:"Tiny Crown", price:60, rarity:"epic" }, { id:"scarf", name:"Cozy Scarf", price:35, rarity:"rare" },
+  { id:"goggles", name:"Steam Goggles", price:50, rarity:"rare" }, { id:"monocle", name:"Monocle", price:40, rarity:"uncommon" },
+  { id:"headband", name:"Ninja Headband", price:45, rarity:"rare" }, { id:"wings", name:"Ink Wings", price:80, rarity:"epic" },
+  { id:"halo_ring", name:"Angel Halo", price:100, rarity:"legendary" }, { id:"mask", name:"Kabuki Mask", price:70, rarity:"epic" },
+  { id:"beret", name:"Artist Beret", price:30, rarity:"uncommon" }, { id:"tophat", name:"Top Hat", price:65, rarity:"epic" },
+  { id:"bandana", name:"Pirate Bandana", price:35, rarity:"rare" }, { id:"collar", name:"Spiked Collar", price:40, rarity:"rare" },
+  { id:"antenna", name:"Alien Antenna", price:55, rarity:"epic" }, { id:"cape", name:"Hero Cape", price:90, rarity:"legendary" },
+];
+export const LILLOK_SKINS = [{ id:"none", name:"Default", price:0 }, { id:"galaxy", name:"Galaxy skin", price:300, rarity:"epic" }, { id:"gold", name:"Gold leaf", price:250, rarity:"epic" },
+  { id:"phantom", name:"Phantom", price:350, rarity:"legendary" }, { id:"prism", name:"Prism Scale", price:400, rarity:"legendary" },
+  { id:"void", name:"Void Skin", price:500, rarity:"legendary" }, { id:"embers", name:"Ember Core", price:450, rarity:"legendary" },
+  { id:"frost", name:"Frost Heart", price:420, rarity:"legendary" }, { id:"storm", name:"Storm Shell", price:480, rarity:"legendary" },
+];
+export const LILLOK_AURAS = [{ id:"none", name:"No aura", price:0 }, { id:"glow", name:"Aura glow", price:200, rarity:"epic" },
+  { id:"embers", name:"Ember Aura", price:280, rarity:"legendary" }, { id:"frost", name:"Frost Aura", price:280, rarity:"legendary" },
+  { id:"storm", name:"Storm Aura", price:320, rarity:"legendary" }, { id:"cosmic", name:"Cosmic Aura", price:400, rarity:"legendary" },
+  { id:"rainbow", name:"Rainbow Aura", price:350, rarity:"legendary" }, { id:"void", name:"Void Aura", price:450, rarity:"legendary" },
+];
+export const LILLOK_PETS = [{ id:"none", name:"No pet", price:0 }, { id:"mini", name:"Mini LilLok", price:400, rarity:"epic" },
+  { id:"inkling", name:"Inkling", price:350, rarity:"epic" }, { id:"blotlet", name:"Blotlet", price:300, rarity:"rare" },
+  { id:"spark", name:"Spark Blob", price:380, rarity:"epic" }, { id:"wisp", name:"Wisp", price:500, rarity:"legendary" },
+  { id:"gloworm", name:"Gloworm", price:280, rarity:"rare" }, { id:"shadow", name:"Shadow Pup", price:450, rarity:"legendary" },
+  { id:"starling", name:"Starling", price:320, rarity:"epic" }, { id:"moonkit", name:"Moonkit", price:550, rarity:"legendary" },
+];
 export const VOICE_PACKS = [{ id:"default", name:"Default voice", price:0 }, { id:"whisper", name:"Whisper pack", price:150 }, { id:"echo", name:"Echo pack", price:200 }, { id:"robot", name:"Robot pack", price:250 }];
 export const AVATAR_ACCENTS = [{ id: "none", name: "Plain", price: 0 }, { id: "ring", name: "Accent ring", price: 20 }, { id: "halo", name: "Sketch halo", price: 35 }, { id: "crown", name: "Ink crown", price: 50 }, { id: "horns", name: "Horns", price: 40 }, { id: "antenna", name: "Antenna", price: 40 }];
 export const PROFILE_UPGRADES = [{ id:"none", name:"No banner", price:0 }, { id:"banner_wave", name:"Wave banner", price:250 }, { id:"banner_ink", name:"Ink splash banner", price:200 }, { id:"bg_warm", name:"Warm background", price:180 }, { id:"bg_cool", name:"Cool background", price:180 }, { id:"bg_dark", name:"Dark background", price:180 }, { id:"avatar_animate", name:"Animated avatar", price:200 }, { id:"pin_post", name:"Pin a post", price:150 }];

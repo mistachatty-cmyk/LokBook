@@ -10,3 +10,46 @@
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+@keyframes lokmythic {
+  0% { background-position: 0% 50%; filter: hue-rotate(0deg); }
+  50% { background-position: 100% 50%; filter: hue-rotate(30deg); }
+  100% { background-position: 0% 50%; filter: hue-rotate(0deg); }
+}
+@keyframes lokshimmer {
+  0% { transform: translateX(-100%) rotate(-25deg); }
+  100% { transform: translateX(200%) rotate(-25deg); }
+}
+@keyframes lokglow {
+  0%, 100% { box-shadow: 0 0 5px currentColor, 0 0 10px currentColor; }
+  50% { box-shadow: 0 0 20px currentColor, 0 0 40px currentColor; }
+}
+@keyframes lokrotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes lokfloat {
+  0% { transform: translateY(0px); opacity: 1; }
+  50% { transform: translateY(-8px); opacity: 0.8; }
+  100% { transform: translateY(0px); opacity: 1; }
+}
+.rarity-common { border-color: #9CA3AF !important; }
+.rarity-uncommon { border-color: #22C55E !important; box-shadow: 0 0 6px rgba(34,197,94,0.3); }
+.rarity-rare { border-color: #3B82F6 !important; box-shadow: 0 0 8px rgba(59,130,246,0.35); }
+.rarity-epic { border-color: #A855F7 !important; box-shadow: 0 0 10px rgba(168,85,247,0.4); }
+.rarity-legendary { border-color: #F59E0B !important; box-shadow: 0 0 14px rgba(245,158,11,0.5); animation: lokglow 2s ease-in-out infinite; }
+.rarity-mythic {
+  border-color: transparent !important;
+  background: linear-gradient(135deg, #FF5DA2, #A855F7, #3B82F6, #22C55E, #F59E0B) border-box !important;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: lokmythic 3s linear infinite;
+  background-size: 300% 300% !important;
+}
+.rarity-mythic-badge {
+  background: linear-gradient(90deg, #FF5DA2, #A855F7, #3B82F6, #22C55E);
+  background-size: 300% 100%;
+  animation: lokmythic 2s linear infinite;
+  color: #fff;
+}
