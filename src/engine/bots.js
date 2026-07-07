@@ -56,10 +56,18 @@ function rushDifficulty() {
 }
 
 // ---------- battle bots ----------
-export function makeMatchBots(n, { kids = false, wins = 0 } = {}) {
+// botType: "artist" (default) — bots genuinely attempt the prompt via
+// engine/promptArt.js, quality scaled by `skill`. "crecre" — the original
+// prompt-blind random-doodle bots, kept as a deliberate chaos/throwback mode.
+export const BOT_TYPES = [
+  { id: "artist", name: "Sketch Artists", desc: "Bots actually attempt the prompt — quality varies by skill." },
+  { id: "crecre", name: "CreCre", desc: "Chaotic nonsense doodles, prompt-blind. The classic bots." },
+];
+
+export function makeMatchBots(n, { kids = false, wins = 0, botType = "artist" } = {}) {
   if (kids) return Array.from({ length: n }, (_, i) => ({
     name: `buddy ${i + 1}`, seed: Math.floor(Math.random() * 9000) + i * 137 + 11,
-    skill: 0.5, curve: "steady", taste: { bold: 0.5, detail: 0.5, speed: 0.5 }, chat: KID_CHAT,
+    skill: 0.5, curve: "steady", taste: { bold: 0.5, detail: 0.5, speed: 0.5 }, chat: KID_CHAT, type: "artist",
   }));
   const d = battleDifficulty(wins);
   const pool = [...ROSTER].sort(() => Math.random() - 0.5).slice(0, n);
@@ -68,6 +76,7 @@ export function makeMatchBots(n, { kids = false, wins = 0 } = {}) {
     seed: Math.floor(Math.random() * 9000) + 11,
     // effective skill: personality baseline pulled toward the difficulty target, ±noise
     skill: Math.max(0.15, Math.min(0.98, b.skill * 0.45 + d * 0.55 + (Math.random() - 0.5) * 0.16)),
+    type: botType,
   }));
 }
 
