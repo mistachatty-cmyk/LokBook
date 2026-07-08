@@ -51,10 +51,30 @@ Binary payload, decompressed with `DecompressionStream("deflate-raw")` before pa
 
 This beats a raw PNG-per-frame stack two ways: (a) bit-depth reduction from the shared palette (routinely 6–8× before any compression), (b) delta+RLE across frames removes almost all cost for near-static regions. Typical target: **≥10× smaller than the current base64-PNG-per-frame approach** for a normal flip.
 
+`deflate-raw` is plain [DEFLATE](https://www.rfc-editor.org/rfc/rfc1951) with no zlib/gzip header — the same universally-implemented algorithm behind `zlib`, `.gz`, and ZIP itself. Any language's standard deflate library can decode `data.lokflip`; a JS runtime isn't required.
+
 ## Compatibility contract
 - A reader that only understands ZIP: gets a valid, well-formed archive.
-- A reader that understands ZIP + can view images: gets `preview.png`, a correct single-frame representation.
+- A reader that understands ZIP + can view images: gets `preview.png`, a correct single-frame representation. **No JavaScript, no LokFlip support of any kind required for this tier.**
 - A reader that understands ZIP + JSON: gets full metadata via `manifest.json` even without an animation player.
+- A reader that implements the codec (any language with a deflate library — `data.lokflip` needs no browser-specific API): gets the full animated flip.
+
+### Verified compatibility (not just self-consistency)
+A file produced by the JS reference encoder was checked against implementations we did **not** write, each independently:
+
+| Check | Tool | Result |
+|---|---|---|
+| ZIP integrity (CRC-32 of every entry) | `unzip -t` (Info-ZIP) | ✅ all entries OK |
+| ZIP listing/structure | `unzip -l` / `unzip -v` | ✅ correct sizes, STORE method, valid CRCs |
+| ZIP extraction | Python 3 `zipfile` (independent implementation) | ✅ `testzip()` reports no bad entries |
+| ZIP extraction | Windows `Expand-Archive` (independent implementation) | ✅ extracts cleanly |
+| `manifest.json` parsing | Python `json.loads` | ✅ parses, all fields present |
+| `preview.png` decodability | Python Pillow/libpng (independent PNG decoder) | ✅ loads as a real 480×600 RGBA image |
+| `data.lokflip` decompression | Node.js `zlib.inflateRawSync` vs. browser `DecompressionStream` | ✅ byte-identical output from two unrelated implementations |
+| Cross-session decode | Fresh headless-browser context decoding a file it never encoded | ✅ correct frame count/dimensions/format |
+
+### Known limitation
+`CompressionStream`/`DecompressionStream` (used by the *browser* reference implementation for `data.lokflip`) requires a reasonably modern browser: Chrome 80+, Firefox 113+, Safari 16.4+. This has **zero effect on the universal-fallback tiers above** (ZIP/`preview.png`/`manifest.json` need no JS API at all) — it only affects JS-based decoding of the compressed animation payload in older browsers. A non-browser implementation (Node, Python, etc.) has no such constraint since it can use any standard deflate library.
 - A reader that implements this spec: gets the full animated flip at a fraction of the size of naive frame storage.
 
 ## Versioning
