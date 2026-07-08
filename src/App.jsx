@@ -551,13 +551,17 @@ function Battle({ownedTiers,ccTier,wins,bigBattleOwned,kids,phase,lillok,customL
   if(pstate==="lobby")return(<div className="mt-4">
     <h2 className="lok-display text-lg font-extrabold">{kids?"Draw Together":"Lok N Slide — Battle"}</h2>
     <p className="text-sm opacity-70 mt-0.5">{kids?"Same prompt, draw with your buddies, everyone wins!":"Same prompt, same clock, layered canvases. Competitors vote — never for themselves."}</p>
-    {!kids&&(<button onClick={()=>setFeatured(f=>!f)} aria-pressed={featured} aria-label="Featured match: 3× Loks" className="lok-btn mt-3 w-full p-3.5 rounded-2xl text-left relative overflow-hidden" style={{border:`3px solid ${T.ink}`,background:featured?T.ink:T.card,color:featured?T.paper:T.ink,boxShadow:featured?`6px 6px 0 ${T.accent}`:`5px 5px 0 #E8B14B`}}>
+    {!kids&&(()=>{const msLeft=new Date(new Date().setHours(24,0,0,0))-Date.now();const hrs=Math.floor(msLeft/3600000);const mins=Math.floor((msLeft%3600000)/60000);return(<button onClick={()=>setFeatured(f=>!f)} aria-pressed={featured} aria-label={featured?"Featured match armed — next win pays 3× Loks":"Arm today's featured match for 3× Loks"} className="lok-btn mt-3 w-full p-3.5 rounded-2xl text-left relative overflow-hidden" style={{border:`3px solid ${T.ink}`,background:featured?T.ink:T.card,color:featured?T.paper:T.ink,boxShadow:featured?`6px 6px 0 ${T.accent}`:`5px 5px 0 #E8B14B`}}>
       <div className="flex items-center gap-3">
         <div className="lok-display font-extrabold text-2xl shrink-0" style={{color:featured?"#E8B14B":T.accent}}>3×</div>
-        <div className="min-w-0 flex-1"><div className="lok-display font-extrabold text-sm uppercase tracking-widest" style={{color:featured?"#E8B14B":"#B8860B"}}>✦ Featured match</div><div className="text-xs opacity-75 mt-0.5">Triple Loks on a win. Rotates daily.</div></div>
-        <span className="text-xs font-extrabold shrink-0" style={{color:featured?T.accent:T.alt}}>{featured?"Armed ✓":"Arm it"}</span>
+        <div className="min-w-0 flex-1">
+          <div className="lok-display font-extrabold text-sm uppercase tracking-widest" style={{color:featured?"#E8B14B":"#B8860B"}}>✦ Today's featured match</div>
+          <div className="text-xs opacity-75 mt-0.5">{featured?"Armed — your next win pays triple Loks.":"Arm it, then win a match to earn 3× Loks."}</div>
+          <div className="text-[10px] font-bold mt-0.5" style={{color:featured?T.accent:T.alt,opacity:0.85}}>Rotates in {hrs}h {mins}m</div>
+        </div>
+        <span className="text-xs font-extrabold shrink-0 px-2 py-1 rounded-full" style={{color:featured?T.ink:T.paper,background:featured?"#E8B14B":T.alt}}>{featured?"Armed ✓":"Arm it"}</span>
       </div>
-    </button>)}
+    </button>);})()}
     {!kids&&(<><div className="mt-3 text-xs font-bold uppercase tracking-widest opacity-60">Format</div>
       <div className="mt-1.5 grid grid-cols-2 gap-2">{FORMATS.map((f,fi2)=>{const locked=f.locked&&!bigUnlocked;const sel=format.id===f.id;return(<button key={f.id} onClick={()=>locked?say("Big Battle unlocks at 1 win"):setFormat(f)} aria-label={`${f.label} — ${f.mood}`} className="lok-btn p-2.5 rounded-xl text-left" style={{border:`3px solid ${sel?T.accent:T.ink}`,background:sel?T.ink:T.card,color:sel?T.paper:T.ink,opacity:locked?0.55:1,boxShadow:sel?`4px 4px 0 ${T.accent}`:`3px 3px 0 ${T.shadow}`,animation:reduceMotion?"none":`lokrise .3s ease ${fi2*0.06}s both`}}><div style={{fontSize:20,lineHeight:1,marginBottom:3}}>{locked?"🔒":f.icon}</div><div className="lok-display font-extrabold text-sm">{f.label}</div><div className="text-[11px] opacity-70 mt-0.5">{f.mood}</div><div className="text-[11px] font-bold mt-0.5" style={{color:sel?T.accent:T.alt}}>{f.coop?"hot-seat":`${f.players} artists`}</div></button>);})}
       </div>{!bigUnlocked&&<button onClick={onUnlockBig} className="lok-btn mt-2 w-full py-2 rounded-xl text-sm font-bold" style={{border:`2.5px dashed ${T.ink}`,color:T.ink}}>Unlock Big Battle · 50 Loks</button>}</>)}
