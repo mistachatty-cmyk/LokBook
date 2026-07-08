@@ -33,7 +33,7 @@ LokBook flips can be exported as **`.lok`** — an open, self-contained animatio
 
 - **Opens anywhere.** A `.lok` file is a real ZIP archive: any OS, any zip tool, any archive browser reads it, no special software required. Inside is a plain `preview.png` (any image viewer renders it) and a human-readable `manifest.json` — even a tool with zero knowledge of the format gets something useful.
 - **Small.** For apps that do implement the format, `data.lokflip` stores the animation as a shared palette + frame-to-frame deltas, then one compression pass — typically **~10× smaller** than a naive PNG-per-frame stack.
-- **Open source.** Full spec + reference implementation: [`docs/LOK_FORMAT.md`](docs/LOK_FORMAT.md) in this repo, and standalone at the dedicated `lok-format` project (spec, tutorial, reference JS encoder/decoder — MIT-licensed, "LokFlip"/`.lok` name and format ownership held by LokServices).
+- **Open source.** Full spec + reference implementation: [`docs/LOK_FORMAT.md`](docs/LOK_FORMAT.md) in this repo, and standalone at **[github.com/mistachatty-cmyk/.Lok](https://github.com/mistachatty-cmyk/.Lok)** (spec, tutorial, reference JS encoder/decoder, runnable example — MIT-licensed, "LokFlip"/`.lok` name and format ownership held by LokServices).
 - **Reference implementation:** [`src/engine/lokFormat.js`](src/engine/lokFormat.js) — `encodeLok(frames, meta)` / `decodeLok(blob)`.
 
 ---
