@@ -4,6 +4,9 @@ const freqMap = { "C4": 262, "D4": 294, "E4": 330, "G4": 392, "A4": 440, "C5": 5
 
 export function useFeedback(soundOn = false) {
   const audioCtx = useRef(null);
+  const grammarRef = useRef("default");
+
+  const setGrammar = useCallback((g) => { grammarRef.current = g; }, []);
 
   const blip = useCallback((note = "C5", { type = "sine", dur = 220, vol = 0.18 } = {}) => {
     if (!soundOn) return;
@@ -27,8 +30,12 @@ export function useFeedback(soundOn = false) {
   }, [soundOn]);
 
   const hap = useCallback((pattern = [30]) => {
-    try { navigator.vibrate?.(pattern); } catch {}
+    try {
+      const g = grammarRef.current;
+      const scaled = g === "expressive" ? pattern.map(p => Math.round(p * 1.5)) : g === "quiet" ? pattern.map(p => Math.round(p * 0.3)) : pattern;
+      navigator.vibrate?.(scaled);
+    } catch {}
   }, []);
 
-  return { blip, hap };
+  return { blip, hap, setGrammar };
 }

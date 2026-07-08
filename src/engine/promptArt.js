@@ -336,6 +336,27 @@ const BOT_FLOURISH = {
     ctx.fillStyle = "rgba(255,93,162,0.08)";
     for (let i = 0; i < 3; i++) { const x = 80 + rng() * 320, y = 80 + rng() * 440; ctx.beginPath(); ctx.arc(x + (rng() - .5) * 30, y + (rng() - .5) * 30, 12 + rng() * 18, 0, Math.PI * 2); ctx.fill(); }
   },
+  "spiral_sage": (ctx, rng) => {
+    ctx.strokeStyle = "rgba(47,169,160,0.15)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(W - 50, H - 50, 14 + rng() * 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(W - 50, H - 50, 6 + rng() * 4, 0, Math.PI * 2); ctx.stroke();
+  },
+  "chaos_quill": (ctx, rng) => {
+    ctx.strokeStyle = "rgba(255,93,162,0.12)"; ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(48 + rng() * 20, 48 + rng() * 80); ctx.lineTo(W - 48 - rng() * 80, H - 48 - rng() * 20); ctx.stroke(); }
+  },
+  "frost_byte": (ctx, rng) => {
+    ctx.fillStyle = "rgba(47,169,160,0.06)";
+    for (let i = 0; i < 3; i++) { const x = 50 + rng() * 380, y = 50 + rng() * 500; ctx.beginPath(); ctx.moveTo(x, y - 16); ctx.lineTo(x + 10, y); ctx.lineTo(x, y + 16); ctx.lineTo(x - 10, y); ctx.closePath(); ctx.fill(); }
+  },
+  "ember_scratch": (ctx, rng) => {
+    ctx.fillStyle = "rgba(232,177,75,0.1)";
+    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(60 + rng() * 360, 60 + rng() * 480, 2 + rng() * 4, 0, Math.PI * 2); ctx.fill(); }
+  },
+  "void_weaver": (ctx, rng) => {
+    ctx.strokeStyle = "rgba(90,139,255,0.08)"; ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(100 + rng() * 280, 100 + rng() * 400, 20 + rng() * 30, 0, Math.PI * 2); ctx.stroke(); }
+  },
 };
 
 export function renderPromptArt(prompt, seed, t, skill = 0.6, botName) {

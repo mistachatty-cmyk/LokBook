@@ -142,6 +142,8 @@ export const LILLOK_SPEECH = {
   battle_start: ["Let's go. Draw fast.", "I'm watching your lines", "Make every stroke count"],
   feed_scroll: ["Good art in the feed today", "Something in here will spark you", "This is where the ideas live"],
   quest_done: ["Quest complete!", "You did what you said you would", "Keep drawing, keep earning"],
+  comeback_tease: ["Go away for CincoOrSo Hours and see what happens!", "Take a real break. I'll be here when you get back.", "Five hours away. I dare you.", "You should go touch grass. for like 5 hours."],
+  comeback_award: ["WELCOME BACK! You actually left!", "You took a break! I'm so proud.", "The ink missed you. Here's a gift.", "Absence makes the ink grow fonder."],
 };
 
 export const EMPTY_ICONS = {
@@ -155,6 +157,11 @@ export const EMPTY_ICONS = {
 export const REVIVAL_MAX = 14;
 export const OFFLINE_BONUS_HOURS = 5;
 export const OFFLINE_BONUS_LOKS = 50;
+export const CELEBRATIONS = [
+  { id:"confetti", name:"Confetti Cascade", desc:"Colorful confetti rains down across the app", fx:"confetti" },
+  { id:"inkbloom", name:"Ink Bloom", desc:"Ink flowers bloom and pulse across the screen", fx:"inkbloom" },
+  { id:"starburst", name:"Starburst", desc:"Stars explode outward from center", fx:"starburst" },
+];
 export const ECHO_EXPIRY_HOURS = 48;
 export const ECHO_SHARE_TEXT = "sHare/dOwLNoALD bEfOre iT eCHoS aWay!!";
 export const TIDE_CANDIDATE_COUNT = 3;
@@ -384,7 +391,12 @@ export const KID_PROMPTS = ["A happy dinosaur", "Your favorite animal", "A magic
 export const BOT_NAMES = ["pixel.pluto", "inkwell_iz", "doodlebug", "sketchram", "tinta", "mooncrayon", "nib.ninja", "grafite", "blot.bot"];
 export const INTERVENTIONS = ["shake", "splat", "blot"];
 
-export const MODES = { shapes: { name: "Shapes", tag: "clean geometry", pool: ["star", "triangle", "square", "hexagon", "circle", "heart", "spiral"] }, stencils: { name: "Stencils", tag: "trace real objects", pool: ["house", "wild-knot", "char-ghost"] }, wild: { name: "INKSANITY", tag: "chaotic outlines", pool: ["wild-knot", "spiral", "heart"] }, chars: { name: "Characters", tag: "outline a creature", pool: ["char-ghost"] } };
+export const MODES = {
+  shapes: { name: "Shapes", tag: "clean geometry", pool: ["star", "triangle", "square", "hexagon", "circle", "heart", "spiral", "diamond", "pentagon", "octagon", "decagon", "star_4", "star_6", "star_8", "cross", "arrow", "wave", "zigzag", "crescent", "teardrop", "droplet", "leaf", "clover", "rings", "target", "gear", "helix", "infinity", "sawtooth", "bow_tie"] },
+  stencils: { name: "Stencils", tag: "trace real objects", pool: ["house", "wild-knot", "char-ghost", "skull", "dagger", "raven", "lotus", "flame", "eye", "mandala", "crown", "sword", "shield", "anchor", "butterfly", "feather", "shell", "moon", "cloud", "mountain", "tree", "fish", "rose", "infinity", "helix", "gear", "star_6", "crescent", "diamond", "target"] },
+  wild: { name: "INKSANITY", tag: "chaotic outlines", pool: ["wild-knot", "spiral", "heart", "labyrinth", "galaxy", "tornado", "lightning", "scribble", "vortex", "star_burst", "web", "honeycomb", "tentacle", "hydra", "nerve", "root", "maze", "tangle", "chaos", "ring_spiral", "helix", "infinity", "spirograph", "octogram", "star_8", "wave_chaos", "gear", "star_6", "cross"] },
+  chars: { name: "Characters", tag: "outline a creature", pool: ["char-ghost", "char_goblin", "char_dragon", "char_wyrm", "char_bat", "char_owl", "char_wolf", "char_fox", "char_frog", "char_snake", "char_bird", "char_imp", "char_demon", "char_angel", "char_robot", "char_alien", "char_slime", "char_jelly", "char_dino", "char_shadow", "char_eye", "char_cat", "char_rabbit", "char_mushroom", "char_tree", "char_knight"] }
+};
 export const WAGERS = [5, 10, 25, 50];
 export const FRONT_NAMES = ["pixel.pluto", "inkwell_iz", "doodlebug", "sketchram", "tinta", "mooncrayon"];
 
