@@ -53,6 +53,15 @@ export const SMILE_VARIANTS = [
 // Theme System 2.0 — CSS custom properties layer. Every token has a fallback,
 // so old saves and themes without the new optional fields (font/gradient/glow)
 // are unaffected. New components can style via var(--lok-*) without prop drilling.
+// Border style presets for LilLok blot containers (Shop + LilLok FAB)
+export const blotBorderStyle = (id, T) => ({
+  none:  { border: `3px solid ${T.ink}` },
+  gilded:{ border: "3px solid #E8B14B", boxShadow: `0 0 0 2px ${T.ink}, 3px 3px 0 ${T.shadow}` },
+  washi: { border: `3px dashed ${T.accent}` },
+  orbit: { border: `3px dotted ${T.alt}`, outline: `2px dashed ${T.ink}`, outlineOffset: 3 },
+  liquid:{ border: `3px solid ${T.accent}`, boxShadow: `0 0 0 2px ${T.ink}, 0 0 16px 3px ${T.accent}` },
+}[id] || { border: `3px solid ${T.ink}` });
+
 export function themeVars(T) {
   return {
     "--lok-paper": T.paper, "--lok-ink": T.ink, "--lok-accent": T.accent,
