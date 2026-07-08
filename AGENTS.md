@@ -87,19 +87,31 @@ Remaining (low priority):
 
 ## CI/CD Pipeline
 
-4 workflows in `.github/workflows/`:
+3 workflows in `.github/workflows/`:
 
 | File | Trigger | Action |
 |------|---------|--------|
 | `ci.yml` | push/PR → `master` (repo's real default branch — was pointed at `main` and had zero runs until fixed, Jul 2026) | `npm ci → build → smoke` |
-| `deploy-web.yml` | push `master` | Build + deploy `dist/` to Cloudflare Pages via wrangler |
 | `deploy-supabase.yml` | push `master` (migrations/fns only) or manual | `supabase link → db push → functions deploy` (3 edge fns) |
 | `release-tauri.yml` | tag `v*` | Cross-platform Tauri build + upload .msi/.dmg/.AppImage to release |
 
-⚠️ `deploy-web.yml`/`deploy-supabase.yml`/`release-tauri.yml` depend on repo secrets (`CLOUDFLARE_API_TOKEN`, `CF_ACCOUNT_ID`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`) that have **not been confirmed as configured** — they'll fail at the deploy step if unset. Verify in GitHub Settings → Secrets before relying on auto-deploy.
+**Web deploy is NOT a GitHub Actions workflow.** Cloudflare Pages' native
+Git integration (OAuth-connected directly in the Cloudflare dashboard,
+Jul 2026) builds and deploys `dist/` on every push to `master` — no repo
+secrets, no workflow file. A `deploy-web.yml` wrangler-based Action existed
+briefly but was deleted to avoid double-deploying against the native
+integration. **Do not re-add a web deploy workflow** without first checking
+whether Cloudflare's native Git connection is still active (Cloudflare
+dashboard → Workers & Pages → lokbook project → Settings → Builds & deployments).
+
+⚠️ `deploy-supabase.yml`/`release-tauri.yml` depend on repo secrets
+(`SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `TAURI_PRIVATE_KEY`,
+`TAURI_KEY_PASSWORD`) that have **not been confirmed as configured** — they'll
+fail at the deploy step if unset. Verify in GitHub Settings → Secrets before
+relying on auto-deploy.
 
 **Secrets** (set in GitHub repo Settings → Secrets and variables → Actions):
-`SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `CLOUDFLARE_API_TOKEN`, `CF_ACCOUNT_ID`, `TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`.
+`SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`.
 
 Supabase project ref: `jfavkudihasswkhkouxq` (LokServices). `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY` have hardcoded fallbacks in `src/supabaseClient.js`, so the web build doesn't need them in CI.
 
