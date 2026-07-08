@@ -11,7 +11,7 @@ export function LilLokBubble({ text, ink = ART.ink, paper = ART.paper, voicePack
     echo: { letterSpacing: "0.06em", textShadow: `2px 2px 0 ${ink}22, 4px 4px 0 ${ink}11` },
     robot: { fontFamily: "monospace", letterSpacing: "0.03em", textTransform: "uppercase", fontSize: 10 },
   }[voicePack] || {};
-  return (<div className="lok-display" style={{ position: "absolute", bottom: "104%", left: "50%", transform: "translateX(-50%)", background: paper, border: `2.5px solid ${ink}`, borderRadius: 12, padding: "5px 11px", fontSize: 11, fontWeight: 700, color: ink, boxShadow: `2px 2px 0 ${ink}`, animation: "lokrise .2s ease", maxWidth: 180, textAlign: "center", zIndex: 99, pointerEvents: "none", whiteSpace: "normal", width: "max-content", ...voiceStyle }}>
+  return (<div className="lok-display" style={{ position: "absolute", bottom: "104%", left: "50%", transform: "translateX(-50%)", background: paper, border: `2.5px solid ${ink}`, borderRadius: 12, padding: "5px 11px", fontSize: 11, fontWeight: 700, color: ink, boxShadow: `2px 2px 0 ${ink}`, animation: "lokrise .2s ease", maxWidth: 280, textAlign: "center", zIndex: 99, pointerEvents: "none", whiteSpace: "normal", width: "max-content", ...voiceStyle }}>
     {text}
     <div style={{ position: "absolute", bottom: -9, left: "50%", transform: "translateX(-50%)", borderLeft: "6px solid transparent", borderRight: "6px solid transparent", borderTop: `9px solid ${ink}` }} />
     <div style={{ position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)", borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `7px solid ${paper}` }} />

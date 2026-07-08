@@ -353,6 +353,13 @@ export const STUDIO_MODULES = [
   { id: "achieve_swatch", type: "achievement", name: "Custom Swatches", desc: "Save custom color swatches", price: 0, unlock: "25 published flips" },
   { id: "achieve_echo", type: "achievement", name: "Studio Echo", desc: "Record & replay studio sessions", price: 0, unlock: "10 Echoes shared" },
   { id: "achieve_cloud", type: "achievement", name: "Cloud Studio", desc: "Sync studio settings to cloud", price: 0, unlock: "Founder badge" },
+  { id: "brush_legacy_pack", type: "module", name: "Legacy Brush Pack", desc: "Restore original brush behavior for all drawing tools", price: 150 },
+  { id: "anim_fps", type: "feature", name: "FPS Control", desc: "Frame rate presets & scrubber playback head", price: 30 },
+  { id: "anim_playback", type: "feature", name: "Advanced Playback", desc: "Loop, auto-advance, copy/paste frame & clear frame", price: 50 },
+  { id: "anim_onion_pro", type: "feature", name: "Pro Onion Skin", desc: "Future frame preview, colored offsets, up to 5 frames", price: 60 },
+  { id: "anim_export_video", type: "feature", name: "Video Export", desc: "Export animation as MP4/WebM video file", price: 150 },
+  { id: "anim_export_spritesheet", type: "feature", name: "Sprite Sheet", desc: "Export all frames as a single grid image", price: 80 },
+  { id: "anim_timeline_zoom", type: "feature", name: "Timeline Zoom", desc: "Resize timeline thumbnails from 40px to 120px", price: 40 },
 ];
 
 export function getModuleLayers(modules) {
