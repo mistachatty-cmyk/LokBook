@@ -263,9 +263,28 @@ function decodeFrames(bytes, bpp, pixelCount, frameCount) {
   return frames;
 }
 
+// Accepts canvas, ImageData, or a "data:image/..." URL string — real app
+// frames are stored as data URLs (Easel.composite() output), synthetic/test
+// frames are often plain canvases, so encodeLok normalizes either way.
+async function normalizeFrame(src) {
+  if (src instanceof HTMLCanvasElement) return src;
+  if (src instanceof ImageData) return imageDataToCanvas(src);
+  if (typeof src === "string") {
+    const img = new Image();
+    img.src = src;
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    c.getContext("2d").drawImage(img, 0, 0);
+    return c;
+  }
+  throw new Error("encodeLok: unsupported frame type (expected canvas, ImageData, or data-URL string)");
+}
+
 // ---------- public API ----------
-export async function encodeLok(frames, meta = {}) {
-  if (!frames.length) throw new Error("encodeLok: no frames");
+export async function encodeLok(framesIn, meta = {}) {
+  if (!framesIn.length) throw new Error("encodeLok: no frames");
+  const frames = await Promise.all(framesIn.map(normalizeFrame));
   const w = frames[0].width, h = frames[0].height;
   const { palette, keyToIndex } = buildPalette(frames);
   const bpp = bitsFor(palette.length);
