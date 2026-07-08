@@ -91,10 +91,12 @@ Remaining (low priority):
 
 | File | Trigger | Action |
 |------|---------|--------|
-| `ci.yml` | PR → `main` | `npm ci → build → smoke` |
-| `deploy-web.yml` | push `main` | Build + deploy `dist/` to Cloudflare Pages via wrangler |
-| `deploy-supabase.yml` | push `main` (migrations/fns only) or manual | `supabase link → db push → functions deploy` (3 edge fns) |
+| `ci.yml` | push/PR → `master` (repo's real default branch — was pointed at `main` and had zero runs until fixed, Jul 2026) | `npm ci → build → smoke` |
+| `deploy-web.yml` | push `master` | Build + deploy `dist/` to Cloudflare Pages via wrangler |
+| `deploy-supabase.yml` | push `master` (migrations/fns only) or manual | `supabase link → db push → functions deploy` (3 edge fns) |
 | `release-tauri.yml` | tag `v*` | Cross-platform Tauri build + upload .msi/.dmg/.AppImage to release |
+
+⚠️ `deploy-web.yml`/`deploy-supabase.yml`/`release-tauri.yml` depend on repo secrets (`CLOUDFLARE_API_TOKEN`, `CF_ACCOUNT_ID`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`) that have **not been confirmed as configured** — they'll fail at the deploy step if unset. Verify in GitHub Settings → Secrets before relying on auto-deploy.
 
 **Secrets** (set in GitHub repo Settings → Secrets and variables → Actions):
 `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `CLOUDFLARE_API_TOKEN`, `CF_ACCOUNT_ID`, `TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`.
