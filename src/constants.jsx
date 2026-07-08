@@ -84,7 +84,6 @@ export const CATEGORY_ICONS = { animals:"🐾", fantasy:"✨", scenes:"🏞️",
 export const weekOfYear = d => Math.ceil((((d - new Date(d.getFullYear(), 0, 1)) / 86400000) + 1) / 7);
 export const WEEKLY_PROMPT = PROMPTS[(new Date().getFullYear() * 53 + weekOfYear(new Date())) % PROMPTS.length];
 
-export const STRIPE_PK = "pk_test_51Tpjso3sNCWqR1Dra2piTZgwIiAfXoS0KPCc6Y1IsaKj0pY1R4sEguelT39s7cud1PqJeEM7IdOAKZ5j95RxTi2L00kIsE7nsZ";
 
 export const PACE_PRESETS = {
   minimal: { name: "MINIMAL", desc: "Instant. Text-dense. No motion.", kill: true, mult: 1 },
@@ -121,15 +120,6 @@ export const NAME_COLOR_MAP = { default: null, pink: "#FF5DA2", teal: "#2FA9A0",
 
 export const REACTION_SETS = { base: ["splat", "heart", "drip"], stars: ["star", "sparkle", "comet"], fire: ["flame", "bolt2", "skull2"], zen: ["leaf", "wave2", "lotus"], spooky: ["ghost", "spiderweb", "eyeball"], sweet: ["cupcake", "icecream", "candy"] };
 
-export const HUMHAH_VARIANTS = [
-  { id: "hmm", label: "Hmm…", emoji: "🤔" },
-  { id: "hah", label: "Hah!", emoji: "😄" },
-];
-export const BOMHOGWAH_VARIANTS = [
-  { id: "bom", label: "Bom!", emoji: "😮" },
-  { id: "hog", label: "Hog!", emoji: "🤯" },
-  { id: "wah", label: "Wah…", emoji: "🥺" },
-];
 
 export const LILLOK_SPEECH = {
   thriving: ["Feeling inky today", "Drawing energy: full", "I see good lines ahead", "Ready to blot the world", "Peak ink. Peak vibes.", "Full tank. Let's draw.", "Ink flowing, heart glowing"],
@@ -162,15 +152,8 @@ export const CELEBRATIONS = [
   { id:"inkbloom", name:"Ink Bloom", desc:"Ink flowers bloom and pulse across the screen", fx:"inkbloom" },
   { id:"starburst", name:"Starburst", desc:"Stars explode outward from center", fx:"starburst" },
 ];
-export const ECHO_EXPIRY_HOURS = 48;
-export const ECHO_SHARE_TEXT = "sHare/dOwLNoALD bEfOre iT eCHoS aWay!!";
-export const TIDE_CANDIDATE_COUNT = 3;
 
-export const EVENTS = [
-  { id:"summer_splash", name:"Summer Splash", icon:"🏖️", start:"2026-06-01", end:"2026-06-30", prompt:"A day at the beach", reward:100, cosmetic:{ type:"frame", id:"seashell", name:"Seashell Frame" } },
-  { id:"spooky_ink", name:"Spooky Ink", icon:"🎃", start:"2026-10-24", end:"2026-10-31", prompt:"Something that haunts you", reward:150, cosmetic:{ type:"frame", id:"ghostlight", name:"Ghostlight Frame" } },
-];
-export const getActiveEvent = () => { const n=new Date().toISOString().slice(0,10); return EVENTS.find(e=>n>=e.start&&n<=e.end)||null; };
+
 
 export const PX_PER_FRAME = 150;
 
@@ -368,34 +351,11 @@ export function getModuleLayers(modules) {
   return layerMods.length ? Math.max(...layerMods.map(m => m.layers)) : 10;
 }
 export function hasModule(modules, id) { return modules.includes(id) || modules.includes("module_uber"); }
-export function getModule(id) { return STUDIO_MODULES.find(m => m.id === id); }
-export function migrateLegacyModules(saved) {
-  const m = new Set(["layers_10", "brush_ink"]);
-  if (!saved) return [...m];
-  const tierMap = { 10: "layers_10", 25: "layers_25", 50: "layers_50", 100: "layers_100" };
-  if (saved.ownedTiers) saved.ownedTiers.forEach(t => { if (tierMap[t]) m.add(tierMap[t]); });
-  if (saved.ccTier) { m.add("feat_blend"); m.add("feat_symmetry"); m.add("brush_marker"); m.add("brush_chalk"); m.add("brush_air"); }
-  const upgradeMap = {
-    sprayCan: "tool_spray", glowBrush: "tool_glow", watercolor: "tool_watercolor",
-    patternStamp: "tool_pattern", shapeTool: "tool_shape", gradientFill: "tool_gradient",
-    pushTool: "tool_push", smudgeTool: "tool_smudge", cloneStamp: "tool_clone",
-    blurSharpen: "tool_blur", colorReplace: "tool_replace", rulers: "tool_rulers",
-    gifExport: "feat_gif", refLayer: "feat_ref", palettes: "feat_palettes",
-    strokeSmooth: "feat_smooth", batchOps: "feat_batch", animPresets: "feat_tween",
-    frameLabels: "feat_labels", canvasSizes: "canvas_sizes"
-  };
-  if (saved.studioUpgrades) saved.studioUpgrades.forEach(id => { if (upgradeMap[id]) m.add(upgradeMap[id]); });
-  return [...m];
-}
-export function getModuleTypes() {
-  const order = ["layers", "brush", "tool", "feature", "canvas", "achievement"];
-  const labels = { layers: "Layers", brush: "Brushes", tool: "Tools", feature: "Features", canvas: "Canvas", achievement: "Achievement" };
-  return order.map(type => ({ type, label: labels[type], items: STUDIO_MODULES.filter(m => m.type === type) }));
-}
+
 
 export const FORMATS = [{ id: "1v1", label: "1v1 Duel", players: 2, icon: "⚔", mood: "One on one. Pure." }, { id: "1v1v1", label: "Triangle", players: 3, icon: "△", mood: "Two rivals, one you." }, { id: "ffa4", label: "4-Player FFA", players: 4, icon: "✦", mood: "Controlled chaos." }, { id: "coop", label: "Local Co-op", players: 2, coop: true, icon: "♡", mood: "Hot-seat, one device." }, { id: "ffa10", label: "Big Battle · 10", players: 10, locked: true, icon: "🔥", mood: "Absolute mayhem." }];
 export const KID_PROMPTS = ["A happy dinosaur", "Your favorite animal", "A magic tree", "A friendly robot", "A rainbow fish", "A silly monster", "Your dream treehouse", "A dancing cloud"];
-export const BOT_NAMES = ["pixel.pluto", "inkwell_iz", "doodlebug", "sketchram", "tinta", "mooncrayon", "nib.ninja", "grafite", "blot.bot"];
+
 export const INTERVENTIONS = ["shake", "splat", "blot"];
 
 export const MODES = {
@@ -447,8 +407,7 @@ export const LILLOK_PETS = [{ id:"none", name:"No pet", price:0 }, { id:"mini", 
 ];
 export const VOICE_PACKS = [{ id:"default", name:"Default voice", price:0 }, { id:"whisper", name:"Whisper pack", price:150 }, { id:"echo", name:"Echo pack", price:200 }, { id:"robot", name:"Robot pack", price:250 }];
 export const AVATAR_ACCENTS = [{ id: "none", name: "Plain", price: 0 }, { id: "ring", name: "Accent ring", price: 20 }, { id: "halo", name: "Sketch halo", price: 35 }, { id: "crown", name: "Ink crown", price: 50 }, { id: "horns", name: "Horns", price: 40 }, { id: "antenna", name: "Antenna", price: 40 }];
-export const PROFILE_UPGRADES = [{ id:"none", name:"No banner", price:0 }, { id:"banner_wave", name:"Wave banner", price:250 }, { id:"banner_ink", name:"Ink splash banner", price:200 }, { id:"bg_warm", name:"Warm background", price:180 }, { id:"bg_cool", name:"Cool background", price:180 }, { id:"bg_dark", name:"Dark background", price:180 }, { id:"avatar_animate", name:"Animated avatar", price:200 }, { id:"pin_post", name:"Pin a post", price:150 }];
-export const SOCIAL_POWER = [{ id:"mass_echo", name:"Mass Echo", desc:"Your echo reaches the full feed", price:450 }, { id:"super_boost", name:"Super Boost", desc:"Boosted post stays top for 48h", price:400 }, { id:"custom_tag", name:"Custom Tag", desc:"Create your own profile tagline", price:350 }];
+
 export const ANIMATION_FX = [{ id:"none", name:"No FX", price:0 }, { id:"sparkle_trail", name:"Sparkle Trail", desc:"Lines leave glittering sparkles", price:200 }, { id:"neon_pulse", name:"Neon Pulse", desc:"Every stroke pulses with neon", price:250 }, { id:"ink_splatter", name:"Ink Splatter", desc:"Brush tips splatter occasionally", price:180 }, { id:"smoke_rise", name:"Smoke Rise", desc:"Drawn lines emit rising smoke", price:220 }, { id:"fire_embers", name:"Fire Embers", desc:"Strokes glow with floating embers", price:300 }, { id:"water_ripple", name:"Water Ripple", desc:"Strokes ripple outward", price:280 }, { id:"galaxy_swirl", name:"Galaxy Swirl", desc:"Lines reveal star field", price:400 },
   { id:"fx_pixel", name:"Pixel Storm", desc:"Frame breaks into pixels", price:150, rarity:"rare" },
   { id:"fx_glitch", name:"Glitch Wave", desc:"Horizontal distortion scan across canvas", price:180, rarity:"rare" },
@@ -467,28 +426,7 @@ export const MUSIC_PACKS = [{ id:"none", name:"No music", price:0 }, { id:"lo-fi
 export const STICKER_PACKS = [{ id:"emoji", name:"Emoji Pack", price:0, stickers:["😎","🔥","🎨","💀","👾","✨","🌈","🍕"] }, { id:"nature", name:"Nature Pack", price:30, stickers:["🌸","🌿","🦋","🍀","🌻","🐚","🍄","🌙"] }, { id:"food", name:"Snack Pack", price:25, stickers:["🍕","🍔","🌮","🍩","🍦","🥨","🧋","🍪"] }, { id:"animals", name:"Animal Pack", price:35, stickers:["🐱","🐶","🦊","🐸","🐼","🐧","🦉","🐝"] }, { id:"space", name:"Space Pack", price:40, stickers:["🚀","🛸","🌍","⭐","🌑","☄️","👽","🪐"] }, { id:"retro", name:"Retro Pack", price:30, stickers:["📟","📼","🕹️","💾","📺","📻","🎮","📸"] }, { id:"magic", name:"Magic Pack", price:45, stickers:["🔮","🪄","🧙","🐉","🦄","🧚","⚡","🌟"] }, { id:"music", name:"Music Pack", price:25, stickers:["🎵","🎸","🥁","🎹","🎤","🎧","🎼","🎷"] }];
 export const POST_EXPORTS = [{ id:"png", name:"PNG frames", desc:"Export frames as transparent PNGs", price:0 }, { id:"gif", name:"Animated GIF", desc:"Export as looping GIF", price:80 }, { id:"webp", name:"WebP anim", desc:"Export as animated WebP", price:50 }, { id:"spritesheet", name:"Spritesheet", desc:"All frames in one grid", price:60 }, { id:"apng", name:"APNG", desc:"Animated PNG format", price:100 }, { id:"pdf", name:"PDF flip", desc:"Export as PDF flipbook", price:120 }, { id:"mp4", name:"MP4 video", desc:"Export as MP4 (soon)", price:150, soon:true }];
 
-export const STUDIO_UPGRADES = [
-  { id:"gifExport", name:"GIF Export", price:200, desc:"Export animation as animated GIF" },
-  { id:"refLayer", name:"Reference layer", price:80, desc:"Import image as semi-transparent reference" },
-  { id:"palettes", name:"Palette packs", price:30, desc:"6 curated color palettes" },
-  { id:"canvasSizes", name:"Canvas sizes", price:100, desc:"Story, square & wide aspect ratios" },
-  { id:"strokeSmooth", name:"Stroke smoothing", price:60, desc:"Auto-smooth bezier line fit" },
-  { id:"batchOps", name:"Batch ops", price:40, desc:"Duplicate, reverse, clear all frames" },
-  { id:"animPresets", name:"Animation presets", price:120, desc:"Auto-tween: bounce, shake, fade, wiggle" },
-  { id:"frameLabels", name:"Frame labels", price:25, desc:"Name each frame in the timeline" },
-  { id:"pushTool", name:"Push tool", price:45, desc:"Nudge strokes and shapes around the canvas" },
-  { id:"smudgeTool", name:"Smudge tool", price:50, desc:"Blur and drag wet ink like paint" },
-  { id:"cloneStamp", name:"Clone stamp", price:70, desc:"Sample and paint pixels from one area to another" },
-  { id:"shapeTool", name:"Shape tool", price:35, desc:"Snap perfect rectangles, ellipses & polygons" },
-  { id:"gradientFill", name:"Gradient fill", price:55, desc:"Linear and radial gradient fills on layers" },
-  { id:"sprayCan", name:"Spray can", price:40, desc:"Scattered dot spray with adjustable density" },
-  { id:"glowBrush", name:"Glow brush", price:60, desc:"Soft luminous strokes with outer glow" },
-  { id:"blurSharpen", name:"Blur / Sharpen", price:45, desc:"Gaussian blur and sharpen filters per layer" },
-  { id:"colorReplace", name:"Color replace", price:35, desc:"Swap one color for another across the layer" },
-  { id:"patternStamp", name:"Pattern stamp", price:50, desc:"Stamp repeating tile patterns onto the canvas" },
-  { id:"watercolor", name:"Watercolor", price:75, desc:"Wet-media brush with bleed and bloom" },
-  { id:"rulers", name:"Rulers & guides", price:25, desc:"Draggable ruler lines with snap-to alignment" },
-];
+
 export function blotBorderStyle(id, T) {
   return ({
     none: { border: `3px solid ${T.ink}` },
@@ -502,12 +440,6 @@ export function blotBorderStyle(id, T) {
 }
 
 export function makeQuests() { return [...QUEST_POOL].sort(() => Math.random() - .5).slice(0, 3).map(q => ({ ...q, progress: 0, done: false })); }
-
-export async function founderSignup(handle, email, save_blob) {
-  const res = await fetch(`${SUPA_URL}/rest/v1/founder_signups`, { method: "POST", headers: { ...getHeaders(), Prefer: "return=minimal" }, body: JSON.stringify({ handle, email: email || null, source: "lok_alpha", save_blob }) });
-  if (!res.ok) throw new Error("signup failed " + res.status);
-  return true;
-}
 
 export const BADGES = [
   // Collection badges (5)
@@ -555,7 +487,7 @@ export async function hashPin(pin) {
   return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-export const toDbPost = (p, author) => ({ id: p.id, author, title: p.title, frames: p.frames, frame_durations: p.frameDurations || null, pace_ms: p.paceMs || 160, mode: p.mode || "A", style: p.style || "bold", loop: !!p.loop, votes: p.votes || 0, views: p.views || 0, reactions: { humhah: 0, bomhogwah: 0, splat: 0, heart: 0, drip: 0, ...(p.reactions||{}) }, echoedAt: null, echoCount: 0, echoParent: null, echoExpiresAt: null, origin: p.from || "studio" });
+
 export const fromDbPost = r => ({ id: r.id, title: r.title, author: r.author, frames: r.frames || [], frameDurations: r.frame_durations || undefined, paceMs: r.pace_ms || 160, mode: r.mode || "A", style: r.style || "bold", loop: !!r.loop, votes: r.votes || 0, views: r.views || 0, reactions: { humhah: 0, bomhogwah: 0, splat: 0, heart: 0, drip: 0, ...(r.reactions||{}) }, echoedAt: null, echoCount: 0, echoParent: null, echoExpiresAt: null, from: r.origin || "studio", createdAt: r.created_at, remote: true, voted: false, viewed: false });
 
 export const GAME_MANUAL_PAGES = [

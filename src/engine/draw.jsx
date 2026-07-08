@@ -249,13 +249,13 @@ export function renderAvatar(seed) {
   return c.toDataURL("image/png");
 }
 
-export function polyPts(cx, cy, sides, R, rot = -Math.PI / 2) { const p = []; for (let i = 0; i <= sides; i++) { const a = rot + (i / sides) * Math.PI * 2; p.push([cx + Math.cos(a) * R, cy + Math.sin(a) * R]); } return p; }
+function polyPts(cx, cy, sides, R, rot = -Math.PI / 2) { const p = []; for (let i = 0; i <= sides; i++) { const a = rot + (i / sides) * Math.PI * 2; p.push([cx + Math.cos(a) * R, cy + Math.sin(a) * R]); } return p; }
 
-export function starPts(cx, cy, points, R, r) { const p = []; for (let i = 0; i <= points * 2; i++) { const a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2; const rad = i % 2 ? r : R; p.push([cx + Math.cos(a) * rad, cy + Math.sin(a) * rad]); } return p; }
+function starPts(cx, cy, points, R, r) { const p = []; for (let i = 0; i <= points * 2; i++) { const a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2; const rad = i % 2 ? r : R; p.push([cx + Math.cos(a) * rad, cy + Math.sin(a) * rad]); } return p; }
 
-export function ellipsePts(cx, cy, rx, ry, n = 60) { const p = []; for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI * 2; p.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]); } return p; }
+function ellipsePts(cx, cy, rx, ry, n = 60) { const p = []; for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI * 2; p.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]); } return p; }
 
-export function linePts(a, b, n = 8) { const p = []; for (let i = 0; i <= n; i++) p.push([a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n]); return p; }
+function linePts(a, b, n = 8) { const p = []; for (let i = 0; i <= n; i++) p.push([a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n]); return p; }
 
 export function traceShape(kind) {
   const cx = W / 2, cy = H / 2; let pts = [];
