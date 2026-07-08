@@ -78,11 +78,28 @@ Completed:
 - **Phase 2c** `legacyBrushes` threaded Studio→Easel, `onLegacyToggle` prop wired for persistence (`App.jsx:317,354,1084`, `Easel.jsx:15,160`)
 - **NewStudioUI** FPS selector, playback controls, pro onion skin, timeline zoom, video export, spritesheet export, auto-advance, reverse, copy/paste/clear frame, lightbox — dual render path at `App.jsx:1084` (`legacyStudio ? <Studio /> : <NewStudioUI />`)
 - **D2** Dead code sweep — 5 stale pages files moved to `src/archive/`, 17 unused exports removed from `constants.jsx`, 4 internal helpers de-exported in `draw.jsx`
+- **CI/CD** 4 GitHub Actions workflows: PR checks (`ci.yml`), Cloudflare Pages deploy (`deploy-web.yml`), Supabase migrations + edge functions deploy (`deploy-supabase.yml`), Tauri desktop release on tags (`release-tauri.yml`)
 
 Remaining (low priority):
 - L1: Feed seeding — now handled by C1, bots auto-post ambient flips
 
 **D1/D3 — phantom dead-code items, already resolved (Jul 2026):** `Onboard` and `OpenFront` have always been local functions inside `App.jsx` (lines 71, 632). No separate `src/pages/Onboard.jsx` or `OpenFront.jsx` files existed — the AGENTS.md "Remaining" entry was a stale plan artifact. The 17 unused exports in `constants.jsx` and 4 de-exported helpers in `draw.jsx` (the real D2 sweep) are done. Do not re-open dead-code sweeps for Onboard/OpenFront.
+
+## CI/CD Pipeline
+
+4 workflows in `.github/workflows/`:
+
+| File | Trigger | Action |
+|------|---------|--------|
+| `ci.yml` | PR → `main` | `npm ci → build → smoke` |
+| `deploy-web.yml` | push `main` | Build + deploy `dist/` to Cloudflare Pages via wrangler |
+| `deploy-supabase.yml` | push `main` (migrations/fns only) or manual | `supabase link → db push → functions deploy` (3 edge fns) |
+| `release-tauri.yml` | tag `v*` | Cross-platform Tauri build + upload .msi/.dmg/.AppImage to release |
+
+**Secrets** (set in GitHub repo Settings → Secrets and variables → Actions):
+`SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `CLOUDFLARE_API_TOKEN`, `CF_ACCOUNT_ID`, `TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`.
+
+Supabase project ref: `jfavkudihasswkhkouxq` (LokServices). `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY` have hardcoded fallbacks in `src/supabaseClient.js`, so the web build doesn't need them in CI.
 
 ## About This File
 This file was created by the agent in the initial overhaul session (July 2026). It captures the codebase conventions for all future AI collaborators.
