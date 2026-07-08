@@ -463,7 +463,6 @@ function SettingsPanel({show,onClose,say,isIOS,canInstall,onInstall,founder,onFo
       {devMode&&(<div className="p-3 rounded-2xl mb-2" style={{border:`3px dashed ${T.accent}`,background:T.paper}}>
         <div className="lok-display font-extrabold text-sm" style={{color:T.accent}}>🔩 Dev Flags</div>
         <div className="mt-2 flex flex-col gap-2">
-          <div className="flex items-center justify-between text-sm"><label htmlFor="flag-loader" className="font-bold">Dynamic Loader</label><input id="flag-loader" type="checkbox" checked={featureFlags.dynamicLoader} onChange={e=>onSetFlag("dynamicLoader",e.target.checked)} style={{accentColor:T.accent}}/></div>
         </div>
       </div>)}
       <div className="p-3 rounded-2xl" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>

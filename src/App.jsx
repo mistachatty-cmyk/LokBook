@@ -814,7 +814,7 @@ export default function LokApp(){
   const[questsCompleted,setQuestsCompleted]=useState(0);const[totalEarned,setTotalEarned]=useState(0);const[traceHinted,setTraceHinted]=useState(false);const[fabBubble,setFabBubble]=useState("");const[adIdx,setAdIdx]=useState(0);const[installEvt,setInstallEvt]=useState(null);const[showSettings,setShowSettings]=useState(false);
   const[loks,setLoks]=useState(260);const[myRooms,setMyRooms]=useState([]);const[pendingRoomCode,setPendingRoomCode]=useState(()=>{try{return new URLSearchParams(location.search).get("room")||null;}catch{return null;}});const[pace,setPace]=useState("sweep");const[speed,setSpeed]=useState(1);const[soundLab,setSoundLab]=useState(false);const[soundQueue,setSoundQueue]=useState([]);const[founder,setFounder]=useState(false);const[totalSpent,setTotalSpent]=useState(0);const[fodHistory,setFodHistory]=useState([]);const[lokPass,setLokPass]=useState(false);const[uiTheme,setUiTheme]=useState("riso");const[ownedThemes,setOwnedThemes]=useState(["riso"]);const[effect,setEffect]=useState("none");const[ownedEffects,setOwnedEffects]=useState(["none"]);const[ownedTiers,setOwnedTiers]=useState([10]);const[ccTier,setCcTier]=useState(false);const[bigBattleOwned,setBigBattleOwned]=useState(false);const[wins,setWins]=useState(0);
   const[profile,setProfile]=useState(()=>{const seed=Math.floor(Math.random()*9999);return{name:starterHandle(seed),bio:"",avatarSeed:seed,links:[{label:"Lok page",url:"coming soon"}]};});
-  const[focusMode,setFocusMode]=useState(false);  const[featureFlags,setFeatureFlags]=useState({dynamicLoader:false,compactUi:false,vibe:"default"});
+  const[focusMode,setFocusMode]=useState(false);  const[featureFlags,setFeatureFlags]=useState({compactUi:false,vibe:"default"});
   const[comebackActive,setComebackActive]=useState(false);
   const[lastComebackAward,setLastComebackAward]=useState(0);
   const[lastOfflineBonus,setLastOfflineBonus]=useState(0);
@@ -925,7 +925,7 @@ export default function LokApp(){
     <input type="password" maxLength={6} inputMode="numeric" autoFocus value={pinInput} onChange={e=>{setPinInput(e.target.value);setPinError("");}} onKeyDown={e=>{if(e.key==="Enter"){if(pinInput===sessionPin){setPinUnlocked(true);setPinInput("");setPinError("");}else{setPinError("Wrong PIN");setPinInput("");}}}} className="w-full rounded-xl px-4 py-3 text-center text-2xl font-extrabold tracking-widest" style={{maxWidth:220,border:`3px solid ${pinError?"#C23B22":ART.ink}`,background:"#fff",color:ART.ink,outline:"none",animation:"inkfade .5s .5s ease both"}} aria-label="Enter PIN"/>
     {pinError&&<div style={{color:"#C23B22",fontSize:13,fontWeight:700}}>{pinError}</div>}
   </div>);
-  if(!ready)return(<Loader dynamic={featureFlags.dynamicLoader}/>);
+  if(!ready)return(<Loader/>);
   return(<ThemeCtx.Provider value={T}>
     <div className={`min-h-screen w-full ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:"'Schibsted Grotesk',system-ui,sans-serif",animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none"}}>
       <GlobalStyle T={T} pace={pace} speed={speed}/><ThemeBackdrop themeId={uiTheme} pace={pace}/><PageEffect effect={effect}/>
@@ -1002,24 +1002,24 @@ export default function LokApp(){
   </ThemeCtx.Provider>);
 }
 
-function Loader({dynamic}){
-  const logoRef=useRef(null);const pos=useRef({x:0,y:0,vx:0,vy:0,down:false});
-  useEffect(()=>{if(!dynamic)return;const el=logoRef.current;if(!el)return;
+function Loader(){
+  const logoRef=useRef(null);const pos=useRef({x:0,y:0,px:0,py:0,vx:0,vy:0,down:false});
+  useEffect(()=>{const el=logoRef.current;if(!el)return;
     const onMove=e=>{pos.current.x=e.clientX;pos.current.y=e.clientY;};
     const onDown=()=>{pos.current.down=true;};const onUp=()=>{pos.current.down=false;};
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerdown",onDown);window.addEventListener("pointerup",onUp);
     let frame;const tick=()=>{
-      const {x,y,vx,vy,down}=pos.current;const rect=el.getBoundingClientRect();
+      const {x,y,px,py,vx,vy,down}=pos.current;const rect=el.getBoundingClientRect();
       const targetX=x-rect.left-rect.width/2;const targetY=y-rect.top-rect.height/2;
-      const ax=(targetX-vx)*0.1;const ay=(targetY-vy)*0.1;
-      pos.current.vx+=ax;pos.current.vy+=ay;pos.current.vx*=0.86;pos.current.vy*=0.86;
-      const scale=down?0.9:1;
-      el.style.transform=`perspective(500px) rotateY(${pos.current.vx/12}deg) rotateX(${-pos.current.vy/12}deg) scale(${scale})`;
+      const ax=(targetX-px)*0.15;const ay=(targetY-py)*0.15;
+      pos.current.vx=(vx+ax)*0.86;pos.current.vy=(vy+ay)*0.86;
+      pos.current.px+=pos.current.vx;pos.current.py+=pos.current.vy;
+      el.style.transform=`perspective(500px) rotateY(${pos.current.px/24}deg) rotateX(${-pos.current.py/24}deg) scale(${down?0.9:1})`;
       frame=requestAnimationFrame(tick);
     };
     tick();
     return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerdown",onDown);window.removeEventListener("pointerup",onUp);cancelAnimationFrame(frame);};
-  },[dynamic]);
+  },[]);
 
   return(<div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:ART.paper,color:ART.ink,fontFamily:"'Bricolage Grotesque',system-ui,sans-serif"}}>
     <style>{`@keyframes inkdrop{0%{transform:scaleY(0.2) scaleX(0.8);opacity:0}40%{transform:scaleY(1.1) scaleX(0.95);opacity:1}60%{transform:scaleY(0.9) scaleX(1.05)}100%{transform:scale(1);opacity:1}} @keyframes inkfade{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}} @keyframes inkpulse{0%,100%{opacity:.4}50%{opacity:1}}`}</style>
