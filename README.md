@@ -27,6 +27,17 @@ And meet **Blot** 🫧 — the little ink creature in the corner. It talks, it r
 
 ---
 
+## The `.lok` file format 📦
+
+LokBook flips can be exported as **`.lok`** — an open, self-contained animation format built for this app and open-sourced for anyone to use.
+
+- **Opens anywhere.** A `.lok` file is a real ZIP archive: any OS, any zip tool, any archive browser reads it, no special software required. Inside is a plain `preview.png` (any image viewer renders it) and a human-readable `manifest.json` — even a tool with zero knowledge of the format gets something useful.
+- **Small.** For apps that do implement the format, `data.lokflip` stores the animation as a shared palette + frame-to-frame deltas, then one compression pass — typically **~10× smaller** than a naive PNG-per-frame stack.
+- **Open source.** Full spec + reference implementation: [`docs/LOK_FORMAT.md`](docs/LOK_FORMAT.md) in this repo, and standalone at the dedicated `lok-format` project (spec, tutorial, reference JS encoder/decoder — MIT-licensed, "LokFlip"/`.lok` name and format ownership held by LokServices).
+- **Reference implementation:** [`src/engine/lokFormat.js`](src/engine/lokFormat.js) — `encodeLok(frames, meta)` / `decodeLok(blob)`.
+
+---
+
 ## Running it yourself
 
 ```bash
@@ -50,8 +61,9 @@ src/
     bots.js         LokMind — battle/rush bot AI: personalities, skill curves,
                     taste-based judging, rubber-band difficulty
     lillok.js       Blot Brain — phase model + context/stat-aware dialogue with memory
+    lokFormat.js    .lok (LokFlip) encoder/decoder — see docs/LOK_FORMAT.md
   theme/theme.js    UI themes
-lok_live.jsx        ⚠ deprecated single-file prototype (reference only — not built)
+  pages/            canonical split-out screens (adopted incrementally — see docs/MASTERPLAN.md D6)
 ```
 
 **Backend (Supabase project "LokServices")**

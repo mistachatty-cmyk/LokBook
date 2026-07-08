@@ -579,6 +579,7 @@ export const GAME_MANUAL_PAGES = [
   { title:"LokPass", icon:"🪪", content:"LokPass is a $2.99 purchase that removes ads and unlocks every UI theme. You also get the PASS badge on your profile. One-time purchase, permanent unlock." },
   { title:"Founders", icon:"🏅", content:"Founders get their progress backed up on LokServices and a permanent Founder badge. Join from Settings to lock in your gallery, Loks, and LilLok for the beta." },
   { title:"Tips & Tricks", icon:"💡", content:"Double-tap the version number in Settings to unlock Sound Lab. Use the search in your gallery. Earn Loks by drawing, voting, and streaks. Long press in the Easel for quick actions. Frame pacing controls how fast the feed scrolls." },
+  { title:".lok files", icon:"📦", content:"Every flip can be saved as a .lok file — LokBook's own animation format. It's a real zip archive, so it opens anywhere (even in a plain file browser you'll see a manifest and a preview image), but it also packs your full animation at roughly a tenth the size of a normal image stack. .lok is open source — anyone can build tools that read or write it. Look for Export as .lok in a flip's menu." },
 ];
 
 export const lokApi = {
