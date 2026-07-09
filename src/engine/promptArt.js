@@ -361,7 +361,7 @@ const BOT_FLOURISH = {
 
 export function renderPromptArt(prompt, seed, t, skill = 0.6, botName) {
   const c = document.createElement("canvas"); c.width = W; c.height = H;
-  const ctx = c.getContext("2d");
+  const ctx = c.getContext("2d", { willReadFrequently: true }); // called every ~2s during Battle; some recipes read pixels
   paperBase(ctx, null);
   const recipe = RECIPES[prompt] || genericFallback;
   try { recipe(ctx, Math.max(0, Math.min(1, t)), seed, Math.max(0.15, Math.min(1, skill))); }

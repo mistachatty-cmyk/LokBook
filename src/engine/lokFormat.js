@@ -131,7 +131,7 @@ async function inflate(bytes) {
 // ---------- palette + indexing (shared logic with engine/gif.js's approach) ----------
 function getImageData(src) {
   if (src instanceof ImageData) return src;
-  const ctx = src.getContext("2d");
+  const ctx = src.getContext("2d", { willReadFrequently: true }); // read twice per frame (palette build + index)
   return ctx.getImageData(0, 0, src.width, src.height);
 }
 

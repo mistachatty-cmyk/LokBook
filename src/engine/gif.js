@@ -60,7 +60,7 @@ export function encodeGIF(frames, { delay = 100, loop = 0 } = {}) {
 function buildPalette(frames) {
   const freq = {};
   frames.forEach(c => {
-    const ctx = c.getContext("2d");
+    const ctx = c.getContext("2d", { willReadFrequently: true });
     const d = ctx.getImageData(0, 0, c.width, c.height).data;
     for (let i = 0; i < d.length; i += 4) {
       if (d[i + 3] < 128) continue;
@@ -90,7 +90,7 @@ function quantize(r, g, b) {
 }
 
 function indexFrame(c, palette) {
-  const ctx = c.getContext("2d");
+  const ctx = c.getContext("2d", { willReadFrequently: true });
   const d = ctx.getImageData(0, 0, c.width, c.height).data;
   const data = new Uint8Array(c.width * c.height);
   for (let i = 0; i < data.length; i++) {

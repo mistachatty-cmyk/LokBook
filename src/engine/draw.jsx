@@ -223,7 +223,7 @@ export function compressFrame(dataUrl, q = 0.72) {
 }
 
 export function renderSequence(painter, n) {
-  const c = document.createElement("canvas"); c.width = W; c.height = H; const ctx = c.getContext("2d");
+  const c = document.createElement("canvas"); c.width = W; c.height = H; const ctx = c.getContext("2d", { willReadFrequently: true });
   const out = []; for (let i = 0; i < n; i++) { ctx.clearRect(0, 0, W, H); paperBase(ctx, i); painter(ctx, n === 1 ? 1 : i / (n - 1), i); out.push(c.toDataURL("image/png")); } return out;
 }
 
@@ -237,7 +237,7 @@ export function makeDoodlePainter(seed) {
   return (ctx, t) => { const upto = Math.floor(total * Math.max(0, Math.min(1, t))); let drawn = 0; for (const b of blobs) { if (drawn >= upto) return; risoCircle(ctx, b.x, b.y, b.rx, b.ry, 4); drawn++; } ctx.lineCap = "round"; ctx.lineJoin = "round"; for (const s of strokes) { if (drawn >= upto) return; ctx.strokeStyle = s.color; ctx.lineWidth = s.width; ctx.beginPath(); s.pts.forEach(([x, y], k) => (k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y))); ctx.stroke(); drawn++; } };
 }
 
-export function renderDoodle(seed, t) { const c = document.createElement("canvas"); c.width = W; c.height = H; const ctx = c.getContext("2d"); paperBase(ctx, null); makeDoodlePainter(seed)(ctx, t); return c.toDataURL("image/png"); }
+export function renderDoodle(seed, t) { const c = document.createElement("canvas"); c.width = W; c.height = H; const ctx = c.getContext("2d", { willReadFrequently: true }); paperBase(ctx, null); makeDoodlePainter(seed)(ctx, t); return c.toDataURL("image/png"); }
 
 export function renderAvatar(seed) {
   const c = document.createElement("canvas"); c.width = 200; c.height = 200; const ctx = c.getContext("2d");
