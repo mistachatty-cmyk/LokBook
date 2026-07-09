@@ -79,6 +79,7 @@ Completed:
 - **NewStudioUI** FPS selector, playback controls, pro onion skin, timeline zoom, video export, spritesheet export, auto-advance, reverse, copy/paste/clear frame, lightbox — dual render path at `App.jsx:1084` (`legacyStudio ? <Studio /> : <NewStudioUI />`)
 - **D2** Dead code sweep — 5 stale pages files moved to `src/archive/`, 17 unused exports removed from `constants.jsx`, 4 internal helpers de-exported in `draw.jsx`
 - **CI/CD** 4 GitHub Actions workflows: PR checks (`ci.yml`), Cloudflare Pages deploy (`deploy-web.yml`), Supabase migrations + edge functions deploy (`deploy-supabase.yml`), Tauri desktop release on tags (`release-tauri.yml`)
+- **Security** Hardcoded Supabase anon key removed from `supabaseClient.js` — requires `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local`. Null guards added to `auth.js` for when Supabase is unconfigured. Playwright pinned as devDep (no extraneous packages). `build:steam` script added.
 
 Remaining (low priority):
 - L1: Feed seeding — now handled by C1, bots auto-post ambient flips
@@ -113,7 +114,7 @@ relying on auto-deploy.
 **Secrets** (set in GitHub repo Settings → Secrets and variables → Actions):
 `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`.
 
-Supabase project ref: `jfavkudihasswkhkouxq` (LokServices). `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY` have hardcoded fallbacks in `src/supabaseClient.js`, so the web build doesn't need them in CI.
+Supabase project ref: `jfavkudihasswkhkouxq` (LokServices). `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY` are required in `.env.local` — no hardcoded fallbacks remain. The CI smoke test stubs them to empty strings (app gracefully degrades with `supabase = null`).
 
 ## About This File
 This file was created by the agent in the initial overhaul session (July 2026). It captures the codebase conventions for all future AI collaborators.

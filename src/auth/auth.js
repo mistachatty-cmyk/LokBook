@@ -6,6 +6,7 @@ const listeners = new Set();
 let _tokenChanged = null;
 
 export function init(onSession) {
+  if (!supabase) return;
   supabase.auth.getSession().then(({ data: { session } }) => {
     if (session) {
       currentSession = session;
@@ -44,6 +45,7 @@ export function getApiToken() {
 }
 
 export async function signInWithEmail(email) {
+  if (!supabase) throw new Error("Supabase not configured");
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: { shouldCreateUser: true },
@@ -52,6 +54,7 @@ export async function signInWithEmail(email) {
 }
 
 export async function signInWithOAuth(provider) {
+  if (!supabase) throw new Error("Supabase not configured");
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
     options: { redirectTo: window.location.origin },
@@ -60,6 +63,7 @@ export async function signInWithOAuth(provider) {
 }
 
 export async function signOut() {
+  if (!supabase) return;
   const { error } = await supabase.auth.signOut();
   if (!error) {
     currentSession = null;
