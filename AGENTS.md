@@ -111,6 +111,17 @@ dashboard → Workers & Pages → lokbook project → Settings → Builds & depl
 fail at the deploy step if unset. Verify in GitHub Settings → Secrets before
 relying on auto-deploy.
 
+**Web deploy — verified Jul 2026:** the Vercel project (`lok-book`) reported
+its GitHub connection as already active, but the live site had gone 5 days
+stale with zero git-linked deployments in that window — the connection
+existed without auto-deploy actually firing. This paragraph itself is the
+test payload for confirming whether a push to `master` now triggers a new
+Vercel deployment automatically. If you're reading this and no corresponding
+deployment shows in `npx vercel ls lok-book` shortly after this commit
+landed on `master`, auto-deploy is still not wired — fall back to manual
+`npx vercel deploy --prod` and escalate the Git connection issue in the
+Vercel dashboard (Project → Settings → Git).
+
 **Secrets** (set in GitHub repo Settings → Secrets and variables → Actions):
 `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`.
 
