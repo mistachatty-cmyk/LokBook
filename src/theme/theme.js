@@ -1,29 +1,29 @@
 import { createContext, useContext } from "react";
 
 export const THEMES = {
-  riso:    { name:"Print Shop",       desc:"Two-ink risograph. The original.",          price:0,  paper:"#F2EDE2", ink:"#23306B", accent:"#FF5DA2", alt:"#2FA9A0", shadow:"#D9D2C0", card:"#FFFDF7", onAccent:"#fff" },
-  midnight:{ name:"Midnight Ink",     desc:"Light table off, lamps on.",                price:40, paper:"#161C38", ink:"#EDE8D8", accent:"#FF5DA2", alt:"#3FC1B7", shadow:"rgba(0,0,0,.5)", card:"#1F2647", onAccent:"#fff" },
-  tide:    { name:"Tide Pool",        desc:"Salt, kelp, one orange fish.",              price:40, paper:"#E2EFEC", ink:"#14555B", accent:"#FF8A5C", alt:"#3D9CA8", shadow:"#C3D8D3", card:"#F4FAF8", onAccent:"#fff" },
+  riso:    { name:"Print Shop",       desc:"Two-ink risograph. The original.",          price:0,  paper:"#F2EDE2", ink:"#23306B", accent:"#FF5DA2", alt:"#2FA9A0", shadow:"#D9D2C0", card:"#FFFDF7", onAccent:"#000" },
+  midnight:{ name:"Midnight Ink",     desc:"Light table off, lamps on.",                price:40, paper:"#161C38", ink:"#EDE8D8", accent:"#FF5DA2", alt:"#3FC1B7", shadow:"rgba(0,0,0,.5)", card:"#1F2647", onAccent:"#000" },
+  tide:    { name:"Tide Pool",        desc:"Salt, kelp, one orange fish.",              price:40, paper:"#E2EFEC", ink:"#14555B", accent:"#FF8A5C", alt:"#3D9CA8", shadow:"#C3D8D3", card:"#F4FAF8", onAccent:"#000" },
   zine:    { name:"Tangerine Zine",   desc:"Photocopied at 2am, stapled crooked.",      price:40, paper:"#FFF1DC", ink:"#46280F", accent:"#F4541D", alt:"#8C6BC8", shadow:"#EBD7B8", card:"#FFFAF0", onAccent:"#fff" },
   bloom:   { name:"Hot Bloom",        desc:"Magenta on bone. Loud and proud.",          price:60, paper:"#FBE9EF", ink:"#3A0B2E", accent:"#E0218A", alt:"#5E8BFF", shadow:"#E9CBD8", card:"#FFF4F8", onAccent:"#fff" },
   forest:  { name:"Forest Risograph", desc:"Pine ink, mushroom paper.",                 price:60, paper:"#ECEFE0", ink:"#1F3A24", accent:"#E8662A", alt:"#5A9E5E", shadow:"#D2D7C2", card:"#F6F8EE", onAccent:"#fff" },
   neon:    { name:"Neon Arcade",      desc:"Coin-op glow. Wave 2.",     price:90,wave:2,paper:"#0E0B1E", ink:"#F0E9FF", accent:"#19F0C3", alt:"#FF2E97", shadow:"rgba(0,0,0,.6)", card:"#1A1430", onAccent:"#0E0B1E" },
-  blush:   { name:"Porcelain Blush",  desc:"Soft clay, gold leaf. Wave 2.", price:90,wave:2, paper:"#F7EEE7", ink:"#5E3B2E", accent:"#D98C6A", alt:"#B79B6E", shadow:"#E6D8CC", card:"#FDF7F2", onAccent:"#fff" },
+  blush:   { name:"Porcelain Blush",  desc:"Soft clay, gold leaf. Wave 2.", price:90,wave:2, paper:"#F7EEE7", ink:"#5E3B2E", accent:"#D98C6A", alt:"#B79B6E", shadow:"#E6D8CC", card:"#FDF7F2", onAccent:"#000" },
   cobalt:  { name:"Cobalt Press",     desc:"Blueprint ink, chalk lines. Wave 2.", price:90,wave:2, paper:"#0B2545", ink:"#DCE8F5", accent:"#FFC94D", alt:"#6FB1FF", shadow:"rgba(0,0,0,.5)", card:"#123257", onAccent:"#0B2545" },
   solar:   { name:"Solar Flare",      desc:"Hot plasma, cold space. Wave 3.", price:120,wave:3,paper:"#1A1430", ink:"#FFFAF0", accent:"#FF5733", alt:"#FFC300", shadow:"rgba(0,0,0,.6)", card:"#2C2A4A", onAccent:"#fff" },
   meadow:  { name:"Meadow",           desc:"Fresh cut grass, summer day. Wave 3.", price:120,wave:3,paper:"#E8F5E9", ink:"#2E7D32", accent:"#FFEB3B", alt:"#81C784", shadow:"#C8E6C9", card:"#F1F8E9", onAccent:"#000" },
-  ocean:   { name:"Ocean Depths",     desc:"Bioluminescent life, deep blue. Wave 4.", price:200,wave:4, animated:true, paper:"#001F3F", ink:"#F0F8FF", accent:"#00BFFF", alt:"#7FDBFF", shadow:"rgba(0,0,0,.7)", card:"#001a33", onAccent:"#fff" },
+  ocean:   { name:"Ocean Depths",     desc:"Bioluminescent life, deep blue. Wave 4.", price:200,wave:4, animated:true, paper:"#001F3F", ink:"#F0F8FF", accent:"#00BFFF", alt:"#7FDBFF", shadow:"rgba(0,0,0,.7)", card:"#001a33", onAccent:"#000" },
   glitch:  { name:"Glitch",           desc:"Digital artifacting, corrupted data. Wave 4.", price:200,wave:4, animated:true, paper:"#000000", ink:"#00FF00", accent:"#FF00FF", alt:"#FFFF00", shadow:"rgba(255,255,255,.2)", card:"#111", onAccent:"#000" },
-  pumpkin: { name:"Pumpkin Patch",    desc:"Orange harvest, black cat silhouette.",      price:45, paper:"#FFF3E0", ink:"#3E2723", accent:"#FF6F00", alt:"#4E342E", shadow:"#E8D5B7", card:"#FFF8E7", onAccent:"#fff" },
+  pumpkin: { name:"Pumpkin Patch",    desc:"Orange harvest, black cat silhouette.",      price:45, paper:"#FFF3E0", ink:"#3E2723", accent:"#FF6F00", alt:"#4E342E", shadow:"#E8D5B7", card:"#FFF8E7", onAccent:"#000" },
   matcha:  { name:"Matcha Studio",    desc:"Green tea paper, bamboo ink.",               price:45, paper:"#E8F5E9", ink:"#1B5E20", accent:"#A5D6A7", alt:"#66BB6A", shadow:"#C8E6C9", card:"#F1F8E9", onAccent:"#1B5E20" },
-  lavender: { name:"Lavender Haze",   desc:"Twilight fields, soft purple air.",          price:50, paper:"#F3E5F5", ink:"#4A148C", accent:"#CE93D8", alt:"#7B1FA2", shadow:"#E1BEE7", card:"#FCE4EC", onAccent:"#fff" },
+  lavender: { name:"Lavender Haze",   desc:"Twilight fields, soft purple air.",          price:50, paper:"#F3E5F5", ink:"#4A148C", accent:"#CE93D8", alt:"#7B1FA2", shadow:"#E1BEE7", card:"#FCE4EC", onAccent:"#000" },
   retro:   { name:"Retro Terminal",   desc:"CRT glow, green phosphor, amber alerts. Wave 2.", price:85,wave:2, paper:"#0D1117", ink:"#00FF41", accent:"#FFB000", alt:"#0088FF", shadow:"rgba(0,0,0,.6)", card:"#161B22", onAccent:"#000" },
   candy:   { name:"Candy Shop",       desc:"Pastel neons, sugar-rush bright. Wave 2.",   price:80,wave:2, paper:"#FFF0F5", ink:"#C2185B", accent:"#FF4081", alt:"#B2FF59", shadow:"#F8BBD0", card:"#FFF9FB", onAccent:"#fff" },
   noir:    { name:"Film Noir",        desc:"Monochrome. Shadow, light, silhouette. Wave 3.", price:110,wave:3, paper:"#1A1A1A", ink:"#F5F5F5", accent:"#E50914", alt:"#8C8C8C", shadow:"#000", card:"#262626", onAccent:"#fff" },
-  sakura:  { name:"Sakura Wind",      desc:"Cherry petals drifting across washi. Wave 3.", price:115,wave:3, paper:"#FEF6F8", ink:"#5D2E46", accent:"#FF7B9C", alt:"#B8A9C9", shadow:"#EDDDE0", card:"#FFF8F9", onAccent:"#fff" },
+  sakura:  { name:"Sakura Wind",      desc:"Cherry petals drifting across washi. Wave 3.", price:115,wave:3, paper:"#FEF6F8", ink:"#5D2E46", accent:"#FF7B9C", alt:"#B8A9C9", shadow:"#EDDDE0", card:"#FFF8F9", onAccent:"#000" },
   aurora:  { name:"Aurora Borealis",  desc:"Northern lights, crisp arctic air. Wave 4.", price:180,wave:4, animated:true, paper:"#0B0C10", ink:"#E0FBFC", accent:"#00FFAA", alt:"#7F5AF0", shadow:"rgba(0,0,0,.6)", card:"#1F2029", onAccent:"#0B0C10" },
   vapor:   { name:"Vaporwave",        desc:"Neon grids, sunset chrome, retro futures. Wave 4.", price:190,wave:4, animated:true, paper:"#07041A", ink:"#F8EFFF", accent:"#FF2E97", alt:"#00D4FF", shadow:"rgba(255,46,151,.25)", card:"#120B2B", onAccent:"#07041A" },
-  smile:  { name:"Smile",            desc:"Warm sunshine, happy accidents. Wave 4.",     price:180,wave:4, paper:"#FEF9E7", ink:"#4A3728", accent:"#F39C12", alt:"#E74C3C", shadow:"#EBDCB8", card:"#FFFDF5", onAccent:"#fff" },
+  smile:  { name:"Smile",            desc:"Warm sunshine, happy accidents. Wave 4.",     price:180,wave:4, paper:"#FEF9E7", ink:"#4A3728", accent:"#F39C12", alt:"#E74C3C", shadow:"#EBDCB8", card:"#FFFDF5", onAccent:"#000" },
 };
 export const SKIN_WAVE_GATE = 2;
 export const SKIN_WAVE_3_GATE = 5;
