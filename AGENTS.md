@@ -127,5 +127,24 @@ Vercel dashboard (Project → Settings → Git).
 
 Supabase project ref: `jfavkudihasswkhkouxq` (LokServices). `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY` are required in `.env.local` — no hardcoded fallbacks remain. The CI smoke test stubs them to empty strings (app gracefully degrades with `supabase = null`).
 
+## Installed Agent Skills (Jul 2026)
+
+Installed project-level (`.claude/skills/`, `.agents/skills/`) via `npx impeccable install` and
+`npx skills add <repo>` (the `vercel-labs/skills` installer — verify any future skill's npm
+`repository` field matches its claimed GitHub source *before* installing; two guessed package
+names for "graphify" (`graphifyy`, `graphify`) turned out to be unrelated/abandoned projects on
+npm and were correctly refused, not installed):
+
+| Skill(s) | Source | Purpose |
+|---|---|---|
+| `impeccable` | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | Design guidance/anti-pattern detection for UI work. Run `/impeccable init` once to generate project design context before using audit/critique/polish commands. |
+| `defuddle`, `json-canvas`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) | Obsidian vault/canvas/markdown authoring. `obsidian-cli` was flagged **Med Risk** by the installer's own Gen assessment — review before use. |
+| `ponytail`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help`, `ponytail-review` | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) | Minimal-code discipline — reach for this (or just say "ponytail") when a task risks over-engineering; `ponytail-audit` for a whole-repo bloat scan. |
+
+**Not installed:** Graphify (`Graphify-Labs/graphify`) — no verified install path found; the
+README's documented `uv tool install graphifyy` does not correspond to the real project on either
+npm or PyPI under that name. Don't guess an install command for it; get the real one from the
+maintainer or the repo directly first.
+
 ## About This File
 This file was created by the agent in the initial overhaul session (July 2026). It captures the codebase conventions for all future AI collaborators.
