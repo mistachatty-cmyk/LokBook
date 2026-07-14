@@ -39,6 +39,14 @@ import { renderPromptArt } from "./engine/promptArt.js";
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+const DEMO_BRUSH_PRESETS=[
+  {id:"starter",name:"Starter",flow:0.35,scatter:0.15,dabs:3,angleJitter:0.2,roundness:1},
+  {id:"light",name:"Light Touch",flow:0.18,scatter:0.05,dabs:1,angleJitter:0.05,roundness:1},
+  {id:"breezy",name:"Breezy",flow:0.25,scatter:0.5,dabs:5,angleJitter:0.6,roundness:0.6},
+  {id:"featherweight",name:"Featherweight",flow:0.12,scatter:0.3,dabs:2,angleJitter:0.3,roundness:0.8},
+  {id:"basics",name:"Bold Basics",flow:0.6,scatter:0.1,dabs:2,angleJitter:0.1,roundness:1},
+];
+
 const mem = new Map();
 const store = {
   async get(k) {
@@ -217,6 +225,9 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
   const T=useT();
   const[layers,setLayers]=useState([{id:1,visible:true,opacity:1,blend:"source-over"}]);
   const[active,setActive]=useState(1);const[tool,setTool]=useState("pen");const[color,setColor]=useState(ART.ink);const[recentColors,setRecentColors]=useState([]);const[size,setSize]=useState(7);const[symmetry,setSymmetry]=useState("none");const[brush,setBrush]=useState("ink");
+  const[dynamics,setDynamics]=useState(true);const[brushLabOpen,setBrushLabOpen]=useState(false);const[customBrushParams,setCustomBrushParams]=useState({flow:0.35,scatter:0.15,dabs:3,angleJitter:0.2,roundness:1});
+  const[savedBrushes,setSavedBrushes]=useState(()=>{try{const r=localStorage.getItem("lok:customBrushes");return r?JSON.parse(r):[];}catch{return[];}});
+  const lastMoveXY=useRef(null);const lastMoveT=useRef(0);const sizeMulRef=useRef(1);const transformDrag=useRef(null);const labPreviewRef=useRef(null);
   const idRef=useRef(1);const canvases=useRef(new Map());const drawing=useRef(false);const undoStack=useRef([]);const redoStack=useRef([]);const wrapRef=useRef(null);const lastPts=useRef([]);const midPts=useRef([]);const activeLayer=layers.find(l=>l.id===active);
   useImperativeHandle(ref,()=>({
     composite(pageNum=null){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");paperBase(ctx,pageNum);layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv&&l.visible){ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=l.blend;ctx.drawImage(cv,0,0);}});ctx.globalAlpha=1;ctx.globalCompositeOperation="source-over";return tmp.toDataURL("image/png");},
@@ -226,7 +237,18 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
   }));
   const pos=e=>{if(!wrapRef.current)return[W/2,H/2];const r=wrapRef.current.getBoundingClientRect();return[((e.clientX-r.left)*W)/r.width,((e.clientY-r.top)*H)/r.height];};
   const pushUndo=()=>{const cv=canvases.current.get(active);if(!cv)return;if(undoStack.current.length>9)undoStack.current.shift();undoStack.current.push({id:active,snap:cv.getContext("2d").getImageData(0,0,W,H)});redoStack.current=[];};
-  const dabAt=(ctx,x,y)=>{ctx.globalCompositeOperation="source-over";ctx.globalAlpha=brush==="chalk"?0.5:0.18;ctx.fillStyle=color;const dots=brush==="chalk"?6:1;for(let d=0;d<dots;d++){const ox=brush==="chalk"?(Math.random()-.5)*size*1.4:0,oy=brush==="chalk"?(Math.random()-.5)*size*1.4:0;ctx.beginPath();ctx.arc(x+ox,y+oy,tool==="soft"?size*1.8:size*0.5,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;};
+  const dynMul=(e,cx,cy)=>{if(!dynamics)return 1;if(e.pointerType==="pen"&&typeof e.pressure==="number"&&e.pressure>0)return 0.4+Math.min(e.pressure,1)*0.9;const now=e.timeStamp||performance.now();let mul=1;if(lastMoveXY.current){const dt=Math.max(now-lastMoveT.current,1);const dist=Math.hypot(cx-lastMoveXY.current[0],cy-lastMoveXY.current[1]);const speed=dist/dt;mul=Math.max(0.55,Math.min(1.2,1.2-speed*2.4));}lastMoveT.current=now;lastMoveXY.current=[cx,cy];return mul;};
+  const applyTransform=fn=>{const cv=canvases.current.get(active);if(!cv)return;pushUndo();const ctx=cv.getContext("2d");const snap=ctx.getImageData(0,0,W,H);const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;tmp.getContext("2d").putImageData(snap,0,0);ctx.clearRect(0,0,W,H);ctx.save();ctx.translate(W/2,H/2);fn(ctx);ctx.drawImage(tmp,-W/2,-H/2);ctx.restore();};
+  const rotateLayer=deg=>applyTransform(c=>c.rotate(deg*Math.PI/180));
+  const scaleLayer=s=>applyTransform(c=>c.scale(s,s));
+  const flipLayer=axis=>applyTransform(c=>c.scale(axis==="h"?-1:1,axis==="v"?-1:1));
+  const commitTranslate=(dx,dy)=>applyTransform(c=>c.translate(dx,dy));
+  const dabCustom=(ctx,x,y,sz,col,p)=>{const dots=Math.round(p.dabs);for(let d=0;d<dots;d++){const ox=(Math.random()-.5)*p.scatter*sz*1.6;const oy=(Math.random()-.5)*p.scatter*sz*1.6;ctx.globalAlpha=p.flow;ctx.fillStyle=col;ctx.save();ctx.translate(x+ox,y+oy);ctx.rotate((Math.random()-.5)*p.angleJitter*Math.PI);ctx.scale(1,Math.max(0.2,p.roundness));ctx.beginPath();ctx.arc(0,0,sz*0.5,0,Math.PI*2);ctx.fill();ctx.restore();}ctx.globalAlpha=1;};
+  const applyBrushPreset=p=>setCustomBrushParams({flow:p.flow,scatter:p.scatter,dabs:p.dabs,angleJitter:p.angleJitter,roundness:p.roundness});
+  const useCustomBrush=()=>{setBrush("custom");if(tool==="eraser"||tool==="fill"||tool==="eyedrop")setTool("pen");};
+  const saveBrushPreset=()=>{if(!ccTier)return;const name=`Brush ${savedBrushes.length+1}`;const next=[...savedBrushes,{id:`custom_${Date.now()}`,name,...customBrushParams}];setSavedBrushes(next);try{localStorage.setItem("lok:customBrushes",JSON.stringify(next));}catch{}};
+  useEffect(()=>{const cv=labPreviewRef.current;if(!cv||!brushLabOpen)return;const ctx=cv.getContext("2d");ctx.clearRect(0,0,cv.width,cv.height);for(let x=8;x<cv.width-8;x+=3){const y=cv.height/2+Math.sin(x*0.15)*cv.height*0.22;dabCustom(ctx,x,y,size*0.6,color,customBrushParams);}},[brushLabOpen,customBrushParams,size,color]);
+  const dabAt=(ctx,x,y)=>{const es=size*sizeMulRef.current;if(brush==="custom"){dabCustom(ctx,x,y,es,color,customBrushParams);return;}ctx.globalCompositeOperation="source-over";ctx.globalAlpha=brush==="chalk"?0.5:0.18;ctx.fillStyle=color;const dots=brush==="chalk"?6:1;for(let d=0;d<dots;d++){const ox=brush==="chalk"?(Math.random()-.5)*es*1.4:0,oy=brush==="chalk"?(Math.random()-.5)*es*1.4:0;ctx.beginPath();ctx.arc(x+ox,y+oy,tool==="soft"?es*1.8:es*0.5,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;};
   const fxAt=(ctx,x,y)=>{if(!animFx||animFx==="none"||Math.random()>0.4)return;ctx.save();ctx.globalCompositeOperation="source-over";
     if(animFx==="sparkle_trail"){ctx.fillStyle="#fff";ctx.globalAlpha=0.8;for(let i=0;i<3;i++){const a=Math.random()*Math.PI*2,r=Math.random()*size*1.2;ctx.beginPath();ctx.arc(x+Math.cos(a)*r,y+Math.sin(a)*r,0.8+Math.random()*1.4,0,Math.PI*2);ctx.fill();}}
     else if(animFx==="neon_pulse"){const g=ctx.createRadialGradient(x,y,0,x,y,size*1.6);g.addColorStop(0,"#fff");g.addColorStop(0.4,color);g.addColorStop(1,"transparent");ctx.fillStyle=g;ctx.globalAlpha=0.35;ctx.beginPath();ctx.arc(x,y,size*1.6,0,Math.PI*2);ctx.fill();}
@@ -238,20 +260,21 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
     ctx.globalAlpha=1;ctx.restore();};
   const symXY=(x,y)=>{const o=[[x,y]];if(symmetry==="mirrorX"||symmetry==="quad")o.push([W-x,y]);if(symmetry==="mirrorY"||symmetry==="quad")o.push([x,H-y]);if(symmetry==="quad")o.push([W-x,H-y]);if(symmetry.startsWith("radial")){const n=+symmetry.slice(6),cx=W/2,cy=H/2;for(let i=1;i<n;i++){const a=(i/n)*Math.PI*2,c=Math.cos(a),s=Math.sin(a);o.push([cx+(x-cx)*c-(y-cy)*s,cy+(x-cx)*s+(y-cy)*c]);}}return o;};
   const stamp=(ctx,x,y,start)=>{
-    const pts=symXY(x,y);
+    const pts=symXY(x,y);const es=size*sizeMulRef.current;
+    if(brush==="custom"){pts.forEach(([sx,sy])=>dabCustom(ctx,sx,sy,es,color,customBrushParams));return;}
     if(tool==="soft"||brush==="chalk"){pts.forEach(([sx,sy])=>dabAt(ctx,sx,sy));return;}
     if(start){lastPts.current=pts.map(p=>[...p]);midPts.current=pts.map(p=>[...p]);
       ctx.globalCompositeOperation=tool==="eraser"?"destination-out":"source-over";ctx.fillStyle=color;ctx.globalAlpha=brush==="marker"&&tool!=="eraser"?0.55:1;
-      pts.forEach(([sx,sy])=>{ctx.beginPath();ctx.arc(sx,sy,(tool==="eraser"?size*2.4:brush==="marker"?size*1.7:size)/2,0,Math.PI*2);ctx.fill();});ctx.globalAlpha=1;return;}
-    ctx.globalCompositeOperation=tool==="eraser"?"destination-out":"source-over";ctx.strokeStyle=color;ctx.lineWidth=tool==="eraser"?size*2.4:brush==="marker"?size*1.7:size;ctx.globalAlpha=brush==="marker"&&tool!=="eraser"?0.55:1;ctx.lineCap="round";ctx.lineJoin="round";
+      pts.forEach(([sx,sy])=>{ctx.beginPath();ctx.arc(sx,sy,(tool==="eraser"?es*2.4:brush==="marker"?es*1.7:es)/2,0,Math.PI*2);ctx.fill();});ctx.globalAlpha=1;return;}
+    ctx.globalCompositeOperation=tool==="eraser"?"destination-out":"source-over";ctx.strokeStyle=color;ctx.lineWidth=tool==="eraser"?es*2.4:brush==="marker"?es*1.7:es;ctx.globalAlpha=brush==="marker"&&tool!=="eraser"?0.55:1;ctx.lineCap="round";ctx.lineJoin="round";
     pts.forEach(([sx,sy],i)=>{const lp=lastPts.current[i]||[sx,sy];const mp=midPts.current[i]||lp;const nmx=(lp[0]+sx)/2,nmy=(lp[1]+sy)/2;ctx.beginPath();ctx.moveTo(mp[0],mp[1]);ctx.quadraticCurveTo(lp[0],lp[1],nmx,nmy);ctx.stroke();midPts.current[i]=[nmx,nmy];lastPts.current[i]=[sx,sy];fxAt(ctx,sx,sy);});
     ctx.globalAlpha=1;
   };
   const fillLayer=ctx=>{ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;ctx.fillRect(0,0,W,H);};
   const eyedrop=(x,y)=>{for(let i=layers.length-1;i>=0;i--){const cv=canvases.current.get(layers[i].id);if(!cv||!layers[i].visible)continue;const d=cv.getContext("2d").getImageData(Math.floor(x),Math.floor(y),1,1).data;if(d[3]>10){setColorAndRecent(`rgb(${d[0]},${d[1]},${d[2]})`);setTool("pen");return;}}};
-  const down=e=>{e.preventDefault();const cv=canvases.current.get(active);if(!cv||!activeLayer?.visible)return;e.currentTarget.setPointerCapture(e.pointerId);if(tool==="eyedrop"){eyedrop(...pos(e));return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}drawing.current=true;onStroke&&onStroke();stamp(cv.getContext("2d"),...pos(e),true);};
-  const move=e=>{if(!drawing.current)return;const cv=canvases.current.get(active);if(cv)stamp(cv.getContext("2d"),...pos(e),false);};
-  const up=e=>{drawing.current=false;lastPts.current=[];midPts.current=[];try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
+  const down=e=>{e.preventDefault();const cv=canvases.current.get(active);if(!cv||!activeLayer?.visible)return;e.currentTarget.setPointerCapture(e.pointerId);const p0=pos(e);sizeMulRef.current=dynMul(e,p0[0],p0[1]);if(tool==="eyedrop"){eyedrop(...p0);return;}if(tool==="transform"){transformDrag.current={startClient:[e.clientX,e.clientY],startCanvas:p0};return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}drawing.current=true;onStroke&&onStroke();stamp(cv.getContext("2d"),...p0,true);};
+  const move=e=>{if(tool==="transform"){if(!transformDrag.current)return;const cv=canvases.current.get(active);if(cv)cv.style.transform=`translate(${e.clientX-transformDrag.current.startClient[0]}px,${e.clientY-transformDrag.current.startClient[1]}px)`;return;}if(!drawing.current)return;const cv=canvases.current.get(active);if(!cv)return;const evs=(e.getCoalescedEvents&&e.getCoalescedEvents().length)?e.getCoalescedEvents():[e];const p=pos(evs[evs.length-1]);sizeMulRef.current=dynMul(e,p[0],p[1]);const ctx=cv.getContext("2d");evs.forEach(ev=>stamp(ctx,...pos(ev),false));};
+  const up=e=>{if(tool==="transform"){const cv=canvases.current.get(active);if(cv)cv.style.transform="";if(transformDrag.current&&e){const p1=pos(e);const[sx,sy]=transformDrag.current.startCanvas;const dx=p1[0]-sx,dy=p1[1]-sy;if(Math.abs(dx)>0.5||Math.abs(dy)>0.5)commitTranslate(dx,dy);}transformDrag.current=null;return;}drawing.current=false;lastPts.current=[];midPts.current=[];try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
   const undo=()=>{const u=undoStack.current.pop();if(!u)return;const cv=canvases.current.get(u.id);if(cv){redoStack.current.push({id:u.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(u.snap,0,0);}};
   const redo=()=>{const r=redoStack.current.pop();if(!r)return;const cv=canvases.current.get(r.id);if(cv){undoStack.current.push({id:r.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(r.snap,0,0);}};
   const addLayer=()=>{if(layers.length>=maxLayers)return;const id=++idRef.current;setLayers(ls=>[...ls,{id,visible:true,opacity:1,blend:"source-over"}]);setActive(id);};
@@ -290,6 +313,37 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
       </select>
       <button onClick={()=>setTool("fill")} aria-pressed={tool==="fill"} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${tool==="fill"?T.accent:T.ink}`,background:tool==="fill"?T.ink:T.card,color:tool==="fill"?T.paper:T.ink}}>Fill</button>
       <button onClick={()=>setTool("eyedrop")} aria-pressed={tool==="eyedrop"} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${tool==="eyedrop"?T.accent:T.ink}`,background:tool==="eyedrop"?T.ink:T.card,color:tool==="eyedrop"?T.paper:T.ink}}>Eyedrop</button>
+      <button onClick={()=>setTool(tool==="transform"?"pen":"transform")} aria-pressed={tool==="transform"} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${tool==="transform"?T.accent:T.ink}`,background:tool==="transform"?T.ink:T.card,color:tool==="transform"?T.paper:T.ink}}>Transform</button>
+      {tool==="transform"&&(<>
+        <button onClick={()=>rotateLayer(-90)} aria-label="Rotate left 90" className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}>↺90</button>
+        <button onClick={()=>rotateLayer(90)} aria-label="Rotate right 90" className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}>↻90</button>
+        <button onClick={()=>flipLayer("h")} aria-label="Flip horizontal" className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}>Flip H</button>
+        <button onClick={()=>flipLayer("v")} aria-label="Flip vertical" className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}>Flip V</button>
+        <button onClick={()=>scaleLayer(1.1)} aria-label="Scale up" className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}>Scale+</button>
+        <button onClick={()=>scaleLayer(0.9)} aria-label="Scale down" className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}>Scale-</button>
+      </>)}
+    </div>)}
+    <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1" role="toolbar" aria-label="Brush lab tools">
+      <button onClick={()=>setBrushLabOpen(o=>!o)} aria-pressed={brushLabOpen} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${brushLabOpen?T.accent:T.ink}`,background:brushLabOpen?T.ink:T.card,color:brushLabOpen?T.paper:T.ink}}>Brush Lab</button>
+      <button onClick={()=>setDynamics(d=>!d)} aria-pressed={dynamics} title="Pressure & speed-based size dynamics" className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${dynamics?T.accent:T.ink}`,background:dynamics?T.ink:T.card,color:dynamics?T.paper:T.ink}}>Dynamics</button>
+    </div>
+    {brushLabOpen&&(<div className="mt-1.5 p-2.5 rounded-xl flex flex-col gap-2" style={{border:`2.5px solid ${T.ink}`,background:T.card}}>
+      <canvas ref={labPreviewRef} width={220} height={48} aria-label="Brush preview" className="rounded-lg" style={{border:`2px solid ${T.ink}`,background:ART.paper,width:220,height:48}}/>
+      <div className="flex flex-wrap gap-1.5">
+        {DEMO_BRUSH_PRESETS.map(p=>(<button key={p.id} onClick={()=>applyBrushPreset(p)} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.paper,color:T.ink}}>{p.name}</button>))}
+        {savedBrushes.map(p=>(<button key={p.id} onClick={()=>applyBrushPreset(p)} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.accent}`,background:T.paper,color:T.ink}}>{p.name}</button>))}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[10px] font-bold" style={{color:T.ink}}>
+        <label className="flex items-center gap-1">Flow<input type="range" min="0.02" max="1" step="0.01" value={customBrushParams.flow} onChange={e=>setCustomBrushParams(p=>({...p,flow:+e.target.value}))} style={{accentColor:T.accent,width:56}} aria-label="Brush flow"/></label>
+        <label className="flex items-center gap-1">Scatter<input type="range" min="0" max="1" step="0.01" value={customBrushParams.scatter} onChange={e=>setCustomBrushParams(p=>({...p,scatter:+e.target.value}))} style={{accentColor:T.accent,width:56}} aria-label="Brush scatter"/></label>
+        <label className="flex items-center gap-1">Dabs<input type="range" min="1" max="10" step="1" value={customBrushParams.dabs} onChange={e=>setCustomBrushParams(p=>({...p,dabs:+e.target.value}))} style={{accentColor:T.accent,width:56}} aria-label="Brush dab count"/></label>
+        <label className="flex items-center gap-1">Jitter<input type="range" min="0" max="1" step="0.01" value={customBrushParams.angleJitter} onChange={e=>setCustomBrushParams(p=>({...p,angleJitter:+e.target.value}))} style={{accentColor:T.accent,width:56}} aria-label="Brush angle jitter"/></label>
+        <label className="flex items-center gap-1">Round<input type="range" min="0.2" max="1" step="0.01" value={customBrushParams.roundness} onChange={e=>setCustomBrushParams(p=>({...p,roundness:+e.target.value}))} style={{accentColor:T.accent,width:56}} aria-label="Brush roundness"/></label>
+      </div>
+      <div className="flex items-center gap-2">
+        <button onClick={useCustomBrush} className="lok-btn px-3 py-1 rounded-full text-[11px] font-extrabold" style={{border:`2.5px solid ${T.accent}`,background:brush==="custom"?T.ink:T.card,color:brush==="custom"?T.paper:T.ink}}>Use this brush</button>
+        {ccTier?<button onClick={saveBrushPreset} className="lok-btn px-3 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}>Save preset</button>:<span className="text-[10px] font-bold opacity-70">Unlock Pro to save custom presets</span>}
+      </div>
     </div>)}
     <div className="mt-2 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Color and tools">
       <div className="flex flex-wrap gap-1.5 items-center">
@@ -303,7 +357,8 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
       {[["pen","Pen"],["soft","Airbrush"],["eraser","Eraser"]].map(([id,l])=>(<button key={id} onClick={()=>setTool(id)} aria-pressed={tool===id} aria-label={l} className="lok-btn px-2.5 h-8 rounded-full font-bold text-xs" style={{border:`3px solid ${tool===id?T.accent:T.ink}`,background:T.card,color:T.ink}}>{l}</button>))}
       <label className="flex items-center gap-1.5 text-xs font-bold" style={{color:T.ink}}>
         size<span className="inline-flex items-center justify-center" style={{width:28,height:28}}><span aria-hidden="true" style={{width:Math.max(4,Math.min(24,size)),height:Math.max(4,Math.min(24,size)),borderRadius:"50%",background:tool==="eraser"?"transparent":color,border:`1.5px solid ${T.ink}`,display:"block"}}/></span>
-        <input type="range" min="2" max="28" value={size} onChange={e=>setSize(+e.target.value)} style={{accentColor:T.accent,width:56}} aria-label={`Brush size ${size}px`}/>
+        <input type="range" min="1" max="160" value={size} onChange={e=>setSize(+e.target.value)} style={{accentColor:T.accent,width:56}} aria-label={`Brush size ${size}px`}/>
+        <input type="number" min="1" max="400" value={size} onChange={e=>setSize(Math.max(1,Math.min(400,+e.target.value||1)))} className="text-[10px] font-bold rounded px-1" style={{width:38,border:`1.5px solid ${T.ink}`,color:T.ink,background:T.paper}} aria-label="Exact brush size"/>
       </label>
       <button onClick={undo} aria-label="Undo" className="lok-btn px-2.5 h-8 rounded-full font-bold text-xs" style={{border:`3px solid ${T.ink}`,background:T.card,color:T.ink}}>Undo</button>
       <button onClick={redo} aria-label="Redo" className="lok-btn px-2.5 h-8 rounded-full font-bold text-xs" style={{border:`3px solid ${T.ink}`,background:T.card,color:T.ink}}>Redo</button>

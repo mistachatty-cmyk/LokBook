@@ -310,6 +310,8 @@ export const STUDIO_MODULES = [
   { id: "tool_blur", type: "tool", name: "Blur / Sharpen", desc: "Gaussian blur & sharpen", price: 45 },
   { id: "tool_replace", type: "tool", name: "Color Replace", desc: "Swap one color for another", price: 35 },
   { id: "tool_rulers", type: "tool", name: "Rulers & Guides", desc: "Draggable ruler lines", price: 25 },
+  { id: "tool_transform", type: "tool", name: "Transform Tool", desc: "Move, rotate, flip & scale a layer", price: 55 },
+  { id: "feat_brushlab_save", type: "feature", name: "Brush Lab Save", desc: "Save custom Brush Lab presets for later", price: 65 },
   { id: "feat_gif", type: "feature", name: "GIF Export", desc: "Export animation as animated GIF", price: 200 },
   { id: "feat_ref", type: "feature", name: "Reference Layer", desc: "Import image as semi-transparent reference", price: 80 },
   { id: "feat_palettes", type: "feature", name: "Palette Packs", desc: "6 curated color palettes", price: 30 },
