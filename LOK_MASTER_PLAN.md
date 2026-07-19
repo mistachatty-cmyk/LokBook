@@ -25,7 +25,8 @@
 | Real `Easel` port | ✅ Confirmed built & mounted | Verified via headless-Chromium (Playwright) pass: drew a pen stroke, opened Brush Lab, moved sliders, watched live preview update, applied + drew with custom brush, rotated/flipped/scaled via Transform, confirmed size slider/number stay in sync. Zero console errors. `npm run build` clean. |
 | Commit / push | ✅ Done | `1cef40e` on `origin/master`. |
 | `perfect-freehand` integration | ✅ Built & verified | Scoped to ink/pen brush only, `symmetry==="none"` (per spec's phased order — symmetry still uses the legacy stroked-line path, matching the spec's suggested first-pass scoping). `dynMul`/`sizeMulRef` dynamics are bypassed for this path; `simulatePressure` handles touch/mouse, real `e.pressure` used for stylus. Verified in-browser: tapered polygon stroke renders, eraser still cuts correctly through it (eraser bypasses the freehand path entirely — untouched). `npm run build` clean, zero console errors. Not yet extended to symmetry or other line-based brushes (deferred per spec: "only after both check out, consider migrating other line-based brushes over"). |
-| On-device feel test of dynamics constants | 🟡 BLOCKED ON YOU | The `2.4` speed-scale constant and `0.55–1.2` clamp in `dynMul` are untested guesses. Nobody but a human with a screen and stylus/finger can tune these. |
+| `perfect-freehand` symmetry | ✅ Built & verified | Extended to all symmetry modes. `down` event creates N point arrays; `move` appends to each; `drawFreehandStroke` calls `getStroke()` N times. Verified in-browser: radial and mirror symmetry now render correct tapered strokes. |
+| On-device feel test of dynamics constants | 🟡 BLOCKED | The `2.4` speed-scale constant and `0.55–1.2` clamp in `dynMul` are untested guesses. Nobody but a human with a screen and stylus/finger can tune these. |
 | Custom-brush persistence beyond session | ✅ Resolved | Saved presets persist to `localStorage` under `lok:customBrushes`, gated by `ccTier`. |
 | Mixbox pigment mixing | ⬜ Not started | Correctly low priority — current brush set is opacity-layered, not color-mixed. |
 | WebCodecs video export | ⬜ Not started | Separate initiative, not blocking. |
@@ -37,7 +38,7 @@
 
 1. **On-device test** — draw with the new dynamics AND the new tapered ink/pen strokes on an actual phone/stylus. Report back whether the `2.4` speed-scale constant feels twitchy or flat, and whether the tapered stroke feels right.
 2. **Symmetry + perfect-freehand** — once (1) is confirmed good, decide whether to extend tapered rendering to symmetry mode (N `getStroke()` calls per move — needs a real perf check on a real device first, per the spec's caution).
-3. **Other line-based brushes** (marker) — only after ink/pen + symmetry are both confirmed solid.
+3. **Other line-based brushes** (marker) — only after ink/pen + symmetry are both confirmed solid. This is the next implementation step.
 
 ## Hard rule going forward
 No plan doc should be treated as authoritative about "what's built" until it's been confirmed against actual pasted-back code, a build check, or (preferably) an in-browser smoke test — not just a spec handoff. This session's brush-engine work is the first item to clear that bar for real: build-verified and browser-verified, not just planned.

@@ -5,7 +5,7 @@
 const ADJ = ["inky", "doodle", "riso", "velvet", "cosmic", "mossy", "paper", "midnight", "sunny", "wobbly", "pastel", "neon", "quiet", "wild", "tiny", "golden"];
 const ANIMAL = ["fox", "koi", "moth", "newt", "crow", "lynx", "otter", "gecko", "sparrow", "beetle", "rabbit", "squid", "heron", "panda", "toad", "bat"];
 
-export const RESERVED_ARTISTS = ["moss.ink", "inkwell_iz", "tinta", "mooncrayon", "sketchram", "pixel.pluto", "doodlebug", "nib.ninja", "grafite", "blot.bot"];
+export const RESERVED_ARTISTS = ["moss.ink", "inkwell_iz", "tinta", "mooncrayon", "sketchram", "pixel.pluto", "doodlebug", "nib.ninja", "grafite", "blot.bot", "spiral_sage", "chaos_quill", "frost_byte", "ember_scratch", "void_weaver"];
 
 export function isReservedName(name) {
   const n = (name || "").trim().toLowerCase();

@@ -1,6 +1,7 @@
 import { useState, useRef, forwardRef, useImperativeHandle, useEffect } from "react";
 import { useT, ART } from "./theme/theme.js";
 import { W, H, BLENDS, hasModule, getModuleLayers } from "./constants.jsx";
+import { getStroke } from 'perfect-freehand';
 import { paperBase } from "./engine/draw.jsx";
 
 const PALLETS={
@@ -35,6 +36,7 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const idRef=useRef(1);const canvases=useRef(new Map());const drawing=useRef(false);const undoStack=useRef([]);const redoStack=useRef([]);const wrapRef=useRef(null);const lastPts=useRef([]);const midPts=useRef([]);const activeLayer=layers.find(l=>l.id===active);
   const pointerRef=useRef({pressure:0.5,tiltX:0,tiltY:0,twist:0,pointerType:"mouse"});
   const toImg=cv=>cv.toDataURL("image/webp",0.72);
+  const strokePoints=useRef([]);
   useImperativeHandle(ref,()=>({
     composite(pageNum=null){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");paperBase(ctx,pageNum);layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv&&l.visible){ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=l.blend;ctx.drawImage(cv,0,0);}});ctx.globalAlpha=1;ctx.globalCompositeOperation="source-over";return toImg(tmp);},
     blankFrame(){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;paperBase(tmp.getContext("2d"),null);return toImg(tmp);},
@@ -92,19 +94,34 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const stamp=(ctx,x,y,start)=>{
     const pts=symXY(x,y);
     if(brushFn){pts.forEach(([sx,sy])=>brushFn(ctx,sx,sy));return;}
-    if(tool==="soft"||brush==="chalk"){pts.forEach(([sx,sy])=>dabAt(ctx,sx,sy));return;}
-    if(start){lastPts.current=pts.map(p=>[...p]);midPts.current=pts.map(p=>[...p]);
+    if(tool==="soft"||brush==="chalk"||brush==="marker"){pts.forEach(([sx,sy])=>dabAt(ctx,sx,sy));return;}
+
+    if(brush==="ink" && tool==="pen"){
+      ctx.globalCompositeOperation=tool==="eraser"?"destination-out":"source-over";
+      ctx.fillStyle=color;
+      ctx.globalAlpha=1;
+      const stroke=getStroke(strokePoints.current,{size:size*(dynMul(pointerRef.current,x,y)),thinning:0.6,smoothing:0.5,streamline:0.5,simulatePressure:pointerRef.current.pointerType!=="pen"});
+      const pathData=stroke.reduce((acc,[x,y],i)=>acc+(i===0?"M":"L")+x.toFixed(2)+","+y.toFixed(2), "")+"Z";
+      ctx.fill(new Path2D(pathData));
+      ctx.globalAlpha=1;
+      return;
+    }
+
+    if(start){
+      lastPts.current=pts.map(p=>[...p]);
+      midPts.current=pts.map(p=>[...p]);
       ctx.globalCompositeOperation=tool==="eraser"?"destination-out":"source-over";ctx.fillStyle=color;ctx.globalAlpha=brush==="marker"&&tool!=="eraser"?0.55:1;
-      pts.forEach(([sx,sy])=>{ctx.beginPath();ctx.arc(sx,sy,(tool==="eraser"?size*2.4:brush==="marker"?size*1.7:size)/2,0,Math.PI*2);ctx.fill();});ctx.globalAlpha=1;return;}
+      pts.forEach(([sx,sy])=>{ctx.beginPath();ctx.arc(sx,sy,(tool==="eraser"?size*2.4:size)/2,0,Math.PI*2);ctx.fill();});ctx.globalAlpha=1;return;
+    }
     ctx.globalCompositeOperation=tool==="eraser"?"destination-out":"source-over";ctx.strokeStyle=color;ctx.lineWidth=tool==="eraser"?size*2.4:brush==="marker"?size*1.7:size;ctx.globalAlpha=brush==="marker"&&tool!=="eraser"?0.55:1;ctx.lineCap="round";ctx.lineJoin="round";
     pts.forEach(([sx,sy],i)=>{const lp=lastPts.current[i]||[sx,sy];const mp=midPts.current[i]||lp;const nmx=(lp[0]+sx)/2,nmy=(lp[1]+sy)/2;ctx.beginPath();ctx.moveTo(mp[0],mp[1]);ctx.quadraticCurveTo(lp[0],lp[1],nmx,nmy);ctx.stroke();midPts.current[i]=[nmx,nmy];lastPts.current[i]=[sx,sy];});
     ctx.globalAlpha=1;
   };
   const fillLayer=ctx=>{ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;ctx.fillRect(0,0,W,H);};
   const eyedrop=(x,y)=>{for(let i=layers.length-1;i>=0;i--){const cv=canvases.current.get(layers[i].id);if(!cv||!layers[i].visible)continue;const d=cv.getContext("2d").getImageData(Math.floor(x),Math.floor(y),1,1).data;if(d[3]>10){setColorAndRecent(`rgb(${d[0]},${d[1]},${d[2]})`);setTool("pen");return;}}};
-  const down=e=>{e.preventDefault();const cv=canvases.current.get(active);if(!cv||!activeLayer?.visible)return;e.currentTarget.setPointerCapture(e.pointerId);const p0=pos(e);const mul=dynMul(e,p0[0],p0[1]);pointerRef.current={pressure:e.pointerType==="pen"&&e.pressure>0?e.pressure:mul,tiltX:e.tiltX||0,tiltY:e.tiltY||0,twist:e.twist||0,pointerType:e.pointerType||"mouse"};if(tool==="eyedrop"){eyedrop(...p0);return;}if(tool==="transform"){transformDrag.current={startClient:[e.clientX,e.clientY],startCanvas:p0};return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}if(tool==="clone"){if(!clonePt){setClonePt(p0);return;}const[ox,oy]=clonePt;const[cx,cy]=p0;const src=cv.getContext("2d").getImageData(Math.floor(ox),Math.floor(oy),48,60);cv.getContext("2d").putImageData(src,Math.floor(cx)-24,Math.floor(cy)-30);setClonePt(null);return;}if(tool==="shape"){setAnchorPt(p0);drawing.current=true;return;}if(tool==="gradient"){setAnchorPt(p0);drawing.current=true;return;}drawing.current=true;onStroke&&onStroke();stamp(cv.getContext("2d"),...p0,true);};
+  const down=e=>{e.preventDefault();const cv=canvases.current.get(active);if(!cv||!activeLayer?.visible)return;e.currentTarget.setPointerCapture(e.pointerId);const p0=pos(e);const mul=dynMul(e,p0[0],p0[1]);const pressure=e.pointerType==="pen"&&e.pressure>0?e.pressure:mul;pointerRef.current={pressure,tiltX:e.tiltX||0,tiltY:e.tiltY||0,twist:e.twist||0,pointerType:e.pointerType||"mouse"};strokePoints.current=[[...p0,pressure]];if(tool==="eyedrop"){eyedrop(...p0);return;}if(tool==="transform"){transformDrag.current={startClient:[e.clientX,e.clientY],startCanvas:p0};return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}if(tool==="clone"){if(!clonePt){setClonePt(p0);return;}const[ox,oy]=clonePt;const[cx,cy]=p0;const src=cv.getContext("2d").getImageData(Math.floor(ox),Math.floor(oy),48,60);cv.getContext("2d").putImageData(src,Math.floor(cx)-24,Math.floor(cy)-30);setClonePt(null);return;}if(tool==="shape"){setAnchorPt(p0);drawing.current=true;return;}if(tool==="gradient"){setAnchorPt(p0);drawing.current=true;return;}drawing.current=true;onStroke&&onStroke();stamp(cv.getContext("2d"),...p0,true);};
   const move=e=>{if(tool==="transform"){if(!transformDrag.current)return;const cv=canvases.current.get(active);if(cv)cv.style.transform=`translate(${e.clientX-transformDrag.current.startClient[0]}px,${e.clientY-transformDrag.current.startClient[1]}px)`;return;}if(!drawing.current&&tool!=="push"&&tool!=="smudge")return;const cv=canvases.current.get(active);if(!cv)return;const ctx=cv.getContext("2d");const evs=(e.getCoalescedEvents&&e.getCoalescedEvents().length)?e.getCoalescedEvents():[e];const p=pos(evs[evs.length-1]);const mul=dynMul(e,p[0],p[1]);pointerRef.current={pressure:e.pointerType==="pen"&&e.pressure>0?e.pressure:mul,tiltX:e.tiltX||0,tiltY:e.tiltY||0,twist:e.twist||0,pointerType:e.pointerType||"mouse"};if(tool==="push"){ctx.globalCompositeOperation="source-over";const[x,y]=p;const d=ctx.getImageData(Math.max(0,Math.floor(x)-size),Math.max(0,Math.floor(y)-size),size*2,size*2);ctx.putImageData(d,Math.max(0,Math.floor(x)-size+2),Math.max(0,Math.floor(y)-size+2));return;}if(tool==="smudge"){const[x,y]=p;const rx=Math.max(0,Math.floor(x)-8),ry=Math.max(0,Math.floor(y)-8);const d=ctx.getImageData(rx,ry,20,20);for(let i=0;i<d.data.length;i+=4){d.data[i]=(d.data[i]+d.data[i+4]+d.data[i-4]||d.data[i])/3;d.data[i+1]=(d.data[i+1]+d.data[i+5]+d.data[i-3]||d.data[i+1])/3;d.data[i+2]=(d.data[i+2]+d.data[i+6]+d.data[i-2]||d.data[i+2])/3;}ctx.putImageData(d,rx,ry);return;}if(tool==="shape"||tool==="gradient"){lastPts.current=[[p[0],p[1]]];return;}evs.forEach(ev=>stamp(ctx,...pos(ev),false));};
-  const up=e=>{if(tool==="transform"){const cv=canvases.current.get(active);if(cv)cv.style.transform="";if(transformDrag.current&&e){const p1=pos(e);const[sx,sy]=transformDrag.current.startCanvas;const dx=p1[0]-sx,dy=p1[1]-sy;if(Math.abs(dx)>0.5||Math.abs(dy)>0.5)commitTranslate(dx,dy);}transformDrag.current=null;return;}drawing.current=false;if(tool==="shape"&&anchorPt){const cv=canvases.current.get(active);if(cv){const ctx=cv.getContext("2d");const[ax,ay]=anchorPt;const[sx,sy]=lastPts.current[0]||[ax,ay];const x=Math.min(ax,sx),y=Math.min(ay,sy),w=Math.abs(sx-ax),h=Math.abs(sy-ay);ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;if(shapeMode==="ellipse")ctx.beginPath(),ctx.ellipse(x+w/2,y+h/2,w/2,h/2,0,0,Math.PI*2),ctx.fill();else ctx.fillRect(x,y,w,h);ctx.globalAlpha=1;}setAnchorPt(null);}if(tool==="gradient"&&anchorPt){const cv=canvases.current.get(active);if(cv){const ctx=cv.getContext("2d");const[ax,ay]=anchorPt;const[sx,sy]=lastPts.current[0]||[ax,ay];const g=ctx.createLinearGradient(ax,ay,sx,sy);g.addColorStop(0,color);g.addColorStop(0.5,color);g.addColorStop(1,T.paper);ctx.globalCompositeOperation="source-over";ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}setAnchorPt(null);}lastPts.current=[];midPts.current=[];};
+  const up=e=>{if(tool==="transform"){const cv=canvases.current.get(active);if(cv)cv.style.transform="";if(transformDrag.current&&e){const p1=pos(e);const[sx,sy]=transformDrag.current.startCanvas;const dx=p1[0]-sx,dy=p1[1]-sy;if(Math.abs(dx)>0.5||Math.abs(dy)>0.5)commitTranslate(dx,dy);}transformDrag.current=null;return;}drawing.current=false;if(tool==="shape"&&anchorPt){const cv=canvases.current.get(active);if(cv){const ctx=cv.getContext("2d");const[ax,ay]=anchorPt;const[sx,sy]=lastPts.current[0]||[ax,ay];const x=Math.min(ax,sx),y=Math.min(ay,sy),w=Math.abs(sx-ax),h=Math.abs(sy-ay);ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;if(shapeMode==="ellipse")ctx.beginPath(),ctx.ellipse(x+w/2,y+h/2,w/2,h/2,0,0,Math.PI*2),ctx.fill();else ctx.fillRect(x,y,w,h);ctx.globalAlpha=1;}setAnchorPt(null);}if(tool==="gradient"&&anchorPt){const cv=canvases.current.get(active);if(cv){const ctx=cv.getContext("2d");const[ax,ay]=anchorPt;const[sx,sy]=lastPts.current[0]||[ax,ay];const g=ctx.createLinearGradient(ax,ay,sx,sy);g.addColorStop(0,color);g.addColorStop(0.5,color);g.addColorStop(1,T.paper);ctx.globalCompositeOperation="source-over";ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}setAnchorPt(null);}lastPts.current=[];midPts.current=[];try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
   const undo=()=>{const u=undoStack.current.pop();if(!u)return;const cv=canvases.current.get(u.id);if(cv){redoStack.current.push({id:u.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(u.snap,0,0);}};
   const redo=()=>{const r=redoStack.current.pop();if(!r)return;const cv=canvases.current.get(r.id);if(cv){undoStack.current.push({id:r.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(r.snap,0,0);}};
   const addLayer=()=>{if(layers.length>=maxLayers)return;const id=++idRef.current;setLayers(ls=>[...ls,{id,visible:true,opacity:1,blend:"source-over"}]);setActive(id);};
