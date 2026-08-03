@@ -109,7 +109,7 @@ export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kid
     <p className="mt-2 text-[11px] opacity-60">Balance: <strong style={{color:T.accent}}>{loks} Loks</strong></p>
     <button onClick={()=>setShowResetConfirm(true)} className="lok-btn mt-2 w-full px-3 py-1.5 rounded-xl text-xs font-bold text-left" style={{border:`2px dashed ${T.shadow}`,color:T.ink,background:"transparent"}}>↺ Reset all cosmetics to default</button>
     {showResetConfirm&&(<div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,.4)"}} onClick={()=>setShowResetConfirm(false)}>
-      <div className="w-full rounded-t-3xl p-5 overflow-y-auto overscroll-contain" style={{maxWidth:560,maxHeight:"80vh",background:T.card,border:`3px solid ${T.ink}`}} onClick={e=>e.stopPropagation()}>
+      <div className="w-full rounded-t-3xl p-5 overflow-y-auto overscroll-contain" style={{maxWidth:560,maxHeight:"min(80vh, 80dvh)",background:T.card,border:`3px solid ${T.ink}`,WebkitOverflowScrolling:"touch"}} onClick={e=>e.stopPropagation()}>
         <div className="lok-display text-lg font-extrabold">Reset all cosmetics?</div>
         <p className="text-xs opacity-70 mt-1 mb-3">This unequips everything below and puts it back to default. Nothing is un-owned and no Loks are refunded — you can re-equip any of it any time.</p>
         <div className="rounded-xl overflow-hidden" style={{border:`2px solid ${T.shadow}`}}>

@@ -110,14 +110,15 @@ function Onboard({onDone,onName,defaultName="",canInstall=false,onInstallClick})
   const steps=[
     {icon:"📖",t:"Welcome to LokBook",d:"Tiny hand-drawn animations. Swipe to flip.",color:T.accent},
     {icon:"🎨",t:"Draw · Battle · Earn",d:"Studio to draw, Battle to compete, LilLok to raise.",color:T.alt},
-    {icon:"🔒",t:"Save your work",d:"Sign in — everything's backed up.",kind:"account",color:"#7A4FBF"},
+    {icon:"🔒",t:"Save your work",d:"Sign in once and your gallery follows you — new phone, same Loks, same LilLok.",kind:"account",color:"#7A4FBF"},
     {icon:"📲",t:"Add to Home Screen",d:isIOS?"Guest art needs this to stick.":"Keeps LokBook one tap away.",kind:"install",color:"#2FA9A0"},
     {icon:"✏️",t:"Make it yours",d:"Your artist name — start with 50 Loks.",color:T.accent},
   ];
   const s=steps[step];const last=step===steps.length-1;
-  const cardRef=useRef(null);const bodyRef=useRef(null);
+  const cardRef=useRef(null);const bodyRef=useRef(null);const acctRef=useRef(null);
   useEffect(()=>{if(cardRef.current)gsap.fromTo(cardRef.current,{opacity:0,y:24,scale:0.94},{opacity:1,y:0,scale:1,duration:0.45,ease:"back.out(1.6)"});},[]);
   useEffect(()=>{if(bodyRef.current)gsap.fromTo(bodyRef.current,{opacity:0,x:16},{opacity:1,x:0,duration:0.3,ease:"power2.out"});},[step]);
+  useEffect(()=>{if(acctRef.current)gsap.fromTo(acctRef.current,{opacity:0,y:6},{opacity:1,y:0,duration:0.3,ease:"power2.out"});},[authSent,step]);
   const go=dir=>{if(bodyRef.current)gsap.to(bodyRef.current,{opacity:0,x:dir>0?-16:16,duration:0.12,ease:"power1.in",onComplete:()=>setStep(st=>st+dir)});else setStep(st=>st+dir);};
   const tapBtn=e=>gsap.fromTo(e.currentTarget,{scale:0.95},{scale:1,duration:0.25,ease:"back.out(3)"});
   return(<div className="fixed inset-0 z-[60] flex items-center justify-center p-5" style={{background:"rgba(0,0,0,.55)"}}>
@@ -126,15 +127,15 @@ function Onboard({onDone,onName,defaultName="",canInstall=false,onInstallClick})
         <div className="mx-auto mb-3 flex items-center justify-center rounded-full" style={{width:56,height:56,fontSize:28,background:s.color+"22",border:`2.5px solid ${s.color}`}}>{s.icon}</div>
         <div className="lok-display text-xl font-extrabold mb-1" style={{color:T.ink}}>{s.t}</div>
         <p className="text-sm opacity-70 leading-snug">{s.d}</p>
-        {s.kind==="account"&&(<div className="mt-3 text-left">
+        {s.kind==="account"&&(<div ref={acctRef} className="mt-3 text-left">
           {auth.isAuthenticated()?(<div className="text-sm font-bold text-center py-2" style={{color:T.alt}}>✓ Signed in as {auth.getEmail()}</div>
           ):authSent?(<div className="text-sm text-center leading-snug py-2">✉️ Check <strong>{authSent}</strong> for the link.</div>
           ):(<>
             <div className="flex gap-1.5">
               <input value={authEmail} onChange={e=>setAuthEmail(e.target.value)} type="email" placeholder="your@email.com" aria-label="Email for account sign-in" onKeyDown={e=>e.key==="Enter"&&sendLink()} className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.paper,color:T.ink}}/>
-              <button onClick={sendLink} disabled={authBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:s.color,color:"#fff",border:`2.5px solid ${T.ink}`,opacity:authBusy?0.6:1}}>{authBusy?"…":"Go"}</button>
+              <button onClick={e=>{tapBtn(e);sendLink();}} disabled={authBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:s.color,color:"#fff",border:`2.5px solid ${T.ink}`,opacity:authBusy?0.6:1}}>{authBusy?"…":"Go"}</button>
             </div>
-            <div className="mt-2 text-[11px] opacity-55 leading-snug text-center">Skip to try as a guest — art stays on this device, and can be cleared after ~a week without the next step.</div>
+            <div className="mt-2 text-[11px] opacity-55 leading-snug text-center">No password, just a magic link. Skip to try as a guest — art stays on this device, and can be cleared after ~a week without the next step.</div>
           </>)}
         </div>)}
         {s.kind==="install"&&(<div className="mt-3">
@@ -856,6 +857,9 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
   const joinFounders=async()=>{if(!fHandle.trim()||fHandle.trim().length<2){say("Enter a handle");return;}setFBusy(true);try{await onFounderJoin(fHandle.trim(),fEmail.trim());say("You're a founder! Data secured on the test server 🏆","success");}catch{say("Couldn't reach the server — try again","error");}setFBusy(false);};
   const auth=useAuth();const[authEmail,setAuthEmail]=useState("");const[authSent,setAuthSent]=useState("");const[authBusy,setAuthBusy]=useState(false);const[cloudBusy,setCloudBusy]=useState(false);
   const sendAuthLink=async()=>{const e=authEmail.trim();if(!e||!e.includes("@")){say("Enter a valid email","error");return;}setAuthBusy(true);try{await auth.signInWithEmail(e);setAuthSent(e);say("Magic link sent — check your email","success");}catch{say("Couldn't send link — try again","error");}setAuthBusy(false);};
+  const acctPanelRef=useRef(null);
+  useEffect(()=>{if(showSettings&&acctPanelRef.current)gsap.fromTo(acctPanelRef.current,{opacity:0,y:10},{opacity:1,y:0,duration:0.35,ease:"power2.out",delay:0.05});},[showSettings,authSent]);
+  const tapBtn=e=>gsap.fromTo(e.currentTarget,{scale:0.95},{scale:1,duration:0.25,ease:"back.out(3)"});
   const cloudSyncNow=async()=>{if(!supabase||!auth.getUserId())return;setCloudBusy(true);try{const localSave=await store.get(SAVE_KEY);const localGallery=await store.get(GALLERY_KEY);const{error}=await supabase.from("auth_saves").upsert({user_id:auth.getUserId(),save_blob:{...localSave,_gallery:localGallery},updated_at:new Date().toISOString()});if(error)throw error;say("Backed up to the cloud","success");}catch{say("Cloud sync failed — try again","error");}setCloudBusy(false);};
   const cloudRestoreNow=async()=>{if(!supabase||!auth.getUserId())return;if(!window.confirm("Replace this device's data with your cloud backup? This device will reload."))return;setCloudBusy(true);try{const{data,error}=await supabase.from("auth_saves").select("save_blob").eq("user_id",auth.getUserId()).single();if(error)throw error;if(!data?.save_blob){say("No cloud backup found yet","error");setCloudBusy(false);return;}const{_gallery,...saveRest}=data.save_blob;await store.set(SAVE_KEY,saveRest);if(_gallery)await store.set(GALLERY_KEY,_gallery);window.location.reload();}catch{say("Restore failed — try again","error");setCloudBusy(false);}};
   const isIOS=typeof navigator!=="undefined"&&/iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -931,15 +935,18 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
       {garden.some(p=>p&&!p.harvested)&&<button onClick={()=>setGarden(g=>g.map(p=>p&&!p.harvested?{...p,growth:Math.min(100,p.growth+5+Math.random()*10)}:p))} className="lok-btn mt-1.5 w-full py-1.5 rounded-xl text-xs font-bold" style={{border:`2px solid ${T.ink}`,background:T.card}}>💧 Water all (+water each plant)</button>}
     </section>)}
     {showSettings&&(<div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,.35)"}} onClick={()=>setShowSettings(false)}>
-      <div className="w-full rounded-t-3xl p-5 overflow-y-auto overscroll-contain" style={{maxWidth:560,maxHeight:"85vh",background:T.card,border:`3px solid ${T.ink}`,animation:"lokrise .25s ease",WebkitOverflowScrolling:"touch"}} onClick={e=>e.stopPropagation()}>
+      <div className="w-full rounded-t-3xl p-5 overflow-y-auto overscroll-contain" style={{maxWidth:560,maxHeight:"min(85vh, 85dvh)",background:T.card,border:`3px solid ${T.ink}`,animation:"lokrise .25s ease",WebkitOverflowScrolling:"touch"}} onClick={e=>e.stopPropagation()}>
         <div className="sticky top-0 flex items-center justify-between mb-3 pb-1 -mt-5 -mx-5 px-5 pt-5" style={{background:T.card,zIndex:1}}><div className="lok-display text-lg font-extrabold">Settings</div><button onClick={()=>setShowSettings(false)} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Close settings">✕</button></div>
         <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${T.ink}`,background:T.paper}}>
           <div className="lok-display font-extrabold text-sm">📱 Add Lok to your home screen</div>
           <div className="text-xs opacity-70 mt-1 leading-snug">{isIOS?"Tap the Share button in Safari, then \u201CAdd to Home Screen\u201D. Lok opens full-screen like a native app.":"Install Lok as an app — it gets its own icon and opens full-screen, no browser bars."}</div>
           {!isIOS&&<button onClick={()=>onInstall&&onInstall()} className="lok-btn lok-display mt-2 w-full py-2.5 rounded-xl font-extrabold" style={{background:canInstall?T.accent:T.shadow,color:canInstall?T.onAccent:T.ink,border:`3px solid ${T.ink}`,opacity:canInstall?1:0.7}} aria-label="Install Lok as an app">{canInstall?"Install Lok":"Install via browser menu →"}</button>}
         </div>
-        <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${auth.isAuthenticated()?T.alt:T.ink}`,background:T.paper}}>
-          <div className="lok-display font-extrabold text-sm">🔐 Account{auth.isAuthenticated()&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>SIGNED IN</span>}</div>
+        <div ref={acctPanelRef} className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${auth.isAuthenticated()?T.alt:"#7A4FBF"}`,background:T.paper}}>
+          <div className="flex items-center gap-2 mb-0.5">
+            <div className="flex items-center justify-center rounded-full shrink-0" style={{width:30,height:30,fontSize:15,background:(auth.isAuthenticated()?T.alt:"#7A4FBF")+"22",border:`2px solid ${auth.isAuthenticated()?T.alt:"#7A4FBF"}`}}>🔐</div>
+            <div className="lok-display font-extrabold text-sm">Account{auth.isAuthenticated()&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>SIGNED IN</span>}</div>
+          </div>
           {!supabase?(<div className="text-xs opacity-70 mt-1 leading-snug">Cloud accounts aren't configured for this build yet.</div>):auth.loading?(<div className="text-xs opacity-60 mt-1">Loading…</div>):auth.isAuthenticated()?(<>
             <div className="text-xs opacity-70 mt-1 leading-snug">Signed in as <strong>{auth.getEmail()}</strong>. Your gallery and progress can back up to the cloud and follow you to other devices.</div>
             <div className="mt-2 flex gap-1.5">
@@ -948,10 +955,10 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
             </div>
             <button onClick={()=>auth.signOut()} className="lok-btn mt-1.5 w-full py-1.5 rounded-xl font-bold text-xs" style={{border:`2px solid ${T.shadow}`,color:T.ink,background:"transparent"}}>Sign out</button>
           </>):authSent?(<div className="text-xs mt-1 leading-snug">✉️ Check <strong>{authSent}</strong> for a magic link to finish signing in.</div>):(<>
-            <div className="text-xs opacity-70 mt-1 leading-snug">Sign in to back up your gallery and Loks, and to be found by other artists.</div>
+            <div className="text-xs opacity-70 mt-1 leading-snug">Sign in once and your gallery follows you — new phone, same Loks, same LilLok.</div>
             <div className="mt-2 flex gap-1.5">
               <input value={authEmail} onChange={e=>setAuthEmail(e.target.value)} placeholder="your@email.com" type="email" aria-label="Email for account sign-in" className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}} onKeyDown={e=>e.key==="Enter"&&sendAuthLink()}/>
-              <button onClick={sendAuthLink} disabled={authBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,opacity:authBusy?0.6:1}}>{authBusy?"Sending…":"Send link"}</button>
+              <button onClick={e=>{tapBtn(e);sendAuthLink();}} disabled={authBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:"#7A4FBF",color:"#fff",border:`3px solid ${T.ink}`,opacity:authBusy?0.6:1}}>{authBusy?"Sending…":"Send link"}</button>
             </div>
           </>)}
         </div>
@@ -1081,8 +1088,8 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
       </div>
     </div>)}
     {editing&&(<div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,.35)"}} onClick={()=>setEditing(false)}>
-      <div className="w-full rounded-t-3xl p-5" style={{maxWidth:560,background:T.card,border:`3px solid ${T.ink}`,animation:"lokrise .25s ease"}} onClick={e=>e.stopPropagation()}>
-        <div className="lok-display text-lg font-extrabold mb-3">Edit profile</div>
+      <div className="w-full rounded-t-3xl p-5 overflow-y-auto overscroll-contain" style={{maxWidth:560,maxHeight:"min(85vh, 85dvh)",background:T.card,border:`3px solid ${T.ink}`,animation:"lokrise .25s ease",WebkitOverflowScrolling:"touch"}} onClick={e=>e.stopPropagation()}>
+        <div className="sticky top-0 flex items-center justify-between mb-3 pb-1 -mt-5 -mx-5 px-5 pt-5" style={{background:T.card,zIndex:1}}><div className="lok-display text-lg font-extrabold">Edit profile</div><button onClick={()=>setEditing(false)} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Close">✕</button></div>
         <div className="flex items-center gap-3 mb-3"><img src={renderAvatar(draft.avatarSeed)} alt="" className="w-16 h-16 rounded-full" style={{border:`3px solid ${T.ink}`}}/><button onClick={()=>setDraft(d=>({...d,avatarSeed:Math.floor(Math.random()*9999)}))} className="lok-btn px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`}} aria-label="Re-roll avatar">Re-roll avatar</button></div>
         <input value={draft.name} onChange={e=>setDraft(d=>({...d,name:e.target.value}))} placeholder="Handle" aria-label="Display name" className="w-full px-3 py-2.5 rounded-xl font-bold mb-2" style={{border:`3px solid ${T.ink}`,background:T.paper,color:T.ink}}/>
         <textarea value={draft.bio} onChange={e=>setDraft(d=>({...d,bio:e.target.value}))} placeholder="What's your gallery about?" rows={3} aria-label="Bio" className="w-full px-3 py-2.5 rounded-xl text-sm mb-3" style={{border:`3px solid ${T.ink}`,background:T.paper,color:T.ink}}/>
