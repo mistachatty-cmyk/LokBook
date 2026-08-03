@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock.js";
 import { useT, THEMES, SKIN_WAVE_GATE, SKIN_WAVE_3_GATE, SKIN_WAVE_4_GATE, blotBorderStyle } from "../theme/theme.js";
 import {
   RARITY, EFFECTS, NAME_COLORS, PAPERS, MYTHIC_ITEMS, CELEBRATIONS, ANIMATION_FX, SKIES,
@@ -24,6 +25,7 @@ export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kid
   const[legacy,setLegacy]=useState(()=>{try{return localStorage.getItem("lok:shop:legacy")==="1";}catch{return false;}});
   useEffect(()=>{try{localStorage.setItem("lok:shop:legacy",legacy?"1":"0");}catch{}},[legacy]);
   const[showResetConfirm,setShowResetConfirm]=useState(false);
+  useBodyScrollLock(showResetConfirm);
   // Only *equips* reset — nothing is un-owned or refunded. Each row is
   // [label, current display value, default id, apply()].
   const defaultThemeId=Object.keys(THEMES)[0];

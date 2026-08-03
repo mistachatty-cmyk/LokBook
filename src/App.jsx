@@ -10,6 +10,7 @@ import Shop from "./pages/Shop.jsx";
 import { encodeLok } from "./engine/lokFormat.js";
 import { AD_PROVIDER } from "./ads.js";
 import { useFeedback } from "./hooks/useFeedback.js";
+import { useBodyScrollLock } from "./hooks/useBodyScrollLock.js";
 import {
   W, H, PROMPTS, PROMPT_META, CATEGORIES, MOTION_TYPES, CATEGORY_ICONS, WEEKLY_PROMPT, SUPA_URL, SUPA_KEY, PACE_PRESETS,
   BLOT_BORDERS, FOD_WINDOW_DAYS, ANIMATED_AVATAR_SPEND, ADS, QUEST_POOL, REACTION_SETS, LILLOK_SPEECH,
@@ -778,6 +779,7 @@ function PersonRow({name,note}){const T=useT();const seed=name.length*31;return(
 
 function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,xp,quests,following,lokdInCount,bookmarks,notifications=[],notifUnread=0,loks=0,totalEarned=0,questsCompleted=0,canInstall=false,onInstall,onClearNotifs,onOpen,onDelete,onRename,say,onCheat,pace="sweep",setPace,speed=1,setSpeed,soundLab=false,onUnlockSoundLab,soundQueue=[],setSoundQueue,founder=false,onFounderJoin,animatedToken=false,flair="",garden=[],setGarden,wordTwister={},setWordTwister,timeMachineIdx=-1,setTimeMachineIdx,heatmapData=[],sessionPin=null,setSessionPin,pinInput="",setPinInput,verified=false,setVerified,devTap,devTimer,devMode,setDevMode,appLogo,setAppLogo,hapticGrammar,setHapticGrammar,setPinUnlocked,setLoks,setTotalEarned,legacyStudio,setLegacyStudio,tutorialProgress={},onStartTutorial,viewingArtist,onBackToMyGallery,featureFlags={compactUi:false,uiScale:"normal"},onSetFlag,onOpenMusic}){
   const T=useT();const[filter,setFilter]=useState("newest");const[view,setView]=useState("gallery");const[editing,setEditing]=useState(false);const[draft,setDraft]=useState(profile);const[showNotifs,setShowNotifs]=useState(false);const[searchQ,setSearchQ]=useState("");const[showSettings,setShowSettings]=useState(false);
+  useBodyScrollLock(showSettings||editing);
   const tapCount=useRef(0);const tapTimer=useRef(null);const audioRef=useRef(null);const[slUrl,setSlUrl]=useState("");const[slPlaying,setSlPlaying]=useState(null);const[fHandle,setFHandle]=useState(profile.name||"");const[fEmail,setFEmail]=useState("");const[fBusy,setFBusy]=useState(false);
   const[bleepCode,setBleepCode]=useState("");
   // Debug-only, never persisted: stash the real balance while unlimited Loks
