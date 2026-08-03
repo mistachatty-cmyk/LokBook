@@ -292,7 +292,10 @@ function Viewer({posts,index,bookmarks,cosmetics={},onBookmark,onClose,onNav,onV
   </div>);
 }
 
-const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,animFx="none"},ref){
+const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,animFx="none",modules=[]},ref){
+  // Pro surfaces unlock from the LokPass tier OR from an owned Studio module,
+  // so module purchases in the Shop actually change the easel.
+  const pro=id=>ccTier||hasModule(modules,id);
   const T=useT();
   const[layers,setLayers]=useState([{id:1,visible:true,opacity:1,blend:"source-over"}]);
   const[active,setActive]=useState(1);const[tool,setTool]=useState("pen");const[color,setColor]=useState(ART.ink);const[recentColors,setRecentColors]=useState([]);const[size,setSize]=useState(7);const[symmetry,setSymmetry]=useState("none");const[brush,setBrush]=useState("ink");
@@ -420,11 +423,11 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
       <button onClick={addLayer} disabled={layers.length>=maxLayers} aria-label="Add layer" className="shrink-0 px-2.5 py-1 rounded-lg font-extrabold text-sm" style={{border:`2.5px solid ${T.ink}`,color:T.ink,opacity:layers.length>=maxLayers?0.35:1,background:T.card}}>+ layer</button>
       {activeLayer&&<label className="shrink-0 flex items-center gap-1.5 text-xs font-bold ml-1" style={{color:T.ink}}>opacity<input type="range" min="0.1" max="1" step="0.05" value={activeLayer.opacity} onChange={e=>patchLayer(active,{opacity:+e.target.value})} style={{accentColor:T.accent,width:64}} aria-label="Layer opacity"/></label>}
     </div>
-    {ccTier&&activeLayer&&(<div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1" role="toolbar" aria-label="Blend modes">
+    {pro("feat_blend")&&activeLayer&&(<div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1" role="toolbar" aria-label="Blend modes">
       <span className="text-xs font-bold opacity-60 shrink-0">blend</span>
       {BLENDS.map(b=>(<button key={b} onClick={()=>patchLayer(active,{blend:b})} aria-pressed={activeLayer.blend===b} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${activeLayer.blend===b?T.accent:T.ink}`,background:activeLayer.blend===b?T.ink:T.card,color:activeLayer.blend===b?T.paper:T.ink}}>{b==="source-over"?"normal":b}</button>))}
     </div>)}
-    {ccTier&&(<div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1" role="toolbar" aria-label="Pro tools">
+    {(pro("feat_symmetry")||pro("brush_marker")||pro("brush_chalk")||pro("tool_fill")||pro("tool_eyedrop")||pro("tool_transform"))&&(<div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1" role="toolbar" aria-label="Pro tools">
       <span className="text-xs font-bold opacity-60 shrink-0">pro</span>
       {[["ink","Ink"],["marker","Marker"],["chalk","Chalk"]].map(([id,l])=>(<button key={id} onClick={()=>{setBrush(id);if(tool==="eraser"||tool==="fill"||tool==="eyedrop")setTool("pen");}} aria-pressed={brush===id} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${brush===id?T.accent:T.ink}`,background:brush===id?T.ink:T.card,color:brush===id?T.paper:T.ink}}>{l}</button>))}
       <select value={symmetry} onChange={e=>setSymmetry(e.target.value)} aria-label="Symmetry mode" className="shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${symmetry!=="none"?T.accent:T.ink}`,background:symmetry!=="none"?T.ink:T.card,color:symmetry!=="none"?T.paper:T.ink}}>
@@ -461,7 +464,7 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
       </div>
       <div className="flex items-center gap-2">
         <button onClick={useCustomBrush} className="lok-btn px-3 py-1 rounded-full text-[11px] font-extrabold" style={{border:`2.5px solid ${T.accent}`,background:brush==="custom"?T.ink:T.card,color:brush==="custom"?T.paper:T.ink}}>Use this brush</button>
-        {ccTier?<button onClick={saveBrushPreset} className="lok-btn px-3 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}>Save preset</button>:<span className="text-[10px] font-bold opacity-70">Unlock Pro to save custom presets</span>}
+        {pro("feat_brushlab_save")?<button onClick={saveBrushPreset} className="lok-btn px-3 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}>Save preset</button>:<span className="text-[10px] font-bold opacity-70">Unlock Pro to save custom presets</span>}
       </div>
     </div>)}
     <div className="mt-2 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Color and tools">
@@ -707,7 +710,7 @@ function NewStudioUI({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt,animFx,mo
   </div>);
 }
 
-function Battle({ownedTiers,ccTier,wins,bigBattleOwned,kids,phase,lillok,customLilLok,onResult,onUnlockBig,onPublish,onLine,blip,hap,say,animFx,authorName}){
+function Battle({ownedTiers,ccTier,wins,bigBattleOwned,kids,phase,lillok,customLilLok,onResult,onUnlockBig,onPublish,onLine,blip,hap,say,animFx,authorName,modules=[]}){
   const T=useT();
   const[pstate,setPstate]=useState("lobby");const[format,setFormat]=useState(FORMATS[0]);const[duration,setDuration]=useState(60);const[tier,setTier]=useState(10);const[prompt,setPrompt]=useState(PROMPTS[0]);const[count,setCount]=useState(3);const[timeLeft,setTimeLeft]=useState(0);const[bots,setBots]=useState([]);const[botThumbs,setBotThumbs]=useState([]);const[entries,setEntries]=useState([]);const[results,setResults]=useState(null);const[shake,setShake]=useState(false);const[splat,setSplat]=useState(null);const[block,setBlock]=useState(null);const[blocked,setBlocked]=useState(0);const[myArt,setMyArt]=useState(null);const[bFrames,setBFrames]=useState([]);const[featured,setFeatured]=useState(false);const[botType,setBotType]=useState("artist");
   const[promptFilters,setPromptFilters]=useState({category:null,motion:null});
@@ -802,7 +805,7 @@ function Battle({ownedTiers,ccTier,wins,bigBattleOwned,kids,phase,lillok,customL
     <div className="mt-1.5 h-2 rounded-full overflow-hidden" style={{background:T.shadow}}><div style={{width:`${(timeLeft/duration)*100}%`,height:"100%",background:T.accent,transition:"width 1s linear"}}/></div>
     <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">{bots.map((b,i)=>(<div key={b.name} className="shrink-0 text-center" style={{width:60}}><img src={botThumbs[i]} alt={b.name} className="w-full rounded-md" style={{aspectRatio:"4/5",objectFit:"cover",border:`2px solid ${T.ink}`}}/><div className="text-[10px] font-bold truncate opacity-70">{b.name}</div></div>))}</div>
     <div className="mt-2 relative">
-      <Easel ref={easel} maxLayers={tier} ccTier={ccTier} onStroke={()=>(strokes.current+=1)} animFx={animFx}/>
+      <Easel ref={easel} maxLayers={tier} ccTier={ccTier} modules={modules} onStroke={()=>(strokes.current+=1)} animFx={animFx}/>
       {splat&&<InterventionFX kind={splat.k} seed={splat.seed}/>}
       {block&&(<button onClick={doBlock} className="lok-btn absolute left-1/2 top-1/2 px-5 py-3 rounded-2xl lok-display font-extrabold text-lg" style={{transform:"translate(-50%,-50%)",background:T.ink,color:T.paper,border:`3px solid ${T.accent}`,animation:"lokpulse .5s infinite"}}>LOK BLOCK!</button>)}
     </div>
@@ -846,7 +849,7 @@ function Battle({ownedTiers,ccTier,wins,bigBattleOwned,kids,phase,lillok,customL
       <div className="lok-display text-2xl font-extrabold px-3 py-1 rounded-xl shrink-0" style={{background:duelTimeLeft<=10?T.accent:T.ink,color:duelTimeLeft<=10?T.onAccent:T.paper,animation:duelTimeLeft<=10&&duelTimeLeft>0&&!reduceMotion?"lokpulse .6s ease-in-out infinite":"none"}}>{duelTimeLeft}s</div>
     </div>
     <div className="mt-1.5 h-2 rounded-full overflow-hidden" style={{background:T.shadow}}><div style={{width:`${(duelTimeLeft/60)*100}%`,height:"100%",background:T.accent,transition:"width 1s linear"}}/></div>
-    <div className="mt-2"><Easel ref={easel} maxLayers={1} ccTier={ccTier} onStroke={()=>(strokes.current+=1)} animFx={animFx}/></div>
+    <div className="mt-2"><Easel ref={easel} maxLayers={1} ccTier={ccTier} modules={modules} onStroke={()=>(strokes.current+=1)} animFx={animFx}/></div>
     <button onClick={submitDuelNow} className="lok-btn lok-display mt-2 w-full py-3 rounded-xl text-lg font-extrabold" style={{background:T.ink,color:T.paper,boxShadow:`3px 3px 0 ${T.accent}`}}>Submit now</button>
   </div>);
   if(pstate==="duel_wait")return(<div className="mt-12 text-center">
@@ -1220,7 +1223,20 @@ export default function LokApp(){
     if(!ready||!auth.isAuthenticated()||!auth.getUserId())return;
     upsertMyProfile({userId:auth.getUserId(),handle:profile.name,displayName:profile.name,avatarSeed:profile.avatarSeed,bio:profile.bio,flips:posts.filter(p=>p.author===profile.name).length,level});
   },[ready,auth.isAuthenticated(),profile.name,profile.bio,profile.avatarSeed,level]);
-  useEffect(()=>{if(!ready)return;const picks=pickAmbientPosts(botPosted,2);if(!picks.length)return;setBotPosted(b=>[...b,...picks.map(p=>p.key)].slice(-400));picks.forEach((pk,i)=>{setTimeout(()=>{try{const post=generateBotPost(pk.bot,pk.seed);if(post)setPosts(ps=>ps.some(x=>x.id===post.id)?ps:[...ps.slice(0,3),post,...ps.slice(3)]);}catch(e){console.warn("botArt",e);}},1600+i*900);});},[ready]);
+  // Resident artists keep working while you're in the app: a burst on open,
+  // then a fresh piece every couple of minutes so the feed stays alive.
+  const dropBotPosts=useCallback(count=>{
+    const picks=pickAmbientPosts(botPosted,count);
+    if(!picks.length)return;
+    setBotPosted(b=>[...b,...picks.map(p=>p.key)].slice(-400));
+    picks.forEach((pk,i)=>{setTimeout(()=>{try{const post=generateBotPost(pk.bot,pk.seed);if(post)setPosts(ps=>ps.some(x=>x.id===post.id)?ps:[...ps.slice(0,3),post,...ps.slice(3)]);}catch(e){console.warn("botArt",e);}},1600+i*900);});
+  },[botPosted]);
+  useEffect(()=>{if(!ready)return;dropBotPosts(3);},[ready]);
+  useEffect(()=>{
+    if(!ready)return;
+    const iv=setInterval(()=>{if(!document.hidden)dropBotPosts(1);},135000);
+    return()=>clearInterval(iv);
+  },[ready,dropBotPosts]);
   useEffect(()=>{const onScroll=()=>{setAdVisible(false);clearTimeout(adScrollTimer.current);adScrollTimer.current=setTimeout(()=>setAdVisible(true),1200);};window.addEventListener("scroll",onScroll,{passive:true});return()=>window.removeEventListener("scroll",onScroll);},[]);
   const guardedAddLoks=useCallback(n=>{const now=Date.now();if(now-earnLog.current.ts>3600000){earnLog.current={ts:now,total:0};}if(earnLog.current.total+n>120){return;}earnLog.current.total+=n;setLoks(l=>l+n);setTotalEarned(t=>t+n);},[]);
   const addLoks=guardedAddLoks;
@@ -1347,7 +1363,7 @@ export default function LokApp(){
             <div className="flex items-center gap-1">{Array.from({length:5}).map((_,i)=>(<button key={i} onClick={()=>{setBattleRoyaleCount(c=>c+1);if(i===4){addLoks(30);say("Battle Royale hype! +30 Loks","success");}}} className="lok-btn w-6 h-6 rounded-full text-[9px] font-bold flex items-center justify-center" style={{border:`2px solid ${i<battleRoyaleCount?T.accent:T.shadow}`,background:i<battleRoyaleCount?T.accent:"transparent",color:i<battleRoyaleCount?T.onAccent:T.ink}} aria-label={i<battleRoyaleCount?"Hype unlocked":"Add hype"}>{i<battleRoyaleCount?"🔥":"+"}</button>))}</div>
             {battleRoyaleCount>=5&&<span className="text-xs font-bold" style={{color:T.accent}}>READY!</span>}
           </div>
-          <Battle ownedTiers={ownedTiers} ccTier={ccTier} wins={wins} bigBattleOwned={bigBattleOwned} kids={kids} phase={phase} lillok={lillok} customLilLok={customLilLok} say={say} blip={blip} hap={hap} animFx={animFx} authorName={profile.name} onLine={showLine} onUnlockBig={()=>spend(50,()=>setBigBattleOwned(true),"Big Battle unlocked")} onResult={(won,mult=1)=>{addLoks((won?25:5)*mult);gainXp(won?25:8);questTick("battle");if(won){setWins(w=>w+1);hap([200,100,200]);pushNotif(`You won a battle! +${25*mult} Loks${mult>1?" · ✦ 3× featured":""}`,"success");feedLilLok(5,"creation");}setLillok(s=>s.stasis?s:({...s,ink:Math.max(0,s.ink-6)}));}} onPublish={post=>setPosts(ps=>[post,...ps])}/></>}
+          <Battle modules={modules} ownedTiers={ownedTiers} ccTier={ccTier} wins={wins} bigBattleOwned={bigBattleOwned} kids={kids} phase={phase} lillok={lillok} customLilLok={customLilLok} say={say} blip={blip} hap={hap} animFx={animFx} authorName={profile.name} onLine={showLine} onUnlockBig={()=>spend(50,()=>setBigBattleOwned(true),"Big Battle unlocked")} onResult={(won,mult=1)=>{addLoks((won?25:5)*mult);gainXp(won?25:8);questTick("battle");if(won){setWins(w=>w+1);hap([200,100,200]);pushNotif(`You won a battle! +${25*mult} Loks${mult>1?" · ✦ 3× featured":""}`,"success");feedLilLok(5,"creation");}setLillok(s=>s.stasis?s:({...s,ink:Math.max(0,s.ink-6)}));}} onPublish={post=>setPosts(ps=>[post,...ps])}/></>}
           {tab==="front"&&<OpenFront kids={kids} loks={loks} dailyPrompt={daily.prompt} hinted={traceHinted} onHinted={()=>setTraceHinted(true)} onWager={amt=>{if(loks<amt)return false;setLoks(l=>l-amt);setTotalSpent(t=>t+amt);return true;}} onEarn={n=>{addLoks(n);questTick("front",Math.max(1,Math.round(n/5)));gainXp(n);setLillok(s=>s.stasis?s:({...s,ink:Math.max(0,s.ink-3)}));}} blip={blip} say={say}/>}
           {tab==="rooms"&&<Rooms profile={profile} userId={profile.name} myRooms={myRooms} setMyRooms={setMyRooms} pendingCode={pendingRoomCode} onPendingCodeUsed={()=>setPendingRoomCode(null)} onArtist={name=>setArtistView&&setArtistView(name)} say={say} blip={blip} hap={hap}/>}
           {tab==="shop"&&<Shop ccTier={ccTier} say={say} modules={modules} onBuyModule={m=>{if(modules.includes(m.id)){say("Already owned");return;}spend(m.price,()=>{setModules(o=>[...o,m.id]);blip("C6");},`${m.name} unlocked`);}} loks={loks} lokPass={lokPass} kids={kids} uiTheme={uiTheme} ownedThemes={ownedThemes} effect={effect} ownedEffects={ownedEffects} sky={sky} ownedSkies={ownedSkies} onSky={(id,s)=>{if(ownedSkies.includes(id)){setSky(id);say(`Equipped ${s.name}`);}else spend(s.price,()=>{setOwnedSkies(o=>[...o,id]);setSky(id);},`${s.name} unlocked`);}} animFx={animFx} ownedAnimFx={ownedAnimFx} onAnimFx={(id,f)=>{if(ownedAnimFx.includes(id)){setAnimFx(id);say(id==="none"?"FX off":`${f.name} equipped`);}else spend(f.price,()=>{setOwnedAnimFx(o=>[...o,id]);setAnimFx(id);},`${f.name} unlocked`);}} fontPack={fontPack} onFontPack={(id,f)=>spend(f.price,()=>{setOwned(o=>({...o,fontPack:[...(o.fontPack||[]),id]}));setFontPack(id);},`${f.name} set`)} cursorPack={cursorPack} onCursorPack={(id,c)=>spend(c.price,()=>{setOwned(o=>({...o,cursorPack:[...(o.cursorPack||[]),id]}));setCursorPack(id);},`${c.name} set`)} musicPack={musicPack} onMusicPack={(id,m)=>spend(m.price,()=>{setOwned(o=>({...o,musicPack:[...(o.musicPack||[]),id]}));setMusicPack(id);},`${m.name} set`)} stickerPack={stickerPack} onStickerPack={(id,s)=>spend(s.price,()=>{setOwned(o=>({...o,stickerPack:[...(o.stickerPack||[]),id]}));setStickerPack(id);},`${s.name} set`)} postExport={postExport} onPostExport={(id,e)=>spend(e.price,()=>{setOwned(o=>({...o,postExport:[...(o.postExport||[]),id]}));setPostExport(id);},`${e.name} set`)} mythicOwned={mythicOwned} mythicEquipped={mythicEquipped} dailyOwned={dailyOwned} weeklyOwned={weeklyOwned} onBuyMythic={(item,rotation)=>{if(rotation==="daily"||rotation==="weekly"){spend(item.price,()=>{rotation==="daily"?setDailyOwned(o=>[...o,item.id]):setWeeklyOwned(o=>[...o,item.id]);},`${item.name} unlocked`);}else{if(mythicOwned.includes(item.id)){setMythicEquipped(item.id);say(`Equipped ${item.name}`);}else spend(item.price,()=>{setMythicOwned(o=>[...o,item.id]);setMythicEquipped(item.id);setTimeout(()=>setCelebration(item.name),100);setTimeout(()=>setCelebration(null),3000);},`${item.name} unlocked`);}}} cosmetics={cosmetics} owned={owned} setKids={setKids} onBuyCosmetic={(cat,item)=>{if((owned[cat]||[]).includes(item.id)){setCosmetics(c=>({...c,[cat]:item.id}));blip("D5");say(`Equipped ${item.name}`);}else spend(item.price,()=>{setOwned(o=>({...o,[cat]:[...(o[cat]||[]),item.id]}));setCosmetics(c=>({...c,[cat]:item.id}));blip("C6");},`${item.name} unlocked`);}} onBuyPass={()=>{setLokPass(true);setOwnedThemes(Object.keys(THEMES));blip("C6");say("LokPass active!");}} onTheme={id=>{if(ownedThemes.includes(id)){setUiTheme(id);say(`Equipped ${THEMES[id].name}`);}else spend(THEMES[id].price,()=>{setOwnedThemes(o=>[...o,id]);setUiTheme(id);},`${THEMES[id].name} unlocked`);}} onEffect={(id,e)=>{if(ownedEffects.includes(id)){setEffect(id);say(id==="none"?"Effects off":`${e.name} equipped`);}else spend(e.price,()=>{setOwnedEffects(o=>[...o,id]);setEffect(id);},`${e.name} unlocked`);}} onCc={()=>spend(120,()=>setCcTier(true),"Studio Pro unlocked")} celebrationStyle={celebrationStyle} onCelebrationStyle={id=>setCelebrationStyle(id)}/>}
