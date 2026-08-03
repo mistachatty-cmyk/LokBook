@@ -364,7 +364,17 @@ export const MODES = {
   shapes: { name: "Shapes", tag: "clean geometry", pool: ["star", "triangle", "square", "hexagon", "circle", "heart", "spiral", "diamond", "pentagon", "octagon", "decagon", "star_4", "star_6", "star_8", "cross", "arrow", "wave", "zigzag", "crescent", "teardrop", "droplet", "leaf", "clover", "rings", "target", "gear", "helix", "infinity", "sawtooth", "bow_tie"] },
   stencils: { name: "Stencils", tag: "trace real objects", pool: ["house", "wild-knot", "char-ghost", "skull", "dagger", "raven", "lotus", "flame", "eye", "mandala", "crown", "sword", "shield", "anchor", "butterfly", "feather", "shell", "moon", "cloud", "mountain", "tree", "fish", "rose", "infinity", "helix", "gear", "star_6", "crescent", "diamond", "target"] },
   wild: { name: "INKSANITY", tag: "chaotic outlines", pool: ["wild-knot", "spiral", "heart", "labyrinth", "galaxy", "tornado", "lightning", "scribble", "vortex", "star_burst", "web", "honeycomb", "tentacle", "hydra", "nerve", "root", "maze", "tangle", "chaos", "ring_spiral", "helix", "infinity", "spirograph", "octogram", "star_8", "wave_chaos", "gear", "star_6", "cross"] },
-  chars: { name: "Characters", tag: "outline a creature", pool: ["char-ghost", "char_goblin", "char_dragon", "char_wyrm", "char_bat", "char_owl", "char_wolf", "char_fox", "char_frog", "char_snake", "char_bird", "char_imp", "char_demon", "char_angel", "char_robot", "char_alien", "char_slime", "char_jelly", "char_dino", "char_shadow", "char_eye", "char_cat", "char_rabbit", "char_mushroom", "char_tree", "char_knight"] }
+  chars: { name: "Characters", tag: "outline a creature", pool: ["char-ghost", "char_goblin", "char_dragon", "char_wyrm", "char_bat", "char_owl", "char_wolf", "char_fox", "char_frog", "char_snake", "char_bird", "char_imp", "char_demon", "char_angel", "char_robot", "char_alien", "char_slime", "char_jelly", "char_dino", "char_shadow", "char_eye", "char_cat", "char_rabbit", "char_mushroom", "char_tree", "char_knight"] },
+  // --- rule variants -------------------------------------------------
+  // `radius` = hit tolerance in canvas px (default 22)
+  // `guide`  = "solid" (default) | "fade" (guide dims as the clock runs) | "blind" (guide vanishes after 3s)
+  // `mult`   = score/payout multiplier
+  precision: { name: "Precision", tag: "tight tolerance · 1.6× payout", radius: 12, mult: 1.6, seconds: 16, guide: "solid",
+    pool: ["star", "hexagon", "spiral", "heart", "gear", "helix", "infinity", "octagon", "star_6", "star_8", "clover", "rings", "target", "crescent", "leaf", "mandala", "lotus", "butterfly", "web", "spirograph"] },
+  fading: { name: "Fading", tag: "the guide fades as you trace", radius: 24, mult: 1.35, seconds: 18, guide: "fade",
+    pool: ["triangle", "square", "circle", "diamond", "cross", "arrow", "wave", "zigzag", "teardrop", "moon", "cloud", "mountain", "tree", "fish", "shell", "feather", "anchor", "crown", "flame", "eye"] },
+  blind: { name: "Blind Ink", tag: "3s look, then draw from memory · 2×", radius: 30, mult: 2, seconds: 20, guide: "blind",
+    pool: ["star", "triangle", "square", "heart", "circle", "crescent", "diamond", "cross", "arrow", "leaf", "moon", "cloud", "fish", "flame", "eye", "shield", "anchor", "clover", "teardrop", "bow_tie"] }
 };
 export const WAGERS = [5, 10, 25, 50];
 export const FRONT_NAMES = ["pixel.pluto", "inkwell_iz", "doodlebug", "sketchram", "tinta", "mooncrayon"];
