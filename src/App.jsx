@@ -6,7 +6,7 @@ import { getStroke } from "perfect-freehand";
 import { gsap } from "gsap";
 import Easel from "./Easel.jsx";
 
-import { THEMES, SKIN_WAVE_GATE, SKIN_WAVE_3_GATE, SKIN_WAVE_4_GATE, ThemeCtx, useT, ART, blotBorderStyle } from "./theme/theme.js";
+import { THEMES, SKIN_WAVE_GATE, SKIN_WAVE_3_GATE, SKIN_WAVE_4_GATE, ThemeCtx, useT, ART, blotBorderStyle, onColor } from "./theme/theme.js";
 import Shop from "./pages/Shop.jsx";
 import { encodeLok } from "./engine/lokFormat.js";
 import { AD_PROVIDER } from "./ads.js";
@@ -208,7 +208,7 @@ function Feed({posts,bookmarks,following,feedMode,setFeedMode,myHandle="",onFeat
       {artists.length>0&&(<div className="mb-2"><div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Artists ({artists.length})</div>
         <div className="flex flex-col gap-1.5">{artists.map(name=>{const per=BOT_PERSONAS[name];return(<button key={name} onClick={()=>onArtist&&onArtist(name)} className="lok-btn w-full text-left p-2 rounded-xl flex items-center gap-2" style={{border:`2px solid ${T.ink}`,background:T.card}}>
           <img src={renderAvatar(name.length*31)} alt="" className="w-8 h-8 rounded-full shrink-0" style={{border:`2px solid ${T.ink}`}}/>
-          <div className="min-w-0 flex-1"><div className="font-bold text-sm truncate"><NameTag name={name}/>{per&&<span className="ml-1.5 text-[9px] px-1 py-0.5 rounded align-middle" style={{background:T.alt,color:"#fff"}}>AI</span>}</div>{per&&<div className="text-[10px] opacity-60 truncate">{per.medium} · {per.vibe}</div>}</div>
+          <div className="min-w-0 flex-1"><div className="font-bold text-sm truncate"><NameTag name={name}/>{per&&<span className="ml-1.5 text-[9px] px-1 py-0.5 rounded align-middle" style={{background:T.alt,color:onColor(T.alt,T)}}>AI</span>}</div>{per&&<div className="text-[10px] opacity-60 truncate">{per.medium} · {per.vibe}</div>}</div>
           <span className="text-xs font-bold shrink-0" style={{color:T.accent}}>View ▸</span></button>);})}</div>
       </div>)}
       <div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Posts ({found.length})</div>
@@ -219,7 +219,7 @@ function Feed({posts,bookmarks,following,feedMode,setFeedMode,myHandle="",onFeat
       <span className="lok-display font-extrabold text-sm shrink-0" style={{color:T.accent}}>{flipOfDay.votes} ▲</span>
     </button>)}
     <div className="mt-3 flex items-center gap-2 p-2.5 rounded-2xl" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`4px 4px 0 ${T.shadow}`}}>
-      <div className="flex items-center justify-center rounded-xl shrink-0" style={{width:44,height:44,background:streakCol,color:"#fff",border:`2.5px solid ${T.ink}`,transition:"background .3s ease"}}><span className="lok-display font-extrabold text-lg">{streak}</span></div>
+      <div className="flex items-center justify-center rounded-xl shrink-0" style={{width:44,height:44,background:streakCol,color:onColor(streakCol,T),border:`2.5px solid ${T.ink}`,transition:"background .3s ease"}}><span className="lok-display font-extrabold text-lg">{streak}</span></div>
       <div className="flex-1 min-w-0"><div className="font-bold text-sm leading-tight">Daily streak · {streak} {streak===1?"day":"days"}</div><div className="text-xs opacity-70 truncate">Today: "{daily.prompt}"</div></div>
       <button onClick={onClaimDaily} disabled={dailyClaimed} aria-label={dailyClaimed?"Daily already claimed":"Claim daily bonus"} className="lok-btn shrink-0 lok-display px-3 py-2 rounded-xl text-sm font-extrabold" style={{background:dailyClaimed?"transparent":T.ink,color:dailyClaimed?T.ink:T.paper,border:`2.5px solid ${T.ink}`,opacity:dailyClaimed?0.55:1}}>{dailyClaimed?"Claimed ✓":"Claim"}</button>
     </div>
@@ -309,7 +309,7 @@ function Viewer({posts,index,bookmarks,cosmetics={},onBookmark,onClose,onNav,onV
     </div>
     <div className="relative flex-1 min-h-0" onTouchStart={e=>(touch.current=e.touches[0].clientX)} onTouchEnd={e=>{if(touch.current==null)return;const dx=e.changedTouches[0].clientX-touch.current;if(Math.abs(dx)>60)onNav(dx<0?1:-1);touch.current=null;}}>
       <div ref={scrollRef} onScroll={isB?undefined:onScroll} className="absolute inset-0 overflow-y-scroll">
-        {isB?(<div className="px-3 py-4 flex flex-col items-center gap-3">{post.frames.map((f,k)=>(<div key={k} className="relative w-full" style={{maxWidth:360}}><img src={f} alt={`page ${k+1}`} className="block w-full rounded-xl" style={{border:`4px solid ${series?T.ink:T.paper}`,boxShadow:series?"none":"0 8px 28px rgba(0,0,0,.4)"}}/><div className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-xs font-bold" style={{background:series?T.ink:T.accent,color:"#fff"}}>{String(k+1).padStart(2,"0")}</div></div>))}<div className="text-xs font-bold opacity-60 py-2" style={{color:series?T.ink:T.paper}}>↑ scroll the whole page ↑</div></div>):(
+        {isB?(<div className="px-3 py-4 flex flex-col items-center gap-3">{post.frames.map((f,k)=>(<div key={k} className="relative w-full" style={{maxWidth:360}}><img src={f} alt={`page ${k+1}`} className="block w-full rounded-xl" style={{border:`4px solid ${series?T.ink:T.paper}`,boxShadow:series?"none":"0 8px 28px rgba(0,0,0,.4)"}}/><div className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-xs font-bold" style={{background:series?T.ink:T.accent,color:onColor(series?T.ink:T.accent,T)}}>{String(k+1).padStart(2,"0")}</div></div>))}<div className="text-xs font-bold opacity-60 py-2" style={{color:series?T.ink:T.paper}}>↑ scroll the whole page ↑</div></div>):(
           <><div className="sticky top-0 flex items-center justify-center p-3" style={{height:"100%"}}><div className="relative" style={{maxHeight:"100%",aspectRatio:"4 / 5"}}>
             <img src={post.frames[fi]} alt={`frame ${fi+1}`} className="block h-full w-auto max-w-full rounded-xl" style={{border:`4px solid ${series?T.ink:T.paper}`,boxShadow:series?"none":"0 12px 40px rgba(0,0,0,.45)"}}/>
             <div className="absolute top-0 bottom-0 flex flex-col justify-between py-2" style={{right:-14}}>{Array.from({length:n}).map((_,k)=>(<div key={k} style={{width:k===fi?16:8,height:k===fi?4:3,borderRadius:2,background:k<=fi?T.accent:"rgba(150,150,150,.35)",transition:"all .18s cubic-bezier(.34,1.56,.64,1)"}}/>))}</div>
@@ -322,7 +322,7 @@ function Viewer({posts,index,bookmarks,cosmetics={},onBookmark,onClose,onNav,onV
       {floats.map(f=>(<div key={f.id} className="absolute bottom-20 pointer-events-none" style={{left:`${f.x}%`,animation:"lokfloat .95s ease-out forwards"}}><ReactionIcon type={f.type} size={34}/></div>))}
     </div>
     <div className="flex items-center gap-2 px-3 py-2.5" style={{background:series?T.card:T.ink,borderTop:`2px solid ${series?T.ink:"rgba(242,237,226,.25)"}`}}>
-      <button onClick={togglePlay} aria-label={playing?"Pause":"Play"} className="lok-btn px-3 py-2 rounded-xl font-extrabold lok-display" style={{background:T.alt,color:"#fff",border:`3px solid ${series?T.ink:T.paper}`}}>{playing?"Pause":`Play`}</button>
+      <button onClick={togglePlay} aria-label={playing?"Pause":"Play"} className="lok-btn px-3 py-2 rounded-xl font-extrabold lok-display" style={{background:T.alt,color:onColor(T.alt,T),border:`3px solid ${series?T.ink:T.paper}`}}>{playing?"Pause":`Play`}</button>
       {!isB&&n>=2&&<button onClick={replay} aria-label="Replay drawing" title="Watch it drawn" className="lok-btn px-2.5 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${series?T.ink:"rgba(242,237,226,.5)"}`,color:series?T.ink:T.paper,background:"transparent"}}>↺</button>}
       <button onClick={()=>onVote(post.id)} aria-label={`Vote — ${post.votes}`} className="lok-btn px-3 py-2 rounded-xl font-extrabold lok-display" style={{background:post.voted?"transparent":T.accent,color:post.voted?(series?T.ink:T.paper):T.onAccent,border:`3px solid ${post.voted?(series?T.ink:"rgba(242,237,226,.5)"):(series?T.ink:T.paper)}`}}>{post.voted?`Voted · ${post.votes}`:`Vote · ${post.votes}`}</button>
       {onShare&&<button onClick={()=>onShare(post)} aria-label="Share" className="lok-btn px-2.5 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${series?T.ink:"rgba(242,237,226,.5)"}`,color:series?T.ink:T.paper,background:"transparent"}}>↗</button>}
@@ -414,7 +414,7 @@ function Studio({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt,animFx,modules
         {frames.map((f,i)=>(<div key={i} className="shrink-0 flex flex-col gap-0.5" style={{width:76}}>
           <div className="rounded-lg overflow-hidden relative" style={{border:`2.5px solid ${T.ink}`,boxShadow:`2px 2px 0 ${T.shadow}`}}>
             <img src={f} alt={`page ${i+1}`} className="block w-full" style={{aspectRatio:"4/5",objectFit:"cover"}}/>
-            <div className="absolute top-0.5 left-0.5 px-1 rounded text-[9px] font-bold" style={{background:T.ink,color:"#fff"}}>{i+1}</div>
+            <div className="absolute top-0.5 left-0.5 px-1 rounded text-[9px] font-bold" style={{background:T.ink,color:onColor(T.ink,T)}}>{i+1}</div>
           </div>
           <div className="flex items-center" style={{gap:2}}>
             <button onClick={()=>moveFrame(i,-1)} aria-label={`Move page ${i+1} left`} className="lok-btn flex-1 font-bold text-[10px] py-0.5 rounded text-center" style={{color:T.ink,border:`1px solid ${T.shadow}`}}>‹</button>
@@ -541,7 +541,7 @@ function NewStudioUI({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt,animFx,mo
         {frames.map((f,i)=>(<div key={i} className="shrink-0 flex flex-col gap-0.5" style={{width:Math.round(76*timelineZoom)}}>
           <div className="rounded-lg overflow-hidden relative cursor-pointer" style={{border:`2.5px solid ${i===pv?T.accent:T.ink}`,boxShadow:`2px 2px 0 ${T.shadow}`}} onClick={()=>setLightboxFrame(f)}>
             <img src={f} alt={`page ${i+1}`} className="block w-full" style={{aspectRatio:"4/5",objectFit:"cover"}}/>
-            <div className="absolute top-0.5 left-0.5 px-1 rounded text-[9px] font-bold" style={{background:T.ink,color:"#fff"}}>{i+1}</div>
+            <div className="absolute top-0.5 left-0.5 px-1 rounded text-[9px] font-bold" style={{background:T.ink,color:onColor(T.ink,T)}}>{i+1}</div>
             {i===pv&&<div className="absolute bottom-0.5 right-0.5 w-2 h-2 rounded-full" style={{background:T.accent}}/>}
           </div>
           <div className="flex items-center" style={{gap:2}}>
@@ -894,10 +894,10 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
     <section className="mt-4 p-4 rounded-2xl" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`6px 6px 0 ${T.shadow}`}}>
       <div className="flex items-center gap-4">
         <FramedAvatar src={avatar} size={72} frame={viewingArtist?null:cosmetics.frame} accent={viewingArtist?null:cosmetics.avatarAccent} ink={T.ink} acc={T.accent} animated={!viewingArtist&&animatedToken}/>
-        <div className="min-w-0 flex-1"><div className="lok-display text-xl font-extrabold leading-tight flex items-center gap-2 flex-wrap"><NameTag name={viewingArtist||profile.name} color={viewingArtist?"default":cosmetics.nameColor} style={{color:T.ink}}/>{!viewingArtist&&flair&&<span className="text-[10px] ml-1 px-1 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>{flair}</span>}{!viewingArtist&&lokPass&&!kids&&<span className="text-xs px-1.5 py-0.5 rounded" style={{background:T.accent,color:T.onAccent}}>PASS</span>}</div><div className="text-sm opacity-70">{myPosts.length} flips{viewingArtist?"":" · "+wins+" "+(wins===1?"win":"wins")}{viewingArtist&&!botPersona&&viewedProfile&&` · Level ${viewedProfile.level||1}`}</div>{botPersona&&(<><div className="mt-1 flex items-center gap-1.5 flex-wrap"><span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold" style={{background:T.alt,color:"#fff"}}>AI ARTIST</span>{botPersona.ward&&<span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{border:`1.5px solid ${T.ink}`}}>{botPersona.ward}</span>}<span className="text-[10px] font-bold opacity-70">{botPersona.medium}</span><span className="text-[10px] opacity-50">· {botPersona.vibe}</span></div><p className="text-xs opacity-75 mt-1 leading-snug">{botPersona.bio}</p>{botPersona.lore&&<p className="text-xs opacity-70 mt-1.5 leading-snug" style={{borderLeft:`2.5px solid ${T.accent}`,paddingLeft:8}}>{botPersona.lore}</p>}{botPersona.signature&&<div className="text-[10px] opacity-55 mt-1.5 italic">Known for: {botPersona.signature}</div>}</>)}</div>
+        <div className="min-w-0 flex-1"><div className="lok-display text-xl font-extrabold leading-tight flex items-center gap-2 flex-wrap"><NameTag name={viewingArtist||profile.name} color={viewingArtist?"default":cosmetics.nameColor} style={{color:T.ink}}/>{!viewingArtist&&flair&&<span className="text-[10px] ml-1 px-1 py-0.5 rounded" style={{background:T.alt,color:onColor(T.alt,T)}}>{flair}</span>}{!viewingArtist&&lokPass&&!kids&&<span className="text-xs px-1.5 py-0.5 rounded" style={{background:T.accent,color:T.onAccent}}>PASS</span>}</div><div className="text-sm opacity-70">{myPosts.length} flips{viewingArtist?"":" · "+wins+" "+(wins===1?"win":"wins")}{viewingArtist&&!botPersona&&viewedProfile&&` · Level ${viewedProfile.level||1}`}</div>{botPersona&&(<><div className="mt-1 flex items-center gap-1.5 flex-wrap"><span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold" style={{background:T.alt,color:onColor(T.alt,T)}}>AI ARTIST</span>{botPersona.ward&&<span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{border:`1.5px solid ${T.ink}`}}>{botPersona.ward}</span>}<span className="text-[10px] font-bold opacity-70">{botPersona.medium}</span><span className="text-[10px] opacity-50">· {botPersona.vibe}</span></div><p className="text-xs opacity-75 mt-1 leading-snug">{botPersona.bio}</p>{botPersona.lore&&<p className="text-xs opacity-70 mt-1.5 leading-snug" style={{borderLeft:`2.5px solid ${T.accent}`,paddingLeft:8}}>{botPersona.lore}</p>}{botPersona.signature&&<div className="text-[10px] opacity-55 mt-1.5 italic">Known for: {botPersona.signature}</div>}</>)}</div>
         <div className="flex gap-1.5">
           {viewingArtist?<button onClick={onBackToMyGallery} className="lok-btn px-3 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${T.accent}`,background:T.ink,color:T.paper}}>← Back to mine</button>:<>
-          {notifUnread>0&&<button onClick={()=>{setShowNotifs(v=>!v);onClearNotifs&&onClearNotifs();}} className="lok-btn relative px-2 py-1.5 rounded-full text-xs font-bold" style={{border:`2px solid ${T.accent}`,background:T.accent,color:"#fff"}} aria-label={`${notifUnread} notifications`}>🔔 {notifUnread}</button>}
+          {notifUnread>0&&<button onClick={()=>{setShowNotifs(v=>!v);onClearNotifs&&onClearNotifs();}} className="lok-btn relative px-2 py-1.5 rounded-full text-xs font-bold" style={{border:`2px solid ${T.accent}`,background:T.accent,color:onColor(T.accent,T)}} aria-label={`${notifUnread} notifications`}>🔔 {notifUnread}</button>}
           <button onClick={()=>{setDraft(profile);setEditing(true);}} className="lok-btn px-3 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Edit profile">Edit</button>
           <button onClick={()=>setShowSettings(true)} className="lok-btn px-2.5 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Settings">⚙</button>
           </>}
@@ -945,7 +945,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
         <div ref={acctPanelRef} className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${auth.isAuthenticated()?T.alt:T.accent}`,background:T.paper}}>
           <div className="flex items-center gap-2 mb-0.5">
             <div className="flex items-center justify-center rounded-full shrink-0" style={{width:30,height:30,fontSize:15,background:(auth.isAuthenticated()?T.alt:T.accent)+"22",border:`2px solid ${auth.isAuthenticated()?T.alt:T.accent}`}}>🔐</div>
-            <div className="lok-display font-extrabold text-sm">Account{auth.isAuthenticated()&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>SIGNED IN</span>}</div>
+            <div className="lok-display font-extrabold text-sm">Account{auth.isAuthenticated()&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:onColor(T.alt,T)}}>SIGNED IN</span>}</div>
           </div>
           {!supabase?(<div className="text-xs opacity-70 mt-1 leading-snug">Cloud accounts aren't configured for this build yet.</div>):auth.loading?(<div className="text-xs opacity-60 mt-1">Loading…</div>):auth.isAuthenticated()?(<>
             <div className="text-xs opacity-70 mt-1 leading-snug">Signed in as <strong>{auth.getEmail()}</strong>. Your gallery and progress can back up to the cloud and follow you to other devices.</div>
@@ -962,8 +962,11 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
             </div>
           </>)}
         </div>
-        {!auth.isAuthenticated()&&<div className="p-3 rounded-2xl mb-2" style={{border:`3px dashed ${T.shadow}`,background:"#23306B0A"}}>
-          <div className="lok-display font-extrabold text-sm flex items-center gap-1.5">👻 Guest of the Pass</div>
+        {!auth.isAuthenticated()&&<div className="p-3 rounded-2xl mb-2" style={{border:`3px dashed ${T.alt}`,background:T.paper}}>
+          <div className="flex items-center gap-2 mb-0.5">
+            <div className="flex items-center justify-center rounded-full shrink-0" style={{width:30,height:30,fontSize:15,background:T.alt+"22",border:`2px dashed ${T.alt}`}}>👻</div>
+            <div className="lok-display font-extrabold text-sm">Guest of the Pass</div>
+          </div>
           <p className="text-xs opacity-60 mt-1 italic leading-snug">"...still here. barely. give me a code and I'll hold your ink until you're ready."</p>
           {passCode?(<div className="mt-2 p-2.5 rounded-xl text-center" style={{border:`2px dashed ${T.ink}`,background:T.card}}>
             <div className="text-[10px] font-bold uppercase tracking-widest opacity-50">your code — write it down</div>
@@ -973,7 +976,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
           ):(<>
             <div className="mt-2 flex gap-1.5">
               <input value={passEmail} onChange={e=>setPassEmail(e.target.value)} type="email" placeholder="email (optional)" aria-label="Email for guest pass" className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/>
-              <button onClick={mintPass} disabled={passBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:"#7A4FBF",color:"#fff",border:`2.5px solid ${T.ink}`,opacity:passBusy?0.6:1}}>{passBusy?"…":"Stash my ink"}</button>
+              <button onClick={mintPass} disabled={passBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:T.alt,color:T.onAccent,border:`2.5px solid ${T.ink}`,opacity:passBusy?0.6:1}}>{passBusy?"…":"Stash my ink"}</button>
             </div>
             <div className="text-[10px] opacity-50 mt-1">Get a code you can redeem later — on this device or a new one.</div>
           </>)}
@@ -984,7 +987,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
           </div>)}
         </div>}
         <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${founder?T.alt:T.ink}`,background:T.paper}}>
-          <div className="lok-display font-extrabold text-sm">🏆 Founders' test server{founder&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>FOUNDER</span>}</div>
+          <div className="lok-display font-extrabold text-sm">🏆 Founders' test server{founder&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:onColor(T.alt,T)}}>FOUNDER</span>}</div>
           <div className="text-xs opacity-70 mt-1 leading-snug">{founder?"You're in. Your gallery, Loks and LilLok are backed up long-term on LokServices.":"Join the test server and your progress gets backed up long-term — founders keep everything into beta."}</div>
           {!founder&&(<>
             <input value={fHandle} onChange={e=>setFHandle(e.target.value)} placeholder="Handle" aria-label="Founder handle" className="mt-2 w-full px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/>
@@ -993,7 +996,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
           </>)}
         </div>
         <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${sessionPin?T.accent:T.ink}`,background:T.paper}}>
-          <div className="lok-display font-extrabold text-sm">🔒 Session lock{sessionPin&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>ACTIVE</span>}</div>
+          <div className="lok-display font-extrabold text-sm">🔒 Session lock{sessionPin&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:onColor(T.alt,T)}}>ACTIVE</span>}</div>
           <div className="text-xs opacity-70 mt-0.5 leading-snug">Set a 4-6 digit PIN to lock LokBook on startup.</div>
           <div className="mt-2 flex gap-1.5">
             {!sessionPin?(<><input type="password" maxLength={6} inputMode="numeric" value={pinInput} onChange={e=>setPinInput(e.target.value)} placeholder="Set PIN" aria-label="Set session PIN" className="flex-1 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/><button onClick={()=>{if(pinInput.length>=4){setSessionPin(pinInput);setPinInput("");say("PIN set");}else say("Need 4-6 digits")}} className="lok-btn px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:T.accent,color:T.onAccent,border:`2.5px solid ${T.ink}`}}>Set</button></>):(<button onClick={()=>{setSessionPin(null);setPinUnlocked(true);say("PIN removed");}} className="lok-btn px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:T.ink,color:T.paper}}>Remove PIN</button>)}
@@ -1293,7 +1296,7 @@ export default function LokApp(){
           Lok{kids?" Juniors":tab==="battle"?" N Slide":"Book"}
         </button>
         <div className="flex items-center gap-2">
-          {kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.alt,color:"#fff"}}>SAFE</span>}
+          {kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.alt,color:onColor(T.alt,T)}}>SAFE</span>}
           {lokPass&&!kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.accent,color:T.onAccent}}>PASS</span>}
           <button onClick={()=>setSound(s=>!s)} aria-label={sound?"Mute sound":"Enable sound"} className="lok-btn w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:sound?T.ink:T.card,color:sound?T.paper:T.ink}}>{sound?"♪":"♪̸"}</button>
           <span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.ink,color:T.paper}} aria-label={`Level ${level}`}>Lv {level}{verified&&<span style={{color:"#E8B14B",marginLeft:2}}>✦</span>}</span>

@@ -50,6 +50,21 @@ export const SMILE_VARIANTS = [
   { id:"smile16", path:"M8 12 Q16 6 24 12 M10 21 Q16 25 22 21", label:"Happy" },
 ];
 
+// Pick black or white text for an arbitrary theme color. Badges and pills sit
+// on T.alt/T.ink/etc., which swing from near-black (forest) to near-white
+// (candy's #B2FF59) across the 26 themes — a hardcoded "#fff" is unreadable on
+// the light half. Uses the WCAG relative-luminance threshold; non-hex inputs
+// (rgba shadows) fall back to the theme's ink.
+export function onColor(bg, T) {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec((bg || "").trim());
+  if (!m) return T?.ink || "#000";
+  let h = m[1];
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  const lin = v => { const s = parseInt(v, 16) / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * lin(h.slice(0, 2)) + 0.7152 * lin(h.slice(2, 4)) + 0.0722 * lin(h.slice(4, 6));
+  return L > 0.179 ? "#000" : "#fff";
+}
+
 // Theme System 2.0 — CSS custom properties layer. Every token has a fallback,
 // so old saves and themes without the new optional fields (font/gradient/glow)
 // are unaffected. New components can style via var(--lok-*) without prop drilling.
