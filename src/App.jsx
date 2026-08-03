@@ -1078,9 +1078,9 @@ export default function LokApp(){
     <div className={`min-h-screen w-full ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:"'Schibsted Grotesk',system-ui,sans-serif",animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none"}}>
       <GlobalStyle T={T} pace={pace} speed={speed}/><ThemeBackdrop themeId={uiTheme} pace={pace}/><PageEffect effect={effect}/>
       {!focusMode && <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3" style={{background:T.paper,borderBottom:`3px solid ${T.ink}`}}>
-        <button onClick={()=>setTab("feed")} aria-label="Go to feed" className="lok-btn lok-display relative text-2xl font-extrabold tracking-tight select-none" style={{background:"transparent",border:"none",padding:0}}>
-          <span className="absolute" style={{color:T.accent,left:3,top:2}}>Lok{kids?" Juniors":tab==="battle"?" N Slide":"Book"}</span>
-          <span className="relative">Lok{kids?" Juniors":tab==="battle"?" N Slide":"Book"}</span>
+        <button onClick={()=>setTab("feed")} aria-label="Go to feed" className="lok-btn lok-display relative text-2xl font-extrabold tracking-tight select-none" style={{background:"transparent",border:"none",padding:0,whiteSpace:"nowrap"}}>
+          <span className="absolute" style={{color:T.accent,left:3,top:2,whiteSpace:"nowrap"}}>Lok{kids?" Juniors":tab==="battle"?" N Slide":"Book"}</span>
+          <span className="relative" style={{whiteSpace:"nowrap"}}>Lok{kids?" Juniors":tab==="battle"?" N Slide":"Book"}</span>
         </button>
         <div className="flex items-center gap-2">
           {kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.alt,color:"#fff"}}>SAFE</span>}
@@ -1145,7 +1145,6 @@ export default function LokApp(){
           <div className="flex justify-center gap-2 mt-4">{Array.from({length:comebackCelebration==="starburst"?20:comebackCelebration==="confetti"?16:12}).map((_,i)=>(<div key={i} className="rounded-full" style={{width:6+(i%3)*2,height:6+(i%3)*2,background:colors[i%colors.length],animation:`lokfloat ${0.5+Math.random()*0.8}s ease-in-out ${i*0.05}s infinite`,opacity:0.7+Math.random()*0.3}}/>))}</div>
         </div>
       </div>);})()}
-      {showOnboard&&<Onboard defaultName={profile.name} onName={n=>{const clean=(n||"").trim();if(!clean)return;if(isReservedName(clean)){const alt=suggestHandle(clean,profile.avatarSeed);say(`"${clean}" is a Lok artist — how about ${alt}?`,"error");setProfile(p=>({...p,name:alt}));return;}setProfile(p=>({...p,name:clean}));}} onDone={()=>{setShowOnboard(false);setOnboarded(true);setShowHint(true);addLoks(50);gainXp(20);blip("C6");say("Welcome · +50 Loks to start");}}/>}
       <div className="fixed left-1/2 z-50 flex flex-col-reverse items-center gap-2" style={{bottom:focusMode?20:100,transform:"translateX(-50%)",pointerEvents:"none",transition:"bottom .3s ease"}}>
         {toasts.map((t,i)=>(<div key={t.id} className="px-4 py-2 rounded-xl font-bold text-center" style={{background:t.type==="success"?T.alt:t.type==="error"?"#C23B22":T.ink,color:T.paper,border:`2.5px solid ${t.type==="success"?T.alt:T.accent}`,animation:"lokrise .2s ease",opacity:1-i*0.18,transform:`scale(${1-i*0.04}) translateY(${i*-4}px)`,maxWidth:"88vw",fontSize:13}}>{t.msg}</div>))}
       </div>
