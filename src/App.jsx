@@ -1090,6 +1090,10 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
           <div className="grid grid-cols-3 gap-1.5">{[["small","Compact"],["normal","Normal"],["large","Large"]].map(([id,label])=>(
             <button key={id} onClick={()=>onSetFlag&&onSetFlag("uiScale",id)} aria-pressed={(featureFlags.uiScale||"normal")===id} className="lok-btn py-1.5 rounded-xl text-xs font-extrabold" style={{border:`2.5px solid ${(featureFlags.uiScale||"normal")===id?T.accent:T.ink}`,background:(featureFlags.uiScale||"normal")===id?T.ink:T.card,color:(featureFlags.uiScale||"normal")===id?T.paper:T.ink}}>{label}</button>))}</div>
           <label className="mt-2 flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={!!featureFlags.compactUi} onChange={e=>onSetFlag&&onSetFlag("compactUi",e.target.checked)} style={{accentColor:T.accent}}/> Tighter spacing (compact layout)</label>
+          <div className="mt-3 font-bold text-sm">LokMotion</div>
+          <div className="text-xs opacity-70 mt-0.5 mb-1.5 leading-snug">How much the interface moves. Full adds bounce to buttons and the active tab.</div>
+          <div className="grid grid-cols-3 gap-1.5">{[["off","Off"],["subtle","Subtle"],["full","Full"]].map(([id,label])=>(
+            <button key={id} onClick={()=>onSetFlag&&onSetFlag("lokMotion",id)} aria-pressed={(featureFlags.lokMotion||"subtle")===id} className="lok-btn py-1.5 rounded-xl text-xs font-extrabold" style={{border:`2.5px solid ${(featureFlags.lokMotion||"subtle")===id?T.accent:T.ink}`,background:(featureFlags.lokMotion||"subtle")===id?T.ink:T.card,color:(featureFlags.lokMotion||"subtle")===id?T.paper:T.ink}}>{label}</button>))}</div>
         </div>
         {soundLab&&(<div className="p-3 rounded-2xl mb-2" style={{border:`3px dashed ${T.accent}`,background:T.paper}}>
           <div className="lok-display font-extrabold text-sm" style={{color:T.accent}}>🔊 Sound Lab</div>
@@ -1181,7 +1185,7 @@ export default function LokApp(){
   const[questsCompleted,setQuestsCompleted]=useState(0);const[totalEarned,setTotalEarned]=useState(0);const[traceHinted,setTraceHinted]=useState(false);const[fabBubble,setFabBubble]=useState("");const[adIdx,setAdIdx]=useState(0);const[installEvt,setInstallEvt]=useState(null);const[showSettings,setShowSettings]=useState(false);const music=useMusic();const[showMusic,setShowMusic]=useState(false);const auth=useAuth();
   const[loks,setLoks]=useState(260);const[myRooms,setMyRooms]=useState([]);const[pendingRoomCode,setPendingRoomCode]=useState(()=>{try{return new URLSearchParams(location.search).get("room")||null;}catch{return null;}});const[pace,setPace]=useState("sweep");const[speed,setSpeed]=useState(1);const[soundLab,setSoundLab]=useState(false);const[soundQueue,setSoundQueue]=useState([]);const[founder,setFounder]=useState(false);const[totalSpent,setTotalSpent]=useState(0);const[fodHistory,setFodHistory]=useState([]);const[lokPass,setLokPass]=useState(false);const[uiTheme,setUiTheme]=useState("riso");const[ownedThemes,setOwnedThemes]=useState(["riso"]);const[effect,setEffect]=useState("none");const[ownedEffects,setOwnedEffects]=useState(["none"]);const[ownedTiers,setOwnedTiers]=useState([10]);const[ccTier,setCcTier]=useState(false);const[bigBattleOwned,setBigBattleOwned]=useState(false);const[wins,setWins]=useState(0);
   const[profile,setProfile]=useState(()=>{const seed=Math.floor(Math.random()*9999);return{name:starterHandle(seed),bio:"",avatarSeed:seed,links:[{label:"Lok page",url:"coming soon"}]};});
-  const[focusMode,setFocusMode]=useState(false);  const[featureFlags,setFeatureFlags]=useState({compactUi:false,vibe:"default",uiScale:"normal"});
+  const[focusMode,setFocusMode]=useState(false);  const[featureFlags,setFeatureFlags]=useState({compactUi:false,vibe:"default",uiScale:"normal",lokMotion:"subtle"});
   const[comebackActive,setComebackActive]=useState(false);const[legacyStudio,setLegacyStudio]=useState(false);const[legacyBrushes,setLegacyBrushes]=useState(false);
   const[studioFrames,setStudioFrames]=useState([]);const[studioFrameDurations,setStudioFrameDurations]=useState([]);const[studioTitle,setStudioTitle]=useState("");const[studioDraftImg,setStudioDraftImg]=useState(null);
   const[lastComebackAward,setLastComebackAward]=useState(0);
@@ -1331,7 +1335,7 @@ export default function LokApp(){
   </div>);
   if(!ready)return(<Loader/>);
   return(<ThemeCtx.Provider value={T}>
-    <div className={`min-h-screen w-full ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:"'Schibsted Grotesk',system-ui,sans-serif",animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none",zoom:{small:0.85,normal:1,large:1.15}[featureFlags.uiScale||"normal"]}}>
+    <div className={`min-h-screen w-full lok-motion-${featureFlags.lokMotion||"subtle"} ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:"'Schibsted Grotesk',system-ui,sans-serif",animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none",zoom:{small:0.85,normal:1,large:1.15}[featureFlags.uiScale||"normal"]}}>
       <GlobalStyle T={T} pace={pace} speed={speed}/><ThemeBackdrop themeId={uiTheme} pace={pace}/><PageEffect effect={effect}/>
       {!focusMode && <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3" style={{background:T.paper,borderBottom:`3px solid ${T.ink}`}}>
         <button onClick={()=>setTab("feed")} aria-label="Go to feed" className="lok-btn lok-display relative text-2xl font-extrabold tracking-tight select-none" style={{background:"transparent",border:"none",padding:0,whiteSpace:"nowrap"}}>

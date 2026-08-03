@@ -151,6 +151,16 @@ export function GlobalStyle({ T, pace = "sweep", speed = 1 }) {
   .lok-btn{transition-duration:calc(.14s * ${m})}
   ${P.kill ? `.lok-tabin,.lok-count{animation:none!important}.lok-btn{transition:none!important}` : ``}
   .lok-compact .px-4{padding-left:12px!important;padding-right:12px!important}.lok-compact .gap-3{gap:8px!important}.lok-compact .p-3{padding:8px!important}.lok-compact .py-2{padding-top:6px!important;padding-bottom:6px!important}.lok-compact .px-2\\.5{padding-left:8px!important;padding-right:8px!important}.lok-compact .text-sm{font-size:12px!important}.lok-compact .text-xs{font-size:10px!important}.lok-compact .gap-2{gap:6px!important}.lok-compact .mt-3{margin-top:8px!important}.lok-compact .mt-2{margin-top:6px!important}.lok-compact .mb-2{margin-bottom:6px!important}
+  /* ---- LokMotion: optional UI liveliness (off | subtle | full) ---- */
+  .lok-motion-off *,.lok-motion-off .lok-btn{animation:none!important;transition:none!important}
+  .lok-motion-subtle .lok-btn:active{transform:scale(.975)}
+  .lok-motion-full .lok-btn{transition:transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s ease}
+  .lok-motion-full .lok-btn:active{transform:scale(.93)}
+  .lok-motion-full nav .lok-btn[aria-current=page] span[aria-hidden]{animation:loknavbob 2.2s ease-in-out infinite}
+  .lok-motion-full .lok-display{animation:loksettle .35s cubic-bezier(.34,1.56,.64,1) both}
+  @keyframes loknavbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
+  @keyframes loksettle{0%{opacity:0;transform:translateY(4px)}100%{opacity:1;transform:translateY(0)}}
+  @media(prefers-reduced-motion:reduce){.lok-motion-full .lok-display,.lok-motion-full nav .lok-btn[aria-current=page] span[aria-hidden]{animation:none!important}}
   @supports(-webkit-touch-callout:none){input,textarea,select{font-size:16px!important}}
   @media(prefers-reduced-motion:reduce){*,.lok-btn{animation-duration:.001ms!important;transition-duration:.05ms!important}html{scroll-behavior:auto}}
 `}</style>);
