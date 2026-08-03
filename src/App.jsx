@@ -244,9 +244,13 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
   const[dynamics,setDynamics]=useState(true);const[brushLabOpen,setBrushLabOpen]=useState(false);const[customBrushParams,setCustomBrushParams]=useState({flow:0.35,scatter:0.15,dabs:3,angleJitter:0.2,roundness:1});
   const[savedBrushes,setSavedBrushes]=useState(()=>{try{const r=localStorage.getItem("lok:customBrushes");return r?JSON.parse(r):[];}catch{return[];}});
   const lastMoveXY=useRef(null);const lastMoveT=useRef(0);const sizeMulRef=useRef(1);const transformDrag=useRef(null);const labPreviewRef=useRef(null);
-  const freehandPts=useRef([]);const freehandBaseline=useRef(null);
+  const freehandPts=useRef([]);const freehandBaseline=useRef(null);const freehandSim=useRef(true);
   const idRef=useRef(1);const canvases=useRef(new Map());const drawing=useRef(false);const undoStack=useRef([]);const redoStack=useRef([]);const wrapRef=useRef(null);const viewportRef=useRef(null);const lastPts=useRef([]);const midPts=useRef([]);const activeLayer=layers.find(l=>l.id===active);
   const[zoom,setZoom]=useState(1);const pointers=useRef(new Map());const pinchState=useRef(null);
+  // Multi-touch behaviour: "paint" = every finger draws at once (the original
+  // chaotic multi-ink effect), "zoom" = two fingers pinch/pan the canvas.
+  const[multiTouch,setMultiTouch]=useState(()=>{try{return localStorage.getItem("lok:multiTouch")||"paint";}catch{return "paint";}});
+  useEffect(()=>{try{localStorage.setItem("lok:multiTouch",multiTouch);}catch{}},[multiTouch]);
   const zoomIn=()=>setZoom(z=>Math.min(3,+(z+0.25).toFixed(2)));
   const zoomOut=()=>setZoom(z=>Math.max(1,+(z-0.25).toFixed(2)));
   const resetZoom=()=>{setZoom(1);if(viewportRef.current){viewportRef.current.scrollLeft=0;viewportRef.current.scrollTop=0;}};
@@ -270,7 +274,9 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
   const saveBrushPreset=()=>{if(!ccTier)return;const name=`Brush ${savedBrushes.length+1}`;const next=[...savedBrushes,{id:`custom_${Date.now()}`,name,...customBrushParams}];setSavedBrushes(next);try{localStorage.setItem("lok:customBrushes",JSON.stringify(next));}catch{}};
   useEffect(()=>{const cv=labPreviewRef.current;if(!cv||!brushLabOpen)return;const ctx=cv.getContext("2d");ctx.clearRect(0,0,cv.width,cv.height);for(let x=8;x<cv.width-8;x+=3){const y=cv.height/2+Math.sin(x*0.15)*cv.height*0.22;dabCustom(ctx,x,y,size*0.6,color,customBrushParams);}},[brushLabOpen,customBrushParams,size,color,T]);
   const useFreehand=()=>brush==="ink"&&tool==="pen";
-  const drawFreehandStroke=ctx=>{if(freehandPts.current.length===0||!freehandBaseline.current)return;ctx.putImageData(freehandBaseline.current,0,0);ctx.globalCompositeOperation=tool==="eraser"?"destination-out":"source-over";ctx.fillStyle=color;ctx.globalAlpha=1;freehandPts.current.forEach(pts=>{const outline=getStroke(pts,{size,thinning:0.5,smoothing:0.5,streamline:0.5,simulatePressure:pts._simulate});if(!outline.length)return;ctx.fill(new Path2D(getSvgPathFromStroke(outline)));});};
+  // freehandPts.current is an array of STROKES (one per symmetry mirror);
+  // each stroke is an array of [x, y, pressure] points.
+  const drawFreehandStroke=ctx=>{if(!freehandPts.current||freehandPts.current.length===0||!freehandBaseline.current)return;ctx.putImageData(freehandBaseline.current,0,0);ctx.globalCompositeOperation=tool==="eraser"?"destination-out":"source-over";ctx.fillStyle=color;ctx.globalAlpha=1;freehandPts.current.forEach(pts=>{if(!pts||pts.length===0)return;const outline=getStroke(pts,{size,thinning:0.5,smoothing:0.5,streamline:0.5,simulatePressure:freehandSim.current});if(!outline.length)return;ctx.fill(new Path2D(getSvgPathFromStroke(outline)));});};
   const dabAt=(ctx,x,y)=>{const es=size*sizeMulRef.current;if(brush==="custom"){dabCustom(ctx,x,y,es,color,customBrushParams);return;}ctx.globalCompositeOperation="source-over";ctx.globalAlpha=brush==="chalk"?0.5:0.18;ctx.fillStyle=color;const dots=brush==="chalk"?6:1;for(let d=0;d<dots;d++){const ox=brush==="chalk"?(Math.random()-.5)*es*1.4:0,oy=brush==="chalk"?(Math.random()-.5)*es*1.4:0;ctx.beginPath();ctx.arc(x+ox,y+oy,tool==="soft"?es*1.8:es*0.5,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;};
   const fxAt=(ctx,x,y)=>{if(!animFx||animFx==="none"||Math.random()>0.4)return;ctx.save();ctx.globalCompositeOperation="source-over";
     if(animFx==="sparkle_trail"){ctx.fillStyle="#fff";ctx.globalAlpha=0.8;for(let i=0;i<3;i++){const a=Math.random()*Math.PI*2,r=Math.random()*size*1.2;ctx.beginPath();ctx.arc(x+Math.cos(a)*r,y+Math.sin(a)*r,0.8+Math.random()*1.4,0,Math.PI*2);ctx.fill();}}
@@ -299,29 +305,29 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
   const pinchMid=pts=>({x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2});
   const down=e=>{e.preventDefault();
     pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(pointers.current.size===2){
+    if(multiTouch==="zoom"&&pointers.current.size===2){
       if(drawing.current||freehandPts.current){drawing.current=false;freehandPts.current=null;freehandBaseline.current=null;}
       const pts=[...pointers.current.values()];const mid=pinchMid(pts);
       pinchState.current={dist:pinchDist(pts),zoom,midX:mid.x,midY:mid.y,scrollLeft:viewportRef.current?.scrollLeft||0,scrollTop:viewportRef.current?.scrollTop||0};
       return;
     }
-    if(pointers.current.size>2)return;
-    const cv=canvases.current.get(active);if(!cv||!activeLayer?.visible)return;e.currentTarget.setPointerCapture(e.pointerId);const p0=pos(e);sizeMulRef.current=dynMul(e,p0[0],p0[1]);if(tool==="eyedrop"){eyedrop(...p0);return;}if(tool==="transform"){transformDrag.current={startClient:[e.clientX,e.clientY],startCanvas:p0};return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}drawing.current=true;onStroke&&onStroke();const ctx=cv.getContext("2d");if(useFreehand()){const pr=e.pointerType==="pen"&&e.pressure>0?e.pressure:0.5;freehandPts.current=[[p0[0],p0[1],pr]];freehandPts.current._simulate=e.pointerType!=="pen";freehandBaseline.current=ctx.getImageData(0,0,W,H);drawFreehandStroke(ctx);return;}stamp(ctx,...p0,true);};
+    if(multiTouch==="zoom"&&pointers.current.size>2)return;
+    const cv=canvases.current.get(active);if(!cv||!activeLayer?.visible)return;e.currentTarget.setPointerCapture(e.pointerId);const p0=pos(e);sizeMulRef.current=dynMul(e,p0[0],p0[1]);if(tool==="eyedrop"){eyedrop(...p0);return;}if(tool==="transform"){transformDrag.current={startClient:[e.clientX,e.clientY],startCanvas:p0};return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}drawing.current=true;onStroke&&onStroke();const ctx=cv.getContext("2d");if(useFreehand()){const pr=e.pointerType==="pen"&&e.pressure>0?e.pressure:0.5;freehandSim.current=e.pointerType!=="pen";freehandPts.current=symXY(p0[0],p0[1]).map(([sx,sy])=>[[sx,sy,pr]]);freehandBaseline.current=ctx.getImageData(0,0,W,H);drawFreehandStroke(ctx);return;}stamp(ctx,...p0,true);};
   const move=e=>{
     if(pointers.current.has(e.pointerId))pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(pointers.current.size===2&&pinchState.current){
+    if(multiTouch==="zoom"&&pointers.current.size===2&&pinchState.current){
       const pts=[...pointers.current.values()];const dist=pinchDist(pts);const mid=pinchMid(pts);
       const newZoom=Math.max(1,Math.min(3,pinchState.current.zoom*(dist/pinchState.current.dist)));
       setZoom(newZoom);
       if(viewportRef.current){viewportRef.current.scrollLeft=pinchState.current.scrollLeft-(mid.x-pinchState.current.midX);viewportRef.current.scrollTop=pinchState.current.scrollTop-(mid.y-pinchState.current.midY);}
       return;
     }
-    if(pointers.current.size>=2)return;
-    if(tool==="transform"){if(!transformDrag.current)return;const cv=canvases.current.get(active);if(cv)cv.style.transform=`translate(${e.clientX-transformDrag.current.startClient[0]}px,${e.clientY-transformDrag.current.startClient[1]}px)`;return;}if(!drawing.current)return;const cv=canvases.current.get(active);if(!cv)return;const evs=(e.getCoalescedEvents&&e.getCoalescedEvents().length)?e.getCoalescedEvents():[e];const ctx=cv.getContext("2d");if(freehandPts.current){evs.forEach(ev=>{const p=pos(ev);const pr=ev.pointerType==="pen"&&ev.pressure>0?ev.pressure:0.5;freehandPts.current.push([p[0],p[1],pr]);});drawFreehandStroke(ctx);return;}const p=pos(evs[evs.length-1]);sizeMulRef.current=dynMul(e,p[0],p[1]);evs.forEach(ev=>stamp(ctx,...pos(ev),false));};
+    if(multiTouch==="zoom"&&pointers.current.size>=2)return;
+    if(tool==="transform"){if(!transformDrag.current)return;const cv=canvases.current.get(active);if(cv)cv.style.transform=`translate(${e.clientX-transformDrag.current.startClient[0]}px,${e.clientY-transformDrag.current.startClient[1]}px)`;return;}if(!drawing.current)return;const cv=canvases.current.get(active);if(!cv)return;const evs=(e.getCoalescedEvents&&e.getCoalescedEvents().length)?e.getCoalescedEvents():[e];const ctx=cv.getContext("2d");if(freehandPts.current&&freehandPts.current.length){evs.forEach(ev=>{const p=pos(ev);const pr=ev.pointerType==="pen"&&ev.pressure>0?ev.pressure:0.5;symXY(p[0],p[1]).forEach(([sx,sy],i)=>{if(freehandPts.current[i])freehandPts.current[i].push([sx,sy,pr]);});});drawFreehandStroke(ctx);return;}const p=pos(evs[evs.length-1]);sizeMulRef.current=dynMul(e,p[0],p[1]);evs.forEach(ev=>stamp(ctx,...pos(ev),false));};
   const up=e=>{
     if(e?.pointerId!=null)pointers.current.delete(e.pointerId);
     if(pointers.current.size<2)pinchState.current=null;
-    if(pointers.current.size>=1)return;
+    if(multiTouch==="zoom"&&pointers.current.size>=1)return;
     if(tool==="transform"){const cv=canvases.current.get(active);if(cv)cv.style.transform="";if(transformDrag.current&&e){const p1=pos(e);const[sx,sy]=transformDrag.current.startCanvas;const dx=p1[0]-sx,dy=p1[1]-sy;if(Math.abs(dx)>0.5||Math.abs(dy)>0.5)commitTranslate(dx,dy);}transformDrag.current=null;return;}freehandPts.current=null;freehandBaseline.current=null;drawing.current=false;lastPts.current=[];midPts.current=[];try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
   const undo=()=>{const u=undoStack.current.pop();if(!u)return;const cv=canvases.current.get(u.id);if(cv){redoStack.current.push({id:u.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(u.snap,0,0);}};
   const redo=()=>{const r=redoStack.current.pop();if(!r)return;const cv=canvases.current.get(r.id);if(cv){undoStack.current.push({id:r.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(r.snap,0,0);}};
@@ -341,6 +347,9 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
         {symmetry.startsWith("radial")&&<div aria-hidden="true" className="absolute pointer-events-none rounded-full" style={{left:"50%",top:"50%",width:10,height:10,transform:"translate(-50%,-50%)",border:`2.5px solid ${T.accent}`}}/>}
       </div>
       <div className="absolute top-1.5 left-1.5 lok-display px-2 py-0.5 rounded-md text-xs font-extrabold pointer-events-none" style={{background:"rgba(35,48,107,.85)",color:T.paper,backdropFilter:"blur(3px)"}}>L{layers.findIndex(l=>l.id===active)+1} / {layers.length}</div>
+      <div className="absolute bottom-1.5 left-1.5">
+        <button onClick={()=>setMultiTouch(m=>m==="paint"?"zoom":"paint")} aria-pressed={multiTouch==="paint"} title={multiTouch==="paint"?"Multi-finger paint is ON — two fingers paint wild ink. Tap to switch to pinch-zoom.":"Pinch-zoom is ON. Tap to switch back to multi-finger paint."} className="lok-btn px-2 h-7 rounded-full font-bold text-[10px]" style={{background:multiTouch==="paint"?T.accent:"rgba(255,255,255,.92)",color:multiTouch==="paint"?T.onAccent:T.ink,border:`2px solid ${T.ink}`}}>{multiTouch==="paint"?"✋ Multi-paint":"🔍 Pinch-zoom"}</button>
+      </div>
       <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
         <button onClick={zoomOut} disabled={zoom<=1} aria-label="Zoom out" className="lok-btn w-7 h-7 rounded-full flex items-center justify-center font-extrabold text-sm" style={{background:"rgba(255,255,255,.92)",border:`2px solid ${T.ink}`,color:T.ink,opacity:zoom<=1?0.4:1}}>−</button>
         <button onClick={zoomIn} disabled={zoom>=3} aria-label="Zoom in" className="lok-btn w-7 h-7 rounded-full flex items-center justify-center font-extrabold text-sm" style={{background:"rgba(255,255,255,.92)",border:`2px solid ${T.ink}`,color:T.ink,opacity:zoom>=3?0.4:1}}>+</button>
