@@ -3,6 +3,7 @@ import {
   forwardRef, useImperativeHandle,
 } from "react";
 import { getStroke } from "perfect-freehand";
+import { gsap } from "gsap";
 import Easel from "./Easel.jsx";
 
 import { THEMES, SKIN_WAVE_GATE, SKIN_WAVE_3_GATE, SKIN_WAVE_4_GATE, ThemeCtx, useT, ART, blotBorderStyle } from "./theme/theme.js";
@@ -106,42 +107,45 @@ function Onboard({onDone,onName,defaultName="",canInstall=false,onInstallClick})
   const isIOS=typeof navigator!=="undefined"&&/iPad|iPhone|iPod/.test(navigator.userAgent);
   const sendLink=async()=>{const e=authEmail.trim();if(!e||!e.includes("@"))return;setAuthBusy(true);try{await auth.signInWithEmail(e);setAuthSent(e);}catch{}setAuthBusy(false);};
   const steps=[
-    {t:"Welcome to LokBook",d:"A home for tiny hand-drawn animations. Slide down any post to flip through its pages."},
-    {t:"Meet moss.ink",d:"The first artist you'll see in the feed — tap any artist's name to visit their page. Lok artists to follow them; vote and bookmark what you love."},
-    {t:"Draw, battle, earn",d:"Make flips in Studio, go head-to-head in Battle, grab prompts in Rush. Turn on sound 🎵 for best experience."},
-    {t:"Meet your LilLok",d:"A living-ink buddy that grows with you. Feed it ink, and it helps you in battles."},
-    {t:"Save your work",d:"Sign in and everything you draw is backed up to your account — safe even if you switch phones.",kind:"account"},
-    {t:"Add to your Home Screen",d:isIOS?"This is the one step that makes guest data reliable — Safari won't clear an installed app's storage the way it clears a browser tab.":"Installing keeps LokBook one tap away and protects your data on this device.",kind:"install"},
-    {t:"Make it yours",d:"This is your artist name — keep it or change it. Here are 50 Loks to begin."},
+    {icon:"📖",t:"Welcome to LokBook",d:"Tiny hand-drawn animations. Swipe to flip.",color:T.accent},
+    {icon:"🎨",t:"Draw · Battle · Earn",d:"Studio to draw, Battle to compete, LilLok to raise.",color:T.alt},
+    {icon:"🔒",t:"Save your work",d:"Sign in — everything's backed up.",kind:"account",color:"#7A4FBF"},
+    {icon:"📲",t:"Add to Home Screen",d:isIOS?"Guest art needs this to stick.":"Keeps LokBook one tap away.",kind:"install",color:"#2FA9A0"},
+    {icon:"✏️",t:"Make it yours",d:"Your artist name — start with 50 Loks.",color:T.accent},
   ];
   const s=steps[step];const last=step===steps.length-1;
+  const cardRef=useRef(null);const bodyRef=useRef(null);
+  useEffect(()=>{if(cardRef.current)gsap.fromTo(cardRef.current,{opacity:0,y:24,scale:0.94},{opacity:1,y:0,scale:1,duration:0.45,ease:"back.out(1.6)"});},[]);
+  useEffect(()=>{if(bodyRef.current)gsap.fromTo(bodyRef.current,{opacity:0,x:16},{opacity:1,x:0,duration:0.3,ease:"power2.out"});},[step]);
+  const go=dir=>{if(bodyRef.current)gsap.to(bodyRef.current,{opacity:0,x:dir>0?-16:16,duration:0.12,ease:"power1.in",onComplete:()=>setStep(st=>st+dir)});else setStep(st=>st+dir);};
+  const tapBtn=e=>gsap.fromTo(e.currentTarget,{scale:0.95},{scale:1,duration:0.25,ease:"back.out(3)"});
   return(<div className="fixed inset-0 z-[60] flex items-center justify-center p-5" style={{background:"rgba(0,0,0,.55)"}}>
-    <div className="w-full rounded-3xl p-6 text-center" style={{maxWidth:420,background:T.card,border:`3px solid ${T.ink}`,boxShadow:`8px 8px 0 ${T.accent}`,animation:"lokrise .3s ease"}}>
-      <div className="lok-display text-2xl font-extrabold mb-2" style={{color:T.accent}}>{s.t}</div>
-      <p className="text-sm leading-snug">{s.d}</p>
-      {s.kind==="account"&&(<div className="mt-3 text-left">
-        {auth.isAuthenticated()?(<div className="text-sm font-bold text-center py-2" style={{color:T.alt}}>✓ Signed in as {auth.getEmail()}</div>
-        ):authSent?(<div className="text-sm text-center leading-snug py-2">✉️ Check <strong>{authSent}</strong> for your magic link.</div>
-        ):(<>
-          <div className="flex gap-1.5">
-            <input value={authEmail} onChange={e=>setAuthEmail(e.target.value)} type="email" placeholder="your@email.com" aria-label="Email for account sign-in" onKeyDown={e=>e.key==="Enter"&&sendLink()} className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.paper,color:T.ink}}/>
-            <button onClick={sendLink} disabled={authBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:T.accent,color:T.onAccent,border:`2.5px solid ${T.ink}`,opacity:authBusy?0.6:1}}>{authBusy?"…":"Sign in"}</button>
-          </div>
-          <div className="mt-3 pt-3 text-xs opacity-70 leading-snug text-center" style={{borderTop:`1.5px dashed ${T.shadow}`}}>Or skip for now — <strong>guest art stays on this device only.</strong> If you don't add LokBook to your Home Screen (next step), or you're in Private Browsing, Safari can quietly clear it after about a week.</div>
-        </>)}
-      </div>)}
-      {s.kind==="install"&&(<div className="mt-3">
-        {isIOS?(<div className="text-sm leading-snug text-center p-3 rounded-xl" style={{border:`2px dashed ${T.ink}`,background:T.paper}}>
-          <div className="font-bold">Tap the Share button in Safari's toolbar, then "Add to Home Screen."</div>
-          <div className="text-xs opacity-60 mt-1.5">Websites can't trigger this step automatically on iPhone — this tap is the one manual part.</div>
-        </div>
-        ):canInstall?(<button onClick={onInstallClick} className="lok-btn lok-display w-full py-3 rounded-xl font-extrabold" style={{background:T.ink,color:T.paper,border:`3px solid ${T.ink}`}}>📲 Install LokBook now</button>
-        ):(<div className="text-xs opacity-60 text-center py-2">Use your browser menu → "Install app" / "Add to Home Screen" any time — also in Settings later.</div>)}
-      </div>)}
-      {last&&<input value={name} onChange={e=>setName(e.target.value)} placeholder="Your artist name" aria-label="Artist name" className="mt-3 w-full px-4 py-2.5 rounded-xl text-center font-bold text-sm" style={{border:`3px solid ${T.ink}`,background:T.paper,color:T.ink}}/>}
-      <div className="flex justify-center gap-1.5 my-4">{steps.map((_,i)=>(<div key={i} style={{width:i===step?22:8,height:6,borderRadius:4,background:i<=step?T.accent:T.shadow,transition:"width .2s"}}/>))}</div>
-      <button onClick={()=>{if(last){onName&&onName(name);onDone();}else setStep(step+1);}} className="lok-btn lok-display w-full py-3 rounded-xl text-lg font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}}>{last?"Claim 50 Loks & start":"Next"}</button>
-      {!last&&<button onClick={onDone} className="mt-2 text-xs font-bold underline opacity-60">skip</button>}
+    <div ref={cardRef} className="w-full rounded-3xl p-6 text-center" style={{maxWidth:380,background:T.card,border:`3px solid ${T.ink}`,boxShadow:`8px 8px 0 ${s.color}`,transition:"box-shadow .3s ease"}}>
+      <div ref={bodyRef}>
+        <div className="mx-auto mb-3 flex items-center justify-center rounded-full" style={{width:56,height:56,fontSize:28,background:s.color+"22",border:`2.5px solid ${s.color}`}}>{s.icon}</div>
+        <div className="lok-display text-xl font-extrabold mb-1" style={{color:T.ink}}>{s.t}</div>
+        <p className="text-sm opacity-70 leading-snug">{s.d}</p>
+        {s.kind==="account"&&(<div className="mt-3 text-left">
+          {auth.isAuthenticated()?(<div className="text-sm font-bold text-center py-2" style={{color:T.alt}}>✓ Signed in as {auth.getEmail()}</div>
+          ):authSent?(<div className="text-sm text-center leading-snug py-2">✉️ Check <strong>{authSent}</strong> for the link.</div>
+          ):(<>
+            <div className="flex gap-1.5">
+              <input value={authEmail} onChange={e=>setAuthEmail(e.target.value)} type="email" placeholder="your@email.com" aria-label="Email for account sign-in" onKeyDown={e=>e.key==="Enter"&&sendLink()} className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.paper,color:T.ink}}/>
+              <button onClick={sendLink} disabled={authBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:s.color,color:"#fff",border:`2.5px solid ${T.ink}`,opacity:authBusy?0.6:1}}>{authBusy?"…":"Go"}</button>
+            </div>
+            <div className="mt-2 text-[11px] opacity-55 leading-snug text-center">Skip to try as a guest — art stays on this device, and can be cleared after ~a week without the next step.</div>
+          </>)}
+        </div>)}
+        {s.kind==="install"&&(<div className="mt-3">
+          {isIOS?(<div className="text-xs leading-snug text-center p-2.5 rounded-xl font-bold" style={{border:`2px dashed ${T.ink}`,background:T.paper}}>Tap Share ⬆ in Safari → "Add to Home Screen"</div>
+          ):canInstall?(<button onClick={onInstallClick} className="lok-btn lok-display w-full py-2.5 rounded-xl font-extrabold text-sm" style={{background:s.color,color:"#fff",border:`3px solid ${T.ink}`}}>📲 Install now</button>
+          ):(<div className="text-[11px] opacity-55 text-center py-1">Browser menu → "Add to Home Screen" any time.</div>)}
+        </div>)}
+        {last&&<input value={name} onChange={e=>setName(e.target.value)} placeholder="Your artist name" aria-label="Artist name" className="mt-3 w-full px-4 py-2.5 rounded-xl text-center font-bold text-sm" style={{border:`3px solid ${T.ink}`,background:T.paper,color:T.ink}}/>}
+      </div>
+      <div className="flex justify-center gap-1.5 my-4">{steps.map((st,i)=>(<div key={i} style={{width:i===step?22:8,height:6,borderRadius:4,background:i<=step?s.color:T.shadow,transition:"width .25s ease, background .25s ease"}}/>))}</div>
+      <button onClick={e=>{tapBtn(e);if(last){onName&&onName(name);onDone();}else go(1);}} className="lok-btn lok-display w-full py-3 rounded-xl text-lg font-extrabold" style={{background:s.color,color:"#fff",border:`3px solid ${T.ink}`}}>{last?"Claim 50 Loks":"Next"}</button>
+      {!last&&<button onClick={onDone} className="mt-2 text-xs font-bold underline opacity-50">skip all</button>}
     </div>
   </div>);
 }
