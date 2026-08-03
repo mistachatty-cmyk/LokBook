@@ -100,14 +100,44 @@ function applyLogo(id){
 }
 
 
-function Onboard({onDone,onName,defaultName=""}){
-  const T=useT();const[step,setStep]=useState(0);const[name,setName]=useState(defaultName);
-  const steps=[{t:"Welcome to LokBook",d:"A home for tiny hand-drawn animations. Slide down any post to flip through its pages."},{t:"Meet moss.ink",d:"The first artist you'll see in the feed — tap any artist's name to visit their page. Lok artists to follow them; vote and bookmark what you love."},{t:"Draw, battle, earn",d:"Make flips in Studio, go head-to-head in Battle, grab prompts in Rush. Turn on sound 🎵 for best experience."},{t:"Meet your LilLok",d:"A living-ink buddy that grows with you. Feed it ink, and it helps you in battles."},{t:"Make it yours",d:"This is your artist name — keep it or change it. Here are 50 Loks to begin."}];
+function Onboard({onDone,onName,defaultName="",canInstall=false,onInstallClick}){
+  const T=useT();const auth=useAuth();const[step,setStep]=useState(0);const[name,setName]=useState(defaultName);
+  const[authEmail,setAuthEmail]=useState("");const[authSent,setAuthSent]=useState("");const[authBusy,setAuthBusy]=useState(false);
+  const isIOS=typeof navigator!=="undefined"&&/iPad|iPhone|iPod/.test(navigator.userAgent);
+  const sendLink=async()=>{const e=authEmail.trim();if(!e||!e.includes("@"))return;setAuthBusy(true);try{await auth.signInWithEmail(e);setAuthSent(e);}catch{}setAuthBusy(false);};
+  const steps=[
+    {t:"Welcome to LokBook",d:"A home for tiny hand-drawn animations. Slide down any post to flip through its pages."},
+    {t:"Meet moss.ink",d:"The first artist you'll see in the feed — tap any artist's name to visit their page. Lok artists to follow them; vote and bookmark what you love."},
+    {t:"Draw, battle, earn",d:"Make flips in Studio, go head-to-head in Battle, grab prompts in Rush. Turn on sound 🎵 for best experience."},
+    {t:"Meet your LilLok",d:"A living-ink buddy that grows with you. Feed it ink, and it helps you in battles."},
+    {t:"Save your work",d:"Sign in and everything you draw is backed up to your account — safe even if you switch phones.",kind:"account"},
+    {t:"Add to your Home Screen",d:isIOS?"This is the one step that makes guest data reliable — Safari won't clear an installed app's storage the way it clears a browser tab.":"Installing keeps LokBook one tap away and protects your data on this device.",kind:"install"},
+    {t:"Make it yours",d:"This is your artist name — keep it or change it. Here are 50 Loks to begin."},
+  ];
   const s=steps[step];const last=step===steps.length-1;
   return(<div className="fixed inset-0 z-[60] flex items-center justify-center p-5" style={{background:"rgba(0,0,0,.55)"}}>
     <div className="w-full rounded-3xl p-6 text-center" style={{maxWidth:420,background:T.card,border:`3px solid ${T.ink}`,boxShadow:`8px 8px 0 ${T.accent}`,animation:"lokrise .3s ease"}}>
       <div className="lok-display text-2xl font-extrabold mb-2" style={{color:T.accent}}>{s.t}</div>
       <p className="text-sm leading-snug">{s.d}</p>
+      {s.kind==="account"&&(<div className="mt-3 text-left">
+        {auth.isAuthenticated()?(<div className="text-sm font-bold text-center py-2" style={{color:T.alt}}>✓ Signed in as {auth.getEmail()}</div>
+        ):authSent?(<div className="text-sm text-center leading-snug py-2">✉️ Check <strong>{authSent}</strong> for your magic link.</div>
+        ):(<>
+          <div className="flex gap-1.5">
+            <input value={authEmail} onChange={e=>setAuthEmail(e.target.value)} type="email" placeholder="your@email.com" aria-label="Email for account sign-in" onKeyDown={e=>e.key==="Enter"&&sendLink()} className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.paper,color:T.ink}}/>
+            <button onClick={sendLink} disabled={authBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:T.accent,color:T.onAccent,border:`2.5px solid ${T.ink}`,opacity:authBusy?0.6:1}}>{authBusy?"…":"Sign in"}</button>
+          </div>
+          <div className="mt-3 pt-3 text-xs opacity-70 leading-snug text-center" style={{borderTop:`1.5px dashed ${T.shadow}`}}>Or skip for now — <strong>guest art stays on this device only.</strong> If you don't add LokBook to your Home Screen (next step), or you're in Private Browsing, Safari can quietly clear it after about a week.</div>
+        </>)}
+      </div>)}
+      {s.kind==="install"&&(<div className="mt-3">
+        {isIOS?(<div className="text-sm leading-snug text-center p-3 rounded-xl" style={{border:`2px dashed ${T.ink}`,background:T.paper}}>
+          <div className="font-bold">Tap the Share button in Safari's toolbar, then "Add to Home Screen."</div>
+          <div className="text-xs opacity-60 mt-1.5">Websites can't trigger this step automatically on iPhone — this tap is the one manual part.</div>
+        </div>
+        ):canInstall?(<button onClick={onInstallClick} className="lok-btn lok-display w-full py-3 rounded-xl font-extrabold" style={{background:T.ink,color:T.paper,border:`3px solid ${T.ink}`}}>📲 Install LokBook now</button>
+        ):(<div className="text-xs opacity-60 text-center py-2">Use your browser menu → "Install app" / "Add to Home Screen" any time — also in Settings later.</div>)}
+      </div>)}
       {last&&<input value={name} onChange={e=>setName(e.target.value)} placeholder="Your artist name" aria-label="Artist name" className="mt-3 w-full px-4 py-2.5 rounded-xl text-center font-bold text-sm" style={{border:`3px solid ${T.ink}`,background:T.paper,color:T.ink}}/>}
       <div className="flex justify-center gap-1.5 my-4">{steps.map((_,i)=>(<div key={i} style={{width:i===step?22:8,height:6,borderRadius:4,background:i<=step?T.accent:T.shadow,transition:"width .2s"}}/>))}</div>
       <button onClick={()=>{if(last){onName&&onName(name);onDone();}else setStep(step+1);}} className="lok-btn lok-display w-full py-3 rounded-xl text-lg font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}}>{last?"Claim 50 Loks & start":"Next"}</button>
@@ -1274,7 +1304,7 @@ export default function LokApp(){
       {showLilLok&&<LilLokPanel lillok={lillok} phase={phase} kids={kids} custom={customLilLok} gear={cosmetics.gear} skin={cosmetics.lillokSkin} aura={cosmetics.lillokAura} pet={cosmetics.lillokPet} loks={loks} onFeed={feedLilLok} onFlask={()=>{if(loks<10){say("Need 10 Loks","error");return false;}setLoks(l=>l-10);setTotalSpent(t=>t+10);feedLilLok(40,"flask");say("Ink flask · −10 Loks","success");return true;}} onClose={()=>setShowLilLok(false)} say={say} setLillok={setLillok} onPublish={post=>{setPosts(ps=>[post,...ps]);say("Revival animation published","success");}} onSaveCustom={c=>{setCustomLilLok(c);setLillok(s=>({...s,name:c.name}));say(`${c.name} is now your LilLok`,"success");}}/>}
       {openIdx!==null&&posts[openIdx]&&(<Viewer posts={posts} index={openIdx} bookmarks={bookmarks} cosmetics={cosmetics} onBookmark={id=>{setBookmarks(b=>b.includes(id)?b.filter(x=>x!==id):[...b,id]);hap([20]);say(bookmarks.includes(id)?"Bookmark removed":"Lok'd in");}} onClose={()=>setOpenIdx(null)} onNav={d=>setOpenIdx(i=>Math.min(posts.length-1,Math.max(0,i+d)))} onVote={id=>{const p=posts.find(x=>x.id===id);if(p.voted)return;patchPost(id,{voted:true,votes:p.votes+1});addLoks(5);gainXp(5);questTick("vote");blip("C5");hap([30]);say("Vote stamped");}} onReact={(id,type)=>{const p=posts.find(x=>x.id===id);patchPost(id,{reactions:{...p.reactions,[type]:p.reactions[type]+1}});blip("D5");hap([15]);}} onViewed={id=>{const p=posts.find(x=>x.id===id);if(p.viewed)return;patchPost(id,{viewed:true,views:(p.views||0)+1});addLoks(3);gainXp(3);questTick("view");say("Full slide-through · +3 Loks");}} onShare={sharePost} onDelete={id=>{setPosts(ps=>ps.filter(p=>p.id!==id));setOpenIdx(null);say("Post deleted");}} onRename={(id,title)=>patchPost(id,{title})} onPatch={patchPost} onEditInStudio={editInStudio} myName={profile.name} onRemix={post=>{const r={id:"new-remix-"+Date.now(),title:"Remix: "+post.title,frames:[...post.frames],frameDurations:post.frameDurations?[...post.frameDurations]:undefined,paceMs:post.paceMs||160,mode:post.mode||"A",style:post.style||"bold",loop:post.loop,from:"studio",author:profile.name,votes:0,voted:false,viewed:false,views:0,reactions:{splat:0,heart:0,drip:0}};setPosts(ps=>[r,...ps]);setOpenIdx(null);editInStudio(r);}}/>)}
       {showHint&&tab==="feed"&&(<button onClick={()=>setShowHint(false)} className="fixed left-1/2 z-50 px-4 py-2.5 rounded-2xl text-sm font-bold text-center lok-btn" style={{bottom:150,transform:"translateX(-50%)",background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,boxShadow:`4px 4px 0 ${T.ink}`,maxWidth:"90vw",animation:"lokrise .4s ease"}} aria-label="Dismiss hint">Slide a post down to play it · ▲ to vote · tap to dismiss</button>)}
-      {showOnboard&&<Onboard defaultName={profile.name} onName={n=>{const clean=(n||"").trim();if(!clean)return;if(isReservedName(clean)){const alt=suggestHandle(clean,profile.avatarSeed);say(`"${clean}" is a Lok artist — how about ${alt}?`,"error");setProfile(p=>({...p,name:alt}));return;}setProfile(p=>({...p,name:clean}));}} onDone={()=>{setShowOnboard(false);setOnboarded(true);setShowHint(true);addLoks(50);gainXp(20);blip("C6");say("Welcome · +50 Loks to start");}}/>}
+      {showOnboard&&<Onboard defaultName={profile.name} canInstall={!!installEvt} onInstallClick={async()=>{if(installEvt){installEvt.prompt();try{const r=await installEvt.userChoice;if(r.outcome==="accepted")say("LokBook added to your home screen!","success");}catch{}setInstallEvt(null);}}} onName={n=>{const clean=(n||"").trim();if(!clean)return;if(isReservedName(clean)){const alt=suggestHandle(clean,profile.avatarSeed);say(`"${clean}" is a Lok artist — how about ${alt}?`,"error");setProfile(p=>({...p,name:alt}));return;}setProfile(p=>({...p,name:clean}));}} onDone={()=>{setShowOnboard(false);setOnboarded(true);setShowHint(true);addLoks(50);gainXp(20);blip("C6");say("Welcome · +50 Loks to start");}}/>}
       {comebackCelebration&&(()=>{const styles={confetti:{},inkbloom:{},starburst:{}};const cs=styles[comebackCelebration]||styles.confetti;const colors=[T.accent,T.alt,"#E8B14B","#FF5DA2","#2FA9A0","#fff"];return(<div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:"rgba(0,0,0,0.2)",animation:"lokrise .3s ease",pointerEvents:"auto"}} onClick={()=>{setComebackCelebration(null);setLoks(l=>l+25);setTotalEarned(t=>t+25);say("+25 Loks for coming back!","success");}}>
         <div className="text-center pointer-events-none" style={{animation:"lokfloat 1.5s ease-in-out infinite"}}>
           <div className="lok-display text-5xl font-extrabold" style={{color:"#fff",textShadow:`0 0 40px ${T.accent}, 0 0 80px ${T.accent}55, 0 4px 8px rgba(0,0,0,0.5)`}}>💎 +1000 Loks!</div>
