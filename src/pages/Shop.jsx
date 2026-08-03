@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock.js";
 import { useT, THEMES, SKIN_WAVE_GATE, SKIN_WAVE_3_GATE, SKIN_WAVE_4_GATE, blotBorderStyle } from "../theme/theme.js";
 import {
@@ -20,7 +20,7 @@ import MythicPreview from "../MythicPreview.jsx";
 const TYPE_LABELS = {
   frame: "Avatar frame", effect: "Page effect", paper: "Canvas texture",
   animation_fx: "Animation FX", name_color: "Name color", lillok_skin: "LilLok skin",
-  cursor: "Cursor", export: "Export format",
+  cursor: "Cursor", export: "Export format", canvas_border: "Studio canvas border",
 };
 
 export const WIP_CATEGORIES = {
@@ -29,7 +29,37 @@ export const WIP_CATEGORIES = {
   musicPack: "Built-in music packs have no audio yet \u2014 add your own in Settings \u2192 Music.",
 };
 
-function ShopItem({owned,equipped,price,onClick,children,swatch,rarity,wip}){const T=useT();const r=rarity&&RARITY[rarity];return(<button onClick={onClick} className={`lok-btn text-left rounded-2xl overflow-hidden w-full ${rarity?`rarity-${rarity}`:""}`} style={{border:`3px solid ${equipped?T.accent:r?.color||T.ink}`,background:T.card,boxShadow:r?.glow?`${r.glow}, 4px 4px 0 ${T.shadow}`:`4px 4px 0 ${T.shadow}`,opacity:wip?0.55:1}}>{swatch}<div className="px-2.5 py-2 flex items-center justify-between gap-2"><div className="min-w-0">{children}{wip&&<div className="mt-1 text-[8px] font-extrabold uppercase tracking-widest px-1 py-0.5 rounded inline-block" style={{background:T.shadow,color:T.ink}}>Not active yet</div>}</div><div className="flex items-center gap-1.5 shrink-0">{r&&!equipped&&!owned&&<span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full" style={{background:r.color||T.ink,color:rarity==="mythic"?"#fff":T.paper}}>{r.icon}</span>}<span className="text-xs font-extrabold whitespace-nowrap" style={{color:wip?T.shadow:equipped?T.alt:T.accent}}>{wip?"n/a":equipped?"On ✓":owned?"Equip":price===0?"Free":`${price} Loks`}</span></div></div></button>);}
+function ShopItem({owned,equipped,price,onClick,children,swatch,rarity,wip}){
+  const T=useT();const r=rarity&&RARITY[rarity];
+  const needsConfirm=!owned&&!wip&&price>0;
+  const[confirming,setConfirming]=useState(false);
+  const confirmTimer=useRef(null);
+  useEffect(()=>()=>clearTimeout(confirmTimer.current),[]);
+  const locked=!owned&&!equipped&&!wip; // grayed until owned or free-and-equippable
+  const handleClick=()=>{
+    if(needsConfirm&&!confirming){setConfirming(true);clearTimeout(confirmTimer.current);confirmTimer.current=setTimeout(()=>setConfirming(false),4000);return;}
+    clearTimeout(confirmTimer.current);setConfirming(false);onClick();
+  };
+  return(<button onClick={handleClick} aria-label={confirming?`Confirm purchase for ${price} Loks`:undefined} className={`lok-btn text-left rounded-2xl overflow-hidden w-full ${rarity?`rarity-${rarity}`:""}`} style={{border:`3px solid ${confirming?T.accent:equipped?T.accent:r?.color||T.ink}`,background:T.card,boxShadow:confirming?`0 0 0 2px ${T.accent}, 4px 4px 0 ${T.shadow}`:r?.glow?`${r.glow}, 4px 4px 0 ${T.shadow}`:`4px 4px 0 ${T.shadow}`,opacity:wip?0.55:locked?0.7:1,filter:locked?"grayscale(0.35)":"none"}}>{swatch}<div className="px-2.5 py-2 flex items-center justify-between gap-2"><div className="min-w-0">{children}{wip&&<div className="mt-1 text-[8px] font-extrabold uppercase tracking-widest px-1 py-0.5 rounded inline-block" style={{background:T.shadow,color:T.ink}}>Not active yet</div>}</div><div className="flex items-center gap-1.5 shrink-0">{r&&!equipped&&<span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full" style={{background:r.color||T.ink,color:rarity==="mythic"?"#fff":T.paper}}>{r.icon}</span>}<span className="text-xs font-extrabold whitespace-nowrap" style={{color:wip?T.shadow:confirming?T.accent:equipped?T.alt:T.accent}}>{wip?"n/a":confirming?"Tap to confirm":equipped?"On ✓":owned?"Equip":price===0?"Free":`${price} Loks`}</span></div></div></button>);}
+function MythicCard({item,own,equipped,onBuy}){
+  const T=useT();
+  const[confirming,setConfirming]=useState(false);
+  const confirmTimer=useRef(null);
+  useEffect(()=>()=>clearTimeout(confirmTimer.current),[]);
+  const handleClick=()=>{
+    if(!own&&!confirming){setConfirming(true);clearTimeout(confirmTimer.current);confirmTimer.current=setTimeout(()=>setConfirming(false),4000);return;}
+    clearTimeout(confirmTimer.current);setConfirming(false);onBuy();
+  };
+  return(<button onClick={handleClick} aria-label={confirming?`Confirm purchase of ${item.name} for ${item.price} Loks`:undefined} className="lok-btn text-left rounded-2xl overflow-hidden rarity-mythic" style={{"--mythic-bg":T.card,boxShadow:confirming?`0 0 24px ${T.accent}`:equipped?`0 0 20px ${T.accent}`:`0 0 20px rgba(255,93,162,0.3)`,position:"relative",opacity:own?1:0.85,filter:own?"none":"grayscale(0.25)"}}>
+    <div className="flex items-center justify-center py-3" style={{minHeight:100,background:`linear-gradient(135deg, ${T.paper}, ${T.card})`}}><MythicPreview itemId={item.fxId} rarity="mythic"/></div>
+    <div className="px-2.5 py-2 relative">
+      <div className="font-bold text-sm truncate flex items-center gap-1">{item.name}{!own&&<span className="text-[8px] px-1 py-0.5 rounded-full rarity-mythic-badge">MYTHIC</span>}</div>
+      <div className="text-[9px] font-extrabold uppercase tracking-wide opacity-80">{TYPE_LABELS[item.type]||item.type}</div>
+      <div className="text-[10px] opacity-70 truncate">{item.desc}</div>
+      <div className="mt-1 text-xs font-extrabold" style={{color:confirming?T.accent:equipped?T.alt:T.accent}}>{confirming?`Tap to confirm · ${item.price} Loks`:equipped?"Equipped":own?"Equip":`${item.price} Loks`}</div>
+    </div>
+  </button>);
+}
 export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kids,uiTheme,ownedThemes,effect,ownedEffects,sky,ownedSkies=[],onSky,animFx,ownedAnimFx=[],onAnimFx,fontPack,onFontPack,cursorPack,onCursorPack,musicPack,onMusicPack,stickerPack,onStickerPack,postExport,onPostExport,cosmetics,owned,onBuyCosmetic,setKids,onBuyPass,onTheme,onEffect,onCc,mythicOwned,mythicEquipped,onBuyMythic,dailyOwned,weeklyOwned,celebrationStyle,onCelebrationStyle}){
   const T=useT();const[catTab,setCatTab]=useState("featured");const[modTab,setModTab]=useState("layers");const[showAll,setShowAll]=useState(false);
   const[legacy,setLegacy]=useState(()=>{try{return localStorage.getItem("lok:shop:legacy")==="1";}catch{return false;}});
@@ -112,7 +142,7 @@ export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kid
       </>);})()}
     </>)}
     {activeTab==="themes"&&!kids&&(<Section title="UI themes" sub={`Own skins to unlock new waves.`}><div className="grid grid-cols-2 gap-3">{Object.entries(THEMES).filter(([,th])=>showAll||(th.wave||1) < 2 || ownedThemes.length>=SKIN_WAVE_GATE).filter(([,th])=>showAll||(th.wave||1) < 3 || ownedThemes.length>=SKIN_WAVE_3_GATE).filter(([,th])=>showAll||(th.wave||1) < 4 || ownedThemes.length>=SKIN_WAVE_4_GATE).map(([id,th])=>{const own=ownedThemes.includes(id);const e2=uiTheme===id;return(<button key={id} onClick={()=>onTheme(id)} className="lok-btn text-left rounded-2xl overflow-hidden" style={{border:`3px solid ${e2?T.accent:own||showAll?T.ink:T.shadow}`,background:T.card,boxShadow:`4px 4px 0 ${T.shadow}`,opacity:own||showAll?1:.5}} aria-label={`Theme ${th.name}`}><div className="flex h-10 relative">{[th.paper,th.ink,th.accent,th.alt].map((c,k)=>(<div key={k} className="flex-1" style={{background:c}}/>))}{th.animated&&<><div className="absolute inset-0" style={{background:`linear-gradient(110deg, transparent 30%, ${th.accent}55 50%, transparent 70%)`,backgroundSize:"220% 100%",animation:"loksheen 2.8s linear infinite"}}/><span className="absolute top-1 right-1 lok-display px-1.5 rounded text-[9px] font-extrabold" style={{background:th.accent,color:th.onAccent}}>● LIVE</span></>}</div><div className="px-2.5 py-2"><div className="font-bold text-sm">{th.name}</div><div className="text-xs opacity-70">{th.desc}</div><div className="mt-1 text-xs font-extrabold" style={{color:T.accent}}>{e2?"Equipped":own?"Equip":showAll?lokPass?"In PASS":`${th.price} Loks`:"🔒 Wave "+(th.wave||1)}</div></div></button>);})}</div></Section>)}
-    {activeTab==="mythic"&&!kids&&(<><Section title="💎 Mythic Collection" sub="Legendary quality. GSAP-animated previews. The rarest items in LokBook."><div className="grid grid-cols-2 gap-3">{MYTHIC_ITEMS.map(item=>{const own=mythicOwned?.includes(item.id);const e2=mythicEquipped===item.id;return(<button key={item.id} onClick={()=>onBuyMythic?.(item)} className={`lok-btn text-left rounded-2xl overflow-hidden rarity-mythic ${e2?"":""}`} style={{"--mythic-bg":T.card,boxShadow:e2?`0 0 20px ${T.accent}`:`0 0 20px rgba(255,93,162,0.3)`,position:"relative"}}><div className="flex items-center justify-center py-3" style={{minHeight:100,background:`linear-gradient(135deg, ${T.paper}, ${T.card})`}}><MythicPreview itemId={item.fxId} rarity="mythic"/></div><div className="px-2.5 py-2 relative"><div className="font-bold text-sm truncate flex items-center gap-1">{item.name}{!own&&<span className="text-[8px] px-1 py-0.5 rounded-full rarity-mythic-badge">MYTHIC</span>}</div><div className="text-[9px] font-extrabold uppercase tracking-wide opacity-80">{TYPE_LABELS[item.type]||item.type}</div><div className="text-[10px] opacity-70 truncate">{item.desc}</div><div className="mt-1 text-xs font-extrabold" style={{color:e2?T.alt:T.accent}}>{e2?"Equipped":own?"Equip":`${item.price} Loks`}</div></div></button>);})}</div></Section>
+    {activeTab==="mythic"&&!kids&&(<><Section title="💎 Mythic Collection" sub="Legendary quality. GSAP-animated previews. The rarest items in LokBook."><div className="grid grid-cols-2 gap-3">{MYTHIC_ITEMS.map(item=>{const own=mythicOwned?.includes(item.id);const e2=mythicEquipped===item.id;return(<MythicCard key={item.id} item={item} own={own} equipped={e2} onBuy={()=>onBuyMythic?.(item)}/>);})}</div></Section>
       <Section title="🎉 Celebrations" sub="Event-only celebration styles — unbuyable. Click to equip."><div className="grid grid-cols-2 gap-3">{CELEBRATIONS.map(c=>{const e2=celebrationStyle===c.id;return(<button key={c.id} onClick={()=>{onCelebrationStyle?.(c.id);}} className="lok-btn text-left rounded-2xl overflow-hidden" style={{border:`3px solid ${e2?T.accent:T.ink}`,background:T.card,opacity:0.6,boxShadow:`4px 4px 0 ${T.shadow}`}}><div className="flex items-center justify-center py-6" style={{background:`linear-gradient(135deg, ${T.paper}, ${T.card})`}}><div className="text-3xl">{c.id==="confetti"?"🎊":c.id==="inkbloom"?"🌸":"✨"}</div></div><div className="px-2.5 py-2"><div className="font-bold text-sm">{c.name}</div><div className="text-[10px] opacity-70">{c.desc}</div><div className="mt-1 text-[9px] font-extrabold uppercase tracking-widest" style={{color:T.alt}}>EVENT ITEM — UNBUYABLE</div></div></button>);})}</div></Section></>)}
     {activeTab==="effects"&&(<Section title="Page effects" sub="Background effects that play on your profile."><div className="grid grid-cols-2 gap-2">{EFFECTS.map(e=>{const own=ownedEffects.includes(e.id);const e2=effect===e.id;return(<ShopItem key={e.id} owned={own} equipped={e2} price={e.price} onClick={()=>onEffect(e.id,e)}><div className="font-bold text-sm">{e.name}</div><div className="text-[10px] opacity-70">Page effect</div></ShopItem>);})}</div></Section>)}
     {activeTab==="fx"&&(<Section title="Animation FX" sub="Visual effects play over your flip when viewed."><div className="grid grid-cols-2 gap-2">{ANIMATION_FX.filter(f=>showAll||f.id!=="none").map(f=>{const own=ownedAnimFx.includes(f.id);const e2=animFx===f.id;return(<ShopItem key={f.id} owned={own} equipped={e2} price={f.price} onClick={()=>onAnimFx(f.id,f)}><div className="font-bold text-sm">{f.name}</div>{f.desc&&<div className="text-[10px] opacity-70">{f.desc}</div>}</ShopItem>);})}</div></Section>)}

@@ -187,6 +187,7 @@ export const MYTHIC_ITEMS = [
   { id:"mythic_celestia",name:"Celestia Veil",         desc:"Polarized aurora sweep — curtains of light across the canvas.",  price:3500, rarity:"mythic", type:"effect",         fxId:"celestia" },
   { id:"mythic_titan",   name:"Titan's Grip",          desc:"Weighty gauntlet cursor with a shockwave on click.",              price:1800, rarity:"mythic", type:"cursor",         fxId:"titan" },
   { id:"mythic_infinity",name:"Infinity Bloom",        desc:"Endless ∞ traced in particle light that never extinguishes.",    price:5000, rarity:"mythic", type:"effect",         fxId:"infinity" },
+  { id:"mythic_canvasframe",name:"Prism Frame",        desc:"An animated rainbow border frames your Studio canvas while you draw — the only mythic that lives in Studio itself, not just the feed.", price:2600, rarity:"mythic", type:"canvas_border", fxId:"canvasframe" },
 ];
 
 export const DAILY_ITEMS = [

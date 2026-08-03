@@ -177,6 +177,13 @@ const fx = {
   },
   // "Prism Shard" reuses the morph-shape/star tags already on the prism SVG.
   prism: (ref) => fx.morph(ref),
+  canvasframe: (ref) => {
+    const q = gsap.utils.selector(ref);
+    const corners = q(".corner");
+    corners.forEach((c, i) => {
+      gsap.to(c, { opacity: 0.4, duration: 0.8 + i * 0.1, repeat: -1, yoyo: true, delay: i * 0.15, ease: "sine.inOut" });
+    });
+  },
 };
 
 const itemSvgs = {
@@ -201,6 +208,7 @@ const itemSvgs = {
   celestia: () => <svg viewBox="0 0 80 80" className="w-full h-full"><defs><linearGradient id="cg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="transparent"/><stop offset="0.3" stopColor="currentColor" stopOpacity="0.3"/><stop offset="0.7" stopColor="currentColor" stopOpacity="0.3"/><stop offset="1" stopColor="transparent"/></linearGradient></defs><rect x="8" y="20" width="64" height="12" rx="6" fill="url(#cg)" className="curtain" opacity="0.5"/><rect x="8" y="36" width="64" height="12" rx="6" fill="url(#cg)" className="curtain" opacity="0.3"/><rect x="8" y="52" width="64" height="12" rx="6" fill="url(#cg)" className="curtain" opacity="0.4"/><circle cx="40" cy="40" r="4" fill="currentColor"/></svg>,
   titan: () => <svg viewBox="0 0 80 80" className="w-full h-full"><path d="M25,70 L25,30 Q25,20 35,18 L50,18 Q55,20 55,30 L55,70" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><circle cx="40" cy="35" r="12" fill="none" stroke="currentColor" strokeWidth="1.5"/><circle cx="40" cy="35" r="5" fill="currentColor" opacity="0.3"/><path d="M30,60 Q40,50 50,60" fill="none" stroke="currentColor" strokeWidth="1.5"/><circle cx="34" cy="32" r="2" fill="currentColor" opacity="0.4"/><circle cx="46" cy="32" r="2" fill="currentColor" opacity="0.4"/></svg>,
   infinity: () => <svg viewBox="0 0 80 80" className="w-full h-full"><path d="M20,40 C20,20 60,20 60,40 C60,60 20,60 20,40 C20,20 60,20 60,40" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.4"/><circle cx="20" cy="40" r="3" fill="currentColor" className="idot"/></svg>,
+  canvasframe: () => <svg viewBox="0 0 80 80" className="w-full h-full"><rect x="14" y="14" width="52" height="52" rx="6" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.25"/><path d="M14,26 L14,14 L26,14" fill="none" stroke="currentColor" strokeWidth="2.5" className="corner"/><path d="M54,14 L66,14 L66,26" fill="none" stroke="currentColor" strokeWidth="2.5" className="corner"/><path d="M66,54 L66,66 L54,66" fill="none" stroke="currentColor" strokeWidth="2.5" className="corner"/><path d="M26,66 L14,66 L14,54" fill="none" stroke="currentColor" strokeWidth="2.5" className="corner"/></svg>,
 };
 
 export default function MythicPreview({ itemId, rarity, size = "full" }) {
