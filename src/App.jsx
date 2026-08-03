@@ -780,7 +780,7 @@ function OpenFront({kids,loks,dailyPrompt,onWager,onEarn,hinted,onHinted,blip,sa
     <div ref={wrapRef} className="relative mt-2 rounded-2xl overflow-hidden select-none" style={{border:`3px solid ${T.ink}`,background:ART.paper,boxShadow:`6px 6px 0 ${T.shadow}`,aspectRatio:"4/5",touchAction:"none"}}>
       <canvas ref={guideRef} width={W} height={H} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" style={{opacity:guideOpacity,transition:guideMode==="blind"?"opacity .35s ease":"opacity .4s linear"}}/>
       <canvas ref={inkRef} width={W} height={H} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true"/>
-      <div className="absolute inset-0" role="img" aria-label="Trace Rush canvas" style={{touchAction:"none",cursor:"crosshair"}} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}/>
+      <div className="absolute inset-0" role="img" aria-label="Trace Rush canvas" style={{touchAction:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none",cursor:"crosshair"}} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up}/>
       <button onClick={finish} className="lok-btn absolute bottom-2 right-2 px-3 py-1.5 rounded-full text-xs font-bold" style={{background:T.ink,color:T.paper}}>Lock it in</button>
     </div>
     <div className="mt-2 flex items-center gap-2"><div className="text-xs opacity-70"><span style={{color:T.alt}}>●</span> {online.toLocaleString()} online</div></div>
