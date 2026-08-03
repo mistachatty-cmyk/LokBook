@@ -110,8 +110,8 @@ function Onboard({onDone,onName,defaultName="",canInstall=false,onInstallClick})
   const steps=[
     {icon:"📖",t:"Welcome to LokBook",d:"Tiny hand-drawn animations. Swipe to flip.",color:T.accent},
     {icon:"🎨",t:"Draw · Battle · Earn",d:"Studio to draw, Battle to compete, LilLok to raise.",color:T.alt},
-    {icon:"🔒",t:"Save your work",d:"Sign in once and your gallery follows you — new phone, same Loks, same LilLok.",kind:"account",color:"#7A4FBF"},
-    {icon:"📲",t:"Add to Home Screen",d:isIOS?"Guest art needs this to stick.":"Keeps LokBook one tap away.",kind:"install",color:"#2FA9A0"},
+    {icon:"🔒",t:"Save your work",d:"Sign in once and your gallery follows you — new phone, same Loks, same LilLok.",kind:"account",color:T.accent},
+    {icon:"📲",t:"Add to Home Screen",d:isIOS?"Guest art needs this to stick.":"Keeps LokBook one tap away.",kind:"install",color:T.alt},
     {icon:"✏️",t:"Make it yours",d:"Your artist name — start with 50 Loks.",color:T.accent},
   ];
   const s=steps[step];const last=step===steps.length-1;
@@ -133,20 +133,20 @@ function Onboard({onDone,onName,defaultName="",canInstall=false,onInstallClick})
           ):(<>
             <div className="flex gap-1.5">
               <input value={authEmail} onChange={e=>setAuthEmail(e.target.value)} type="email" placeholder="your@email.com" aria-label="Email for account sign-in" onKeyDown={e=>e.key==="Enter"&&sendLink()} className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.paper,color:T.ink}}/>
-              <button onClick={e=>{tapBtn(e);sendLink();}} disabled={authBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:s.color,color:"#fff",border:`2.5px solid ${T.ink}`,opacity:authBusy?0.6:1}}>{authBusy?"…":"Go"}</button>
+              <button onClick={e=>{tapBtn(e);sendLink();}} disabled={authBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:s.color,color:T.onAccent,border:`2.5px solid ${T.ink}`,opacity:authBusy?0.6:1}}>{authBusy?"…":"Go"}</button>
             </div>
             <div className="mt-2 text-[11px] opacity-55 leading-snug text-center">No password, just a magic link. Skip to try as a guest — art stays on this device, and can be cleared after ~a week without the next step.</div>
           </>)}
         </div>)}
         {s.kind==="install"&&(<div className="mt-3">
           {isIOS?(<div className="text-xs leading-snug text-center p-2.5 rounded-xl font-bold" style={{border:`2px dashed ${T.ink}`,background:T.paper}}>Tap Share ⬆ in Safari → "Add to Home Screen"</div>
-          ):canInstall?(<button onClick={onInstallClick} className="lok-btn lok-display w-full py-2.5 rounded-xl font-extrabold text-sm" style={{background:s.color,color:"#fff",border:`3px solid ${T.ink}`}}>📲 Install now</button>
+          ):canInstall?(<button onClick={onInstallClick} className="lok-btn lok-display w-full py-2.5 rounded-xl font-extrabold text-sm" style={{background:s.color,color:T.onAccent,border:`3px solid ${T.ink}`}}>📲 Install now</button>
           ):(<div className="text-[11px] opacity-55 text-center py-1">Browser menu → "Add to Home Screen" any time.</div>)}
         </div>)}
         {last&&<input value={name} onChange={e=>setName(e.target.value)} placeholder="Your artist name" aria-label="Artist name" className="mt-3 w-full px-4 py-2.5 rounded-xl text-center font-bold text-sm" style={{border:`3px solid ${T.ink}`,background:T.paper,color:T.ink}}/>}
       </div>
       <div className="flex justify-center gap-1.5 my-4">{steps.map((st,i)=>(<div key={i} style={{width:i===step?22:8,height:6,borderRadius:4,background:i<=step?s.color:T.shadow,transition:"width .25s ease, background .25s ease"}}/>))}</div>
-      <button onClick={e=>{tapBtn(e);if(last){onName&&onName(name);onDone();}else go(1);}} className="lok-btn lok-display w-full py-3 rounded-xl text-lg font-extrabold" style={{background:s.color,color:"#fff",border:`3px solid ${T.ink}`}}>{last?"Claim 50 Loks":"Next"}</button>
+      <button onClick={e=>{tapBtn(e);if(last){onName&&onName(name);onDone();}else go(1);}} className="lok-btn lok-display w-full py-3 rounded-xl text-lg font-extrabold" style={{background:s.color,color:T.onAccent,border:`3px solid ${T.ink}`}}>{last?"Claim 50 Loks":"Next"}</button>
       {!last&&<button onClick={onDone} className="mt-2 text-xs font-bold underline opacity-50">skip all</button>}
     </div>
   </div>);
@@ -942,9 +942,9 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
           <div className="text-xs opacity-70 mt-1 leading-snug">{isIOS?"Tap the Share button in Safari, then \u201CAdd to Home Screen\u201D. Lok opens full-screen like a native app.":"Install Lok as an app — it gets its own icon and opens full-screen, no browser bars."}</div>
           {!isIOS&&<button onClick={()=>onInstall&&onInstall()} className="lok-btn lok-display mt-2 w-full py-2.5 rounded-xl font-extrabold" style={{background:canInstall?T.accent:T.shadow,color:canInstall?T.onAccent:T.ink,border:`3px solid ${T.ink}`,opacity:canInstall?1:0.7}} aria-label="Install Lok as an app">{canInstall?"Install Lok":"Install via browser menu →"}</button>}
         </div>
-        <div ref={acctPanelRef} className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${auth.isAuthenticated()?T.alt:"#7A4FBF"}`,background:T.paper}}>
+        <div ref={acctPanelRef} className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${auth.isAuthenticated()?T.alt:T.accent}`,background:T.paper}}>
           <div className="flex items-center gap-2 mb-0.5">
-            <div className="flex items-center justify-center rounded-full shrink-0" style={{width:30,height:30,fontSize:15,background:(auth.isAuthenticated()?T.alt:"#7A4FBF")+"22",border:`2px solid ${auth.isAuthenticated()?T.alt:"#7A4FBF"}`}}>🔐</div>
+            <div className="flex items-center justify-center rounded-full shrink-0" style={{width:30,height:30,fontSize:15,background:(auth.isAuthenticated()?T.alt:T.accent)+"22",border:`2px solid ${auth.isAuthenticated()?T.alt:T.accent}`}}>🔐</div>
             <div className="lok-display font-extrabold text-sm">Account{auth.isAuthenticated()&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>SIGNED IN</span>}</div>
           </div>
           {!supabase?(<div className="text-xs opacity-70 mt-1 leading-snug">Cloud accounts aren't configured for this build yet.</div>):auth.loading?(<div className="text-xs opacity-60 mt-1">Loading…</div>):auth.isAuthenticated()?(<>
@@ -958,7 +958,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
             <div className="text-xs opacity-70 mt-1 leading-snug">Sign in once and your gallery follows you — new phone, same Loks, same LilLok.</div>
             <div className="mt-2 flex gap-1.5">
               <input value={authEmail} onChange={e=>setAuthEmail(e.target.value)} placeholder="your@email.com" type="email" aria-label="Email for account sign-in" className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}} onKeyDown={e=>e.key==="Enter"&&sendAuthLink()}/>
-              <button onClick={e=>{tapBtn(e);sendAuthLink();}} disabled={authBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:"#7A4FBF",color:"#fff",border:`3px solid ${T.ink}`,opacity:authBusy?0.6:1}}>{authBusy?"Sending…":"Send link"}</button>
+              <button onClick={e=>{tapBtn(e);sendAuthLink();}} disabled={authBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,opacity:authBusy?0.6:1}}>{authBusy?"Sending…":"Send link"}</button>
             </div>
           </>)}
         </div>
