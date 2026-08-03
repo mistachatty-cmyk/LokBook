@@ -23,6 +23,30 @@ export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kid
   const T=useT();const[catTab,setCatTab]=useState("featured");const[modTab,setModTab]=useState("layers");const[showAll,setShowAll]=useState(false);
   const[legacy,setLegacy]=useState(()=>{try{return localStorage.getItem("lok:shop:legacy")==="1";}catch{return false;}});
   useEffect(()=>{try{localStorage.setItem("lok:shop:legacy",legacy?"1":"0");}catch{}},[legacy]);
+  const[showResetConfirm,setShowResetConfirm]=useState(false);
+  // Only *equips* reset — nothing is un-owned or refunded. Each row is
+  // [label, current display value, default id, apply()].
+  const defaultThemeId=Object.keys(THEMES)[0];
+  const resetRows=[
+    ["Theme",THEMES[uiTheme]?.name||uiTheme,defaultThemeId,()=>onTheme(defaultThemeId)],
+    ["Effect",EFFECTS.find(e=>e.id===effect)?.name||effect,"none",()=>onEffect("none",EFFECTS.find(e=>e.id==="none"))],
+    ["Sky",SKIES.find(s=>s.id===sky)?.name||sky||"—","clear",()=>onSky("clear",SKIES.find(s=>s.id==="clear"))],
+    ["Animation FX",ANIMATION_FX.find(f=>f.id===animFx)?.name||animFx,"none",()=>onAnimFx("none",ANIMATION_FX.find(f=>f.id==="none"))],
+    ["Paper",PAPERS.find(p=>p.id===cosmetics.paper)?.name||"Plain paper","plain",()=>onBuyCosmetic("paper",PAPERS.find(p=>p.id==="plain"))],
+    ["Cursor",CURSORS.find(c=>c.id===cursorPack)?.name||cursorPack,"default",()=>onBuyCosmetic("cursorPack",CURSORS.find(c=>c.id==="default"))],
+    ["Font",FONT_PACKS.find(f=>f.id===fontPack)?.name||fontPack,"default",()=>onBuyCosmetic("fontPack",FONT_PACKS.find(f=>f.id==="default"))],
+    ["Name color",NAME_COLORS.find(c=>c.id===cosmetics.nameColor)?.name||cosmetics.nameColor,"default",()=>onBuyCosmetic("nameColor",NAME_COLORS.find(c=>c.id==="default"))],
+    ["Avatar frame",FRAMES.find(f=>f.id===cosmetics.frame)?.name||cosmetics.frame,"none",()=>onBuyCosmetic("frame",FRAMES.find(f=>f.id==="none"))],
+    ["Reaction pack",REACTION_PACKS.find(r=>r.id===cosmetics.reactionPack)?.name||cosmetics.reactionPack,"base",()=>onBuyCosmetic("reactionPack",REACTION_PACKS.find(r=>r.id==="base"))],
+    ["Avatar accent",AVATAR_ACCENTS.find(a=>a.id===cosmetics.avatarAccent)?.name||cosmetics.avatarAccent,"none",()=>onBuyCosmetic("avatarAccent",AVATAR_ACCENTS.find(a=>a.id==="none"))],
+    ["Blot border",BLOT_BORDERS.find(b=>b.id===cosmetics.blotBorder)?.name||cosmetics.blotBorder,"none",()=>onBuyCosmetic("blotBorder",BLOT_BORDERS.find(b=>b.id==="none"))],
+    ["LilLok gear",LILLOK_GEAR.find(g=>g.id===cosmetics.gear)?.name||cosmetics.gear||"None","none",()=>onBuyCosmetic("gear",LILLOK_GEAR.find(g=>g.id==="none"))],
+    ["LilLok skin",LILLOK_SKINS.find(s=>s.id===cosmetics.lillokSkin)?.name||cosmetics.lillokSkin||"None","none",()=>onBuyCosmetic("lillokSkin",LILLOK_SKINS.find(s=>s.id==="none"))],
+    ["LilLok aura",LILLOK_AURAS.find(a=>a.id===cosmetics.lillokAura)?.name||cosmetics.lillokAura||"None","none",()=>onBuyCosmetic("lillokAura",LILLOK_AURAS.find(a=>a.id==="none"))],
+    ["LilLok pet",LILLOK_PETS.find(p=>p.id===cosmetics.lillokPet)?.name||cosmetics.lillokPet||"None","none",()=>onBuyCosmetic("lillokPet",LILLOK_PETS.find(p=>p.id==="none"))],
+    ["Voice pack",VOICE_PACKS.find(v=>v.id===cosmetics.voicePack)?.name||cosmetics.voicePack||"Default","default",()=>onBuyCosmetic("voicePack",VOICE_PACKS.find(v=>v.id==="default"))],
+  ];
+  const resetAllCosmetics=()=>{resetRows.forEach(([,,,apply])=>apply());setShowResetConfirm(false);say("All cosmetics reset to default — nothing un-owned","success");};
   const Section=({title,sub,children})=>(<section className="mt-5"><h3 className="lok-display text-base font-extrabold">{title}</h3>{sub&&<p className="text-xs opacity-60 mb-1">{sub}</p>}<div className="mt-2">{children}</div></section>);
   const has=(cat,id)=>owned[cat]?.includes(id);const eq=(cat,id)=>cosmetics[cat]===id;
   const buy=(cat,item)=>{if(WIP_CATEGORIES[cat]){say?.(WIP_CATEGORIES[cat],"error");return;}onBuyCosmetic(cat,item);};
@@ -41,6 +65,23 @@ export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kid
       <button onClick={()=>setLegacy(v=>!v)} aria-pressed={legacy} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-extrabold" style={{border:`2.5px solid ${T.ink}`,background:legacy?T.ink:T.card,color:legacy?T.paper:T.ink}}>{legacy?"Show simple":"Show legacy"}</button>
     </div>
     <p className="mt-2 text-[11px] opacity-60">Balance: <strong style={{color:T.accent}}>{loks} Loks</strong></p>
+    <button onClick={()=>setShowResetConfirm(true)} className="lok-btn mt-2 w-full px-3 py-1.5 rounded-xl text-xs font-bold text-left" style={{border:`2px dashed ${T.shadow}`,color:T.ink,background:"transparent"}}>↺ Reset all cosmetics to default</button>
+    {showResetConfirm&&(<div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,.4)"}} onClick={()=>setShowResetConfirm(false)}>
+      <div className="w-full rounded-t-3xl p-5 overflow-y-auto overscroll-contain" style={{maxWidth:560,maxHeight:"80vh",background:T.card,border:`3px solid ${T.ink}`}} onClick={e=>e.stopPropagation()}>
+        <div className="lok-display text-lg font-extrabold">Reset all cosmetics?</div>
+        <p className="text-xs opacity-70 mt-1 mb-3">This unequips everything below and puts it back to default. Nothing is un-owned and no Loks are refunded — you can re-equip any of it any time.</p>
+        <div className="rounded-xl overflow-hidden" style={{border:`2px solid ${T.shadow}`}}>
+          {resetRows.map(([label,current,defaultId],i)=>(<div key={label} className="flex items-center justify-between px-3 py-2 text-xs" style={{background:i%2?T.paper:T.card,borderTop:i?`1px solid ${T.shadow}`:"none"}}>
+            <span className="font-bold">{label}</span>
+            <span className="opacity-70">{current} → <strong>Default</strong></span>
+          </div>))}
+        </div>
+        <div className="mt-4 flex gap-2">
+          <button onClick={()=>setShowResetConfirm(false)} className="lok-btn flex-1 py-2.5 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}>Cancel</button>
+          <button onClick={resetAllCosmetics} className="lok-btn flex-1 py-2.5 rounded-xl font-extrabold text-sm" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}}>Reset everything</button>
+        </div>
+      </div>
+    </div>)}
     <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">{cats.map(([id,l])=>(<button key={id} onClick={()=>setCatTab(id)} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:catTab===id?T.ink:T.card,color:catTab===id?T.paper:T.ink}}>{l}</button>))}
       <button onClick={()=>setShowAll(s=>!s)} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-sm font-bold" style={{border:`2.5px solid ${showAll?T.accent:T.shadow}`,background:showAll?T.ink:T.card,color:showAll?T.paper:T.shadow}} aria-pressed={showAll}>👀 All</button>
     </div>

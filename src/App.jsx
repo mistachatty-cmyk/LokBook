@@ -40,7 +40,7 @@ import { renderPromptArt } from "./engine/promptArt.js";
 import { useMusic, MusicTicker, MusicSheet } from "./MusicPlayer.jsx";
 import NewArtists from "./NewArtists.jsx";
 import FeaturedArtist from "./FeaturedArtist.jsx";
-import { upsertMyProfile, fetchNewestArtists, fetchRandomOlderArtists, searchArtists, BOARD_SIZE } from "./engine/profiles.js";
+import { upsertMyProfile, fetchNewestArtists, fetchRandomOlderArtists, searchArtists, fetchArtistByHandle, BOARD_SIZE } from "./engine/profiles.js";
 import { supabase } from "./supabaseClient.js";
 import { useAuth } from "./auth/AuthContext.jsx";
 import { findOrCreateDuel, fetchDuel, cancelWaitingDuel, submitDuelArt, finalizeDuel } from "./engine/duels.js";
@@ -208,6 +208,7 @@ function FeedCard({p,live,marked,loked,cosmetics={},onOpen,onVote,onLok,onBookma
     <div className="relative mx-auto rounded-2xl overflow-hidden" style={{width:"100%",maxWidth:360,border:`3px solid ${T.ink}`,boxShadow:live?`7px 7px 0 ${T.accent}`:`6px 6px 0 ${T.shadow}`,transform:live?"scale(1)":"scale(.97)",transition:"transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s ease"}}>
       <button onClick={()=>onOpen(p.id)} className="block w-full" aria-label={`Open ${p.title}`}><img src={p.frames[fi]} alt={p.title} className="block w-full" style={{aspectRatio:"4/5",objectFit:"cover"}}/></button>
       {mood&&<div className="absolute top-2 right-2 text-xs z-10" style={{filter:"drop-shadow(0 1px 2px rgba(0,0,0,.4))"}} aria-label={`mood: ${mood}`}>{moodEmojis[mood]}</div>}
+      {p.eventLine&&<div className="absolute top-2 left-2 right-2 text-[10px] font-bold text-white px-2 py-1 rounded-lg z-10" style={{background:"rgba(0,0,0,.55)",backdropFilter:"blur(2px)"}}>{p.author} {p.eventLine}</div>}
       {p.frames.length>1&&<div className="absolute top-0 left-0 right-0 h-1" style={{background:"rgba(0,0,0,.15)"}}><div style={{width:`${((fi+1)/p.frames.length)*100}%`,height:"100%",background:T.accent,transition:"width .12s linear"}}/></div>}
       <div className="absolute left-0 right-0 bottom-0 p-3 flex items-end gap-2" style={{background:"linear-gradient(transparent, rgba(0,0,0,.6))"}}>
         <div className="flex-1 text-white min-w-0"><div className="lok-display font-extrabold leading-tight truncate">{p.title}</div><div className="text-xs opacity-90"><button onClick={()=>onArtist&&onArtist(p.author||"moss.ink")} style={{background:"transparent",border:"none",padding:0,textDecoration:"underline",cursor:"pointer",color:"inherit",font:"inherit"}}><NameTag name={p.author||"moss.ink"} color={cosmetics.nameColor} style={{color:"#fff"}}/></button>{flair?<span className="ml-1.5 text-[10px] font-bold tracking-wide" style={{color:"#F0DB4F"}}>{flair}</span>:null} · {p.from==="revival"?"revival loop":p.from==="battle"?"battle piece":p.mode==="B"?"page-flip":"flipbook"}</div></div>
@@ -531,7 +532,7 @@ function NewStudioUI({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt,animFx,mo
 function Battle({ownedTiers,ccTier,wins,bigBattleOwned,kids,phase,lillok,customLilLok,onResult,onUnlockBig,onPublish,onLine,blip,hap,say,animFx,authorName,modules=[],paper="plain",cursorPack="default"}){
   const T=useT();
   const[pstate,setPstate]=useState("lobby");const[format,setFormat]=useState(FORMATS[0]);const[duration,setDuration]=useState(60);const[tier,setTier]=useState(10);const[prompt,setPrompt]=useState(PROMPTS[0]);const[count,setCount]=useState(3);const[timeLeft,setTimeLeft]=useState(0);const[bots,setBots]=useState([]);const[botThumbs,setBotThumbs]=useState([]);const[entries,setEntries]=useState([]);const[results,setResults]=useState(null);const[shake,setShake]=useState(false);const[splat,setSplat]=useState(null);const[block,setBlock]=useState(null);const[blocked,setBlocked]=useState(0);const[myArt,setMyArt]=useState(null);const[bFrames,setBFrames]=useState([]);const[featured,setFeatured]=useState(false);const[botType,setBotType]=useState("artist");
-  const[promptFilters,setPromptFilters]=useState({category:null,motion:null});
+  const[promptFilters,setPromptFilters]=useState({category:null,motion:null});const[promptFiltersOpen,setPromptFiltersOpen]=useState(false);
   const easel=useRef(null);const strokes=useRef(0);const tickRef=useRef(null);const matchT=useRef(0);
   const auth=useAuth();const[duel,setDuel]=useState(null);const[duelTimeLeft,setDuelTimeLeft]=useState(60);const isPlayer1Ref=useRef(true);const duelPromptRef=useRef("");
   const filtered=PROMPT_META.filter(p=>{
@@ -592,15 +593,20 @@ function Battle({ownedTiers,ccTier,wins,bigBattleOwned,kids,phase,lillok,customL
       </div>{!bigUnlocked&&<button onClick={onUnlockBig} className="lok-btn mt-2 w-full py-2 rounded-xl text-sm font-bold" style={{border:`2.5px dashed ${T.ink}`,color:T.ink}}>Unlock Big Battle · 50 Loks</button>}</>)}
     {!kids&&(<><div className="mt-3 text-xs font-bold uppercase tracking-widest opacity-60">Bot Style</div>
     <div className="mt-1.5 grid grid-cols-2 gap-2">{BOT_TYPES.map(bt=>{const sel=botType===bt.id;return(<button key={bt.id} onClick={()=>setBotType(bt.id)} aria-pressed={sel} className="lok-btn p-2.5 rounded-xl text-left" style={{border:`3px solid ${sel?T.accent:T.ink}`,background:sel?T.ink:T.card,color:sel?T.paper:T.ink}}><div className="lok-display font-extrabold text-sm">{bt.id==="artist"?"🎨":"🌀"} {bt.name}</div><div className="text-[11px] opacity-70 mt-0.5">{bt.desc}</div></button>);})}</div></>)}
-    <div className="mt-3 text-xs font-bold uppercase tracking-widest opacity-60">Prompt filters</div>
-    <div className="mt-1.5 flex flex-wrap gap-1.5">
-      <button onClick={()=>setPromptFilters(f=>({...f,category:null}))} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${!promptFilters.category?T.accent:T.shadow}`,background:!promptFilters.category?T.ink:T.card,color:!promptFilters.category?T.paper:T.ink}}>All cats</button>
-      {CATEGORIES.map(c=>(<button key={c} onClick={()=>setPromptFilters(f=>({...f,category:f.category===c?null:c}))} className="lok-btn shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${promptFilters.category===c?T.accent:T.shadow}`,background:promptFilters.category===c?T.ink:T.card,color:promptFilters.category===c?T.paper:T.ink}}>{CATEGORY_ICONS[c]||"🎨"}{c}</button>))}
-    </div>
-    <div className="mt-1.5 flex gap-1.5">
-      <button onClick={()=>setPromptFilters(f=>({...f,motion:null}))} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${!promptFilters.motion?T.accent:T.shadow}`,background:!promptFilters.motion?T.ink:T.card,color:!promptFilters.motion?T.paper:T.ink}}>All motion</button>
-      {MOTION_TYPES.map(m=>(<button key={m} onClick={()=>setPromptFilters(f=>({...f,motion:f.motion===m?null:m}))} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${promptFilters.motion===m?T.accent:T.shadow}`,background:promptFilters.motion===m?T.ink:T.card,color:promptFilters.motion===m?T.paper:T.ink}}>{m==="static"?"■ Static":m==="loop"?"⟳ Loop":"→ Transform"}</button>))}
-    </div>
+    <button onClick={()=>setPromptFiltersOpen(v=>!v)} aria-expanded={promptFiltersOpen} className="lok-btn mt-3 w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold" style={{border:`2px solid ${promptFilters.category||promptFilters.motion?T.accent:T.shadow}`,background:T.card,color:T.ink}}>
+      <span className="flex items-center gap-1.5"><span className="uppercase tracking-widest opacity-60" style={{fontSize:10}}>Prompt filters</span>{(promptFilters.category||promptFilters.motion)&&<span className="px-1.5 py-0.5 rounded-full text-[10px] font-extrabold" style={{background:T.ink,color:T.paper}}>{[promptFilters.category&&(CATEGORY_ICONS[promptFilters.category]||"🎨")+" "+promptFilters.category,promptFilters.motion&&(promptFilters.motion==="static"?"■ Static":promptFilters.motion==="loop"?"⟳ Loop":"→ Transform")].filter(Boolean).join(" · ")}</span>}</span>
+      <span aria-hidden="true" style={{transform:promptFiltersOpen?"rotate(180deg)":"none",transition:"transform .15s"}}>▾</span>
+    </button>
+    {promptFiltersOpen&&(<div className="mt-1.5 p-2 rounded-xl" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>
+      <div className="flex flex-wrap gap-1.5">
+        <button onClick={()=>setPromptFilters(f=>({...f,category:null}))} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${!promptFilters.category?T.accent:T.shadow}`,background:!promptFilters.category?T.ink:T.card,color:!promptFilters.category?T.paper:T.ink}}>All cats</button>
+        {CATEGORIES.map(c=>(<button key={c} onClick={()=>setPromptFilters(f=>({...f,category:f.category===c?null:c}))} className="lok-btn shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${promptFilters.category===c?T.accent:T.shadow}`,background:promptFilters.category===c?T.ink:T.card,color:promptFilters.category===c?T.paper:T.ink}}>{CATEGORY_ICONS[c]||"🎨"}{c}</button>))}
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        <button onClick={()=>setPromptFilters(f=>({...f,motion:null}))} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${!promptFilters.motion?T.accent:T.shadow}`,background:!promptFilters.motion?T.ink:T.card,color:!promptFilters.motion?T.paper:T.ink}}>All motion</button>
+        {MOTION_TYPES.map(m=>(<button key={m} onClick={()=>setPromptFilters(f=>({...f,motion:f.motion===m?null:m}))} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${promptFilters.motion===m?T.accent:T.shadow}`,background:promptFilters.motion===m?T.ink:T.card,color:promptFilters.motion===m?T.paper:T.ink}}>{m==="static"?"■ Static":m==="loop"?"⟳ Loop":"→ Transform"}</button>))}
+      </div>
+    </div>)}
     <div className="mt-3 text-xs font-bold uppercase tracking-widest opacity-60">Clock</div>
     <div className="mt-1.5 flex gap-2">{[30,60,90].map(s=>(<button key={s} onClick={()=>setDuration(s)} className="lok-btn flex-1 py-1.5 rounded-full text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:duration===s?T.accent:T.card,color:duration===s?T.onAccent:T.ink}}>{s}s</button>))}</div>
     <button onClick={startMatch} className="lok-btn lok-display mt-4 w-full py-3.5 rounded-xl text-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,boxShadow:`5px 5px 0 ${T.ink}`,animation:reduceMotion?"none":"lokpulse 2.4s ease-in-out infinite"}}>{kids?"Start drawing!":"Find a match"}</button>
@@ -774,6 +780,14 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
   const T=useT();const[filter,setFilter]=useState("newest");const[view,setView]=useState("gallery");const[editing,setEditing]=useState(false);const[draft,setDraft]=useState(profile);const[showNotifs,setShowNotifs]=useState(false);const[searchQ,setSearchQ]=useState("");const[showSettings,setShowSettings]=useState(false);
   const tapCount=useRef(0);const tapTimer=useRef(null);const audioRef=useRef(null);const[slUrl,setSlUrl]=useState("");const[slPlaying,setSlPlaying]=useState(null);const[fHandle,setFHandle]=useState(profile.name||"");const[fEmail,setFEmail]=useState("");const[fBusy,setFBusy]=useState(false);
   const[bleepCode,setBleepCode]=useState("");
+  // Debug-only, never persisted: stash the real balance while unlimited Loks
+  // is on so turning it off restores exactly what the player actually earned.
+  const debugRealLoks=useRef(null);
+  const[debugUnlimitedLoks,setDebugUnlimitedLoks]=useState(false);
+  const toggleDebugUnlimitedLoks=()=>{
+    if(!debugUnlimitedLoks){debugRealLoks.current=loks;setLoks(999999);setDebugUnlimitedLoks(true);say("Unlimited Loks on (debug)","success");}
+    else{setLoks(debugRealLoks.current??loks);debugRealLoks.current=null;setDebugUnlimitedLoks(false);say("Unlimited Loks off — balance restored");}
+  };
   const versionTap=()=>{if(soundLab)return;tapCount.current++;clearTimeout(tapTimer.current);tapTimer.current=setTimeout(()=>{tapCount.current=0;},1200);if(tapCount.current>=7){tapCount.current=0;onUnlockSoundLab&&onUnlockSoundLab();say("🔊 Sound Lab unlocked","success");}};
   const ytId=u=>{const m=u.match(/(?:youtu\.be\/|v=|shorts\/)([\w-]{11})/);return m?m[1]:null;};
   const slAdd=()=>{const u=slUrl.trim();if(!u)return;const kind=ytId(u)?"youtube":/spotify\.com/.test(u)?"spotify":"mp3";setSoundQueue(q=>[...q.slice(-9),{id:Date.now(),url:u,kind}]);setSlUrl("");say(kind==="spotify"?"Queued (Spotify embed — full playback needs Premium SDK)":"Queued");};
@@ -786,9 +800,21 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
   const cloudSyncNow=async()=>{if(!supabase||!auth.getUserId())return;setCloudBusy(true);try{const localSave=await store.get(SAVE_KEY);const localGallery=await store.get(GALLERY_KEY);const{error}=await supabase.from("auth_saves").upsert({user_id:auth.getUserId(),save_blob:{...localSave,_gallery:localGallery},updated_at:new Date().toISOString()});if(error)throw error;say("Backed up to the cloud","success");}catch{say("Cloud sync failed — try again","error");}setCloudBusy(false);};
   const cloudRestoreNow=async()=>{if(!supabase||!auth.getUserId())return;if(!window.confirm("Replace this device's data with your cloud backup? This device will reload."))return;setCloudBusy(true);try{const{data,error}=await supabase.from("auth_saves").select("save_blob").eq("user_id",auth.getUserId()).single();if(error)throw error;if(!data?.save_blob){say("No cloud backup found yet","error");setCloudBusy(false);return;}const{_gallery,...saveRest}=data.save_blob;await store.set(SAVE_KEY,saveRest);if(_gallery)await store.set(GALLERY_KEY,_gallery);window.location.reload();}catch{say("Restore failed — try again","error");setCloudBusy(false);}};
   const isIOS=typeof navigator!=="undefined"&&/iPad|iPhone|iPod/.test(navigator.userAgent);
-  const avatar=useMemo(()=>renderAvatar(profile.avatarSeed),[profile.avatarSeed]);
   const targetArtist=viewingArtist||profile.name;
   const botPersona=viewingArtist?BOT_PERSONAS[viewingArtist]:null;
+  // Viewing someone else's page: fetch their public row instead of showing
+  // our own bio/avatar/stats under their name. Bots carry their data in
+  // BOT_PERSONAS already, so only real accounts need the network round-trip.
+  const[viewedProfile,setViewedProfile]=useState(null);
+  useEffect(()=>{
+    if(!viewingArtist||botPersona){setViewedProfile(null);return;}
+    let live=true;
+    fetchArtistByHandle(viewingArtist).then(p=>{if(live)setViewedProfile(p);});
+    return()=>{live=false;};
+  },[viewingArtist,botPersona]);
+  const avatarSeed=viewingArtist?(viewedProfile?.avatar_seed??(viewingArtist.length*31)):profile.avatarSeed;
+  const avatar=useMemo(()=>renderAvatar(avatarSeed),[avatarSeed]);
+  const displayBio=viewingArtist?(botPersona?"":(viewedProfile?viewedProfile.bio||"No bio yet.":"Loading…")):profile.bio;
   // Resident AI artists always have a gallery to show, even before any of
   // their ambient posts have landed in this device's feed.
   const backCat=useMemo(()=>(viewingArtist&&isBotArtist(viewingArtist))?botBackCatalogue(viewingArtist,6):[],[viewingArtist]);
@@ -804,8 +830,8 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
   return(<div>
     <section className="mt-4 p-4 rounded-2xl" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`6px 6px 0 ${T.shadow}`}}>
       <div className="flex items-center gap-4">
-        {!viewingArtist&&<FramedAvatar src={avatar} size={72} frame={cosmetics.frame} accent={cosmetics.avatarAccent} ink={T.ink} acc={T.accent} animated={animatedToken}/>}
-        <div className="min-w-0 flex-1"><div className="lok-display text-xl font-extrabold leading-tight flex items-center gap-2 flex-wrap"><NameTag name={viewingArtist||profile.name} color={viewingArtist?"default":cosmetics.nameColor} style={{color:T.ink}}/>{!viewingArtist&&flair&&<span className="text-[10px] ml-1 px-1 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>{flair}</span>}{!viewingArtist&&lokPass&&!kids&&<span className="text-xs px-1.5 py-0.5 rounded" style={{background:T.accent,color:T.onAccent}}>PASS</span>}</div><div className="text-sm opacity-70">{myPosts.length} flips{viewingArtist?"":" · "+wins+" "+(wins===1?"win":"wins")}</div>{botPersona&&(<><div className="mt-1 flex items-center gap-1.5 flex-wrap"><span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold" style={{background:T.alt,color:"#fff"}}>AI ARTIST</span>{botPersona.ward&&<span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{border:`1.5px solid ${T.ink}`}}>{botPersona.ward}</span>}<span className="text-[10px] font-bold opacity-70">{botPersona.medium}</span><span className="text-[10px] opacity-50">· {botPersona.vibe}</span></div><p className="text-xs opacity-75 mt-1 leading-snug">{botPersona.bio}</p>{botPersona.lore&&<p className="text-xs opacity-70 mt-1.5 leading-snug" style={{borderLeft:`2.5px solid ${T.accent}`,paddingLeft:8}}>{botPersona.lore}</p>}{botPersona.signature&&<div className="text-[10px] opacity-55 mt-1.5 italic">Known for: {botPersona.signature}</div>}</>)}</div>
+        <FramedAvatar src={avatar} size={72} frame={viewingArtist?null:cosmetics.frame} accent={viewingArtist?null:cosmetics.avatarAccent} ink={T.ink} acc={T.accent} animated={!viewingArtist&&animatedToken}/>
+        <div className="min-w-0 flex-1"><div className="lok-display text-xl font-extrabold leading-tight flex items-center gap-2 flex-wrap"><NameTag name={viewingArtist||profile.name} color={viewingArtist?"default":cosmetics.nameColor} style={{color:T.ink}}/>{!viewingArtist&&flair&&<span className="text-[10px] ml-1 px-1 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>{flair}</span>}{!viewingArtist&&lokPass&&!kids&&<span className="text-xs px-1.5 py-0.5 rounded" style={{background:T.accent,color:T.onAccent}}>PASS</span>}</div><div className="text-sm opacity-70">{myPosts.length} flips{viewingArtist?"":" · "+wins+" "+(wins===1?"win":"wins")}{viewingArtist&&!botPersona&&viewedProfile&&` · Level ${viewedProfile.level||1}`}</div>{botPersona&&(<><div className="mt-1 flex items-center gap-1.5 flex-wrap"><span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold" style={{background:T.alt,color:"#fff"}}>AI ARTIST</span>{botPersona.ward&&<span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{border:`1.5px solid ${T.ink}`}}>{botPersona.ward}</span>}<span className="text-[10px] font-bold opacity-70">{botPersona.medium}</span><span className="text-[10px] opacity-50">· {botPersona.vibe}</span></div><p className="text-xs opacity-75 mt-1 leading-snug">{botPersona.bio}</p>{botPersona.lore&&<p className="text-xs opacity-70 mt-1.5 leading-snug" style={{borderLeft:`2.5px solid ${T.accent}`,paddingLeft:8}}>{botPersona.lore}</p>}{botPersona.signature&&<div className="text-[10px] opacity-55 mt-1.5 italic">Known for: {botPersona.signature}</div>}</>)}</div>
         <div className="flex gap-1.5">
           {viewingArtist?<button onClick={onBackToMyGallery} className="lok-btn px-3 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${T.accent}`,background:T.ink,color:T.paper}}>← Back to mine</button>:<>
           {notifUnread>0&&<button onClick={()=>{setShowNotifs(v=>!v);onClearNotifs&&onClearNotifs();}} className="lok-btn relative px-2 py-1.5 rounded-full text-xs font-bold" style={{border:`2px solid ${T.accent}`,background:T.accent,color:"#fff"}} aria-label={`${notifUnread} notifications`}>🔔 {notifUnread}</button>}
@@ -815,21 +841,21 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
         </div>
       </div>
       {showNotifs&&notifications.length>0&&(<div className="mt-3 flex flex-col gap-1.5">{notifications.slice(-5).reverse().map(n=>(<div key={n.id} className="text-xs px-3 py-2 rounded-xl" style={{background:T.paper,border:`1.5px solid ${T.shadow}`}}>{n.msg}</div>))}</div>)}
-      <p className="mt-3 text-sm leading-snug">{profile.bio}</p>
-      <div className="mt-3 grid grid-cols-3 gap-2">{[["lokdin","Lok'd in",(lokdInCount).toLocaleString()],["lokd","Lok'd",following.length],["bookmarks","Bookmarks",bookmarks.length]].map(([id,label,n])=>(<button key={id} onClick={()=>setView(view===id?"gallery":id)} className="lok-btn py-2 rounded-xl text-center" style={{border:`2.5px solid ${view===id?T.accent:T.ink}`,background:view===id?T.ink:"transparent",color:view===id?T.paper:T.ink}} aria-pressed={view===id}><div className="lok-display font-extrabold leading-none">{n}</div><div className="text-[11px] opacity-75">{label}</div></button>))}</div>
+      <p className="mt-3 text-sm leading-snug">{displayBio}</p>
+      {!viewingArtist&&<div className="mt-3 grid grid-cols-3 gap-2">{[["lokdin","Lok'd in",(lokdInCount).toLocaleString()],["lokd","Lok'd",following.length],["bookmarks","Bookmarks",bookmarks.length]].map(([id,label,n])=>(<button key={id} onClick={()=>setView(view===id?"gallery":id)} className="lok-btn py-2 rounded-xl text-center" style={{border:`2.5px solid ${view===id?T.accent:T.ink}`,background:view===id?T.ink:"transparent",color:view===id?T.paper:T.ink}} aria-pressed={view===id}><div className="lok-display font-extrabold leading-none">{n}</div><div className="text-[11px] opacity-75">{label}</div></button>))}</div>}
     </section>
-    {!kids&&(<section className="mt-3 p-4 rounded-2xl" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`4px 4px 0 ${T.shadow}`}}>
+    {!kids&&!viewingArtist&&(<section className="mt-3 p-4 rounded-2xl" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`4px 4px 0 ${T.shadow}`}}>
       <div className="flex items-center justify-between"><div className="lok-display font-extrabold">Level {level}</div><div className="text-xs opacity-70">{xp%100}/100 XP</div></div>
       <div className="mt-1 h-2.5 rounded-full overflow-hidden" style={{background:T.shadow}}><div style={{width:`${xp%100}%`,height:"100%",background:T.accent}}/></div>
       <div className="lok-display font-extrabold mt-3 mb-1 text-sm">Today's quests</div>
       <div className="space-y-1.5">{quests?.items?.map(q=>(<div key={q.id} className="flex items-center gap-2 text-sm"><span className="font-bold" style={{color:q.done?T.alt:T.ink,opacity:q.done?1:0.9}}>{q.done?"✓":"○"}</span><span className="flex-1" style={{textDecoration:q.done?"line-through":"none",opacity:q.done?0.55:1}}>{q.label}</span><span className="text-xs font-bold" style={{color:T.accent}}>{q.progress}/{q.goal} · +{q.reward}</span></div>))}</div>
     </section>)}
-    {!kids&&(<section className="mt-3 p-3 rounded-2xl" style={{border:`2px solid ${T.alt}`,background:T.card}}>
+    {!kids&&!viewingArtist&&(<section className="mt-3 p-3 rounded-2xl" style={{border:`2px solid ${T.alt}`,background:T.card}}>
       <div className="flex items-center gap-2 mb-1.5"><div className="lok-display font-extrabold text-sm" style={{color:T.alt}}>🌀 Word Twister</div><span className="text-xs opacity-50">daily</span></div>
       {wordTwister.word?(!wordTwister.found?<div className="flex items-center gap-2"><span className="lok-display text-2xl font-extrabold tracking-widest" style={{color:T.accent}}>{wordTwister.shuffled}</span><input value={wordTwister.guess||""} onChange={e=>{const v=e.target.value.toLowerCase();setWordTwister(w=>{if(v===w.word){setLoks(l=>l+5);setTotalEarned(t=>t+5);say("Word cracked! +5 Loks","success");return{...w,found:true,guess:v};}return{...w,guess:v};});}} placeholder="Unscramble…" maxLength={20} className="flex-1 px-2 py-1.5 rounded-lg text-sm font-bold" style={{border:`2px solid ${T.ink}`,background:T.paper,color:T.ink}} aria-label="Guess the word"/><button onClick={()=>setWordTwister(w=>({...w,revealed:true}))} className="lok-btn text-[10px] font-bold px-2 py-1 rounded" style={{border:`1.5px solid ${T.shadow}`,color:T.ink}}>Reveal</button></div>:<div className="text-sm font-bold" style={{color:T.alt}}>Solved ✓ <span className="font-mono">{wordTwister.word}</span></div>):<button onClick={()=>{const pool=["SKETCH","INKWELL","BLOOM","RISOPRINT","LILLOK","FLIPBOOK","STENCIL","VIGNETTE"];const w=pool[Math.floor(Math.random()*pool.length)];const shuffled=w.split("").sort(()=>Math.random()-.5).join("");setWordTwister({word:w,shuffled,found:false,guess:"",revealed:false});}} className="lok-btn text-xs font-bold px-3 py-1.5 rounded-lg" style={{border:`2px solid ${T.ink}`}}>Start daily twister</button>}
       {wordTwister.revealed&&!wordTwister.found&&<div className="mt-1 text-[10px] font-bold opacity-60">The word was: <span className="font-mono" style={{color:T.accent}}>{wordTwister.word}</span></div>}
     </section>)}
-    {!kids&&(<section className="mt-3 p-3 rounded-2xl" style={{border:`2px solid ${T.shadow}`,background:T.card}}>
+    {!kids&&!viewingArtist&&(<section className="mt-3 p-3 rounded-2xl" style={{border:`2px solid ${T.shadow}`,background:T.card}}>
       <div className="flex items-center justify-between mb-1.5"><div className="lok-display font-extrabold text-sm">Loks</div>{nextMilestone&&<div className="text-[10px] opacity-50 font-bold">next quest milestone: {nextMilestone}</div>}</div>
       <div className="flex items-center justify-around">
         <div className="text-center"><div className="lok-display font-extrabold text-xl" style={{color:T.accent}}>{loks}</div><div className="text-[11px] opacity-60">balance</div></div>
@@ -837,7 +863,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
         <div className="text-center"><div className="lok-display font-extrabold text-xl">{questsCompleted}</div><div className="text-[11px] opacity-60">quests done</div></div>
       </div>
     </section>)}
-    {!kids&&(<section className="mt-3 p-3 rounded-2xl" style={{border:`2px solid ${T.alt}`,background:T.card}}>
+    {!kids&&!viewingArtist&&(<section className="mt-3 p-3 rounded-2xl" style={{border:`2px solid ${T.alt}`,background:T.card}}>
       <div className="flex items-center gap-2 mb-1.5"><div className="lok-display font-extrabold text-sm" style={{color:T.alt}}>🌱 Ink Garden</div><span className="text-xs opacity-50">{garden.length}/6 planted</span></div>
       <div className="grid grid-cols-3 gap-2">{Array.from({length:6}).map((_,i)=>{const plant=garden[i];return(<div key={i} className="rounded-xl flex items-center justify-center" style={{minHeight:60,border:`2px dashed ${plant?T.accent:T.shadow}`,background:plant?T.paper:"transparent",transition:"all .3s"}}>
         {plant?<div className="text-center"><div className="text-lg">{plant.harvested?"🌸":plant.growth>=100?"🌻":"🌱"}</div><div className="text-[9px] font-bold mt-0.5">{plant.harvested?"done":plant.growth>=100?<button onClick={()=>{setGarden(g=>g.map((x,j)=>j===i?{...x,harvested:true}:x));setLoks(l=>l+8);say("Harvested! +8 Loks","success");}} className="underline" style={{color:T.accent}}>harvest</button>:`${Math.round(plant.growth)}%`}</div></div>
@@ -945,6 +971,12 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
         </div>
         {devMode&&(<div className="p-3 rounded-2xl mb-2" style={{border:`3px dashed ${T.accent}`,background:T.paper}}>
           <div className="lok-display font-extrabold text-sm" style={{color:T.accent}}>🔩 Dev Flags</div>
+          <div className="mt-2 p-2 rounded-xl" style={{border:`2px solid ${debugUnlimitedLoks?T.accent:T.shadow}`,background:T.card}}>
+            <div className="flex items-center justify-between">
+              <div className="min-w-0"><div className="font-bold text-xs">💰 Unlimited Loks</div><div className="text-[10px] opacity-60 leading-snug">QA only — your real balance is stashed and restored exactly when you turn this off. Never affects totals or quest counters.</div></div>
+              <button onClick={toggleDebugUnlimitedLoks} aria-pressed={debugUnlimitedLoks} className="lok-btn shrink-0 ml-2 px-3 py-1.5 rounded-full text-xs font-extrabold" style={{background:debugUnlimitedLoks?T.accent:T.card,color:debugUnlimitedLoks?T.onAccent:T.ink,border:`2px solid ${T.ink}`}}>{debugUnlimitedLoks?"On":"Off"}</button>
+            </div>
+          </div>
           <div className="mt-2 font-bold text-xs" style={{color:T.ink}}>App Icon</div>
           <div className="text-[10px] opacity-60 mt-0.5 mb-1.5 leading-snug">Changes the tab icon instantly. Home screen shortcuts may need removing &amp; re-adding to pick up a new icon (iOS/Android limitation).</div>
           <div className="grid grid-cols-2 gap-2">{LOGOS.map(l=>{

@@ -50,6 +50,20 @@ export async function fetchRandomOlderArtists(want = 6) {
   return data;
 }
 
+/** Exact lookup for viewing a single artist's public profile page. */
+export async function fetchArtistByHandle(handle) {
+  if (!supabase) return null;
+  const h = (handle || "").trim();
+  if (!h) return null;
+  const { data } = await supabase
+    .from("lok_profiles")
+    .select("user_id,handle,display_name,avatar_seed,bio,flips,level,created_at")
+    .or(`handle.eq.${h},display_name.eq.${h}`)
+    .limit(1)
+    .maybeSingle();
+  return data || null;
+}
+
 /** Handle/name search across real accounts. */
 export async function searchArtists(query, limit = 15) {
   if (!supabase) return [];
