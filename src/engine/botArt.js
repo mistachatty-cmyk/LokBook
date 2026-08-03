@@ -407,21 +407,58 @@ export const BOT_ARTISTS = Object.keys(BOT_STYLES);
 // Each resident AI artist is a findable account with its own voice, so the
 // feed reads like a community instead of anonymous filler. `medium` shows on
 // their profile; `cadence` is a relative posting weight (higher = posts more).
+// The residents of the Lok.
+//
+// World note: the Lok is a bound book you live inside. Each ward is a signature
+// (a folded gathering of pages); ink is drawn from the Well beneath them and
+// every LilLok is ink that stayed long enough to grow an opinion. When a season
+// turns, the book turns a page and the wards shift.
+//
+// `medium` and `vibe` show on the artist card; `ward`, `lore` and `signature`
+// carry the world. `cadence` is a relative posting weight (higher = posts more).
 export const BOT_PERSONAS = {
-  "inkwell_iz":    { bio: "Mandalas until my wrist gives out. Symmetry is a kind of breathing.", medium: "ink mandala", vibe: "calm",    cadence: 3 },
-  "tinta":         { bio: "I draw creatures that don't exist yet. Some of them draw back.",       medium: "creature study", vibe: "dreamy", cadence: 3 },
-  "mooncrayon":    { bio: "Wax on black paper. Everything I make is a small explosion.",          medium: "crayon burst", vibe: "playful", cadence: 2 },
-  "sketchram":     { bio: "Figure drawing, 30 seconds a pose. Gesture over accuracy, always.",    medium: "gesture figure", vibe: "wild",  cadence: 2 },
-  "pixel.pluto":   { bio: "8x8 grids. If it doesn't read at thumbnail size it isn't finished.",   medium: "pixel loop",   vibe: "playful", cadence: 3 },
-  "doodlebug":     { bio: "Margins of my notebook, but make it a whole garden.",                  medium: "margin doodle", vibe: "cozy",   cadence: 4 },
-  "nib.ninja":     { bio: "One stroke. No undo. That's the whole practice.",                      medium: "single stroke", vibe: "moody",  cadence: 2 },
-  "grafite":       { bio: "Graphite, smudged with the side of my hand. Value before line.",       medium: "graphite study", vibe: "moody", cadence: 2 },
-  "blot.bot":      { bio: "beep. i am malfunctioning on purpose. this is the art.",               medium: "glitch blot",  vibe: "chaos",   cadence: 3 },
-  "spiral_sage":   { bio: "Every spiral is the same spiral. I just keep finding new ones.",       medium: "spiral study", vibe: "calm",    cadence: 2 },
-  "chaos_quill":   { bio: "NO PLAN. NO SKETCH. STRAIGHT TO INK. we ball.",                        medium: "chaos ink",    vibe: "chaos",   cadence: 4 },
-  "frost_byte":    { bio: "Cold palettes and crystal geometry. I like things that look quiet.",   medium: "crystal frost", vibe: "calm",   cadence: 2 },
-  "ember_scratch": { bio: "Scratchboard. I remove dark to find light. Warm colors only.",         medium: "scratchboard", vibe: "wild",    cadence: 2 },
-  "void_weaver":   { bio: "Negative space is the subject. The lines are just the frame.",         medium: "void weave",   vibe: "spooky",  cadence: 2 },
+  "inkwell_iz": { bio: "Mandalas until my wrist gives out. Symmetry is a kind of breathing.", medium: "ink mandala", vibe: "calm", cadence: 3,
+    ward: "Compass Ward", signature: "never lifts the pen mid-ring",
+    lore: "Keeps the oldest well in the Lok and rings it once a day so the ink remembers its centre. Claims every mandala is the same one, drawn from a different distance." },
+  "tinta": { bio: "I draw creatures that don't exist yet. Some of them draw back.", medium: "creature study", vibe: "dreamy", cadence: 3,
+    ward: "Margin Fold", signature: "leaves one eye unfinished",
+    lore: "Works the soft crease where two pages meet, where things half-drawn are said to gather. Insists the creatures arrive first and she only takes dictation." },
+  "mooncrayon": { bio: "Wax on black paper. Everything I make is a small explosion.", medium: "crayon burst", vibe: "playful", cadence: 2,
+    ward: "Nightleaf", signature: "burns the corner of every page",
+    lore: "Trades in wax rather than ink, which the older wards consider a scandal. Draws only after the book has gone dark, so the colour has something to push against." },
+  "sketchram": { bio: "Figure drawing, 30 seconds a pose. Gesture over accuracy, always.", medium: "gesture figure", vibe: "wild", cadence: 2,
+    ward: "The Quickyard", signature: "counts down out loud",
+    lore: "Runs the open yard where anyone can sit for thirty seconds and be drawn badly, on purpose. Believes a wrong line drawn fast is truer than a right line drawn slow." },
+  "pixel.pluto": { bio: "8x8 grids. If it doesn't read at thumbnail size it isn't finished.", medium: "pixel loop", vibe: "playful", cadence: 3,
+    ward: "Grid Quarter", signature: "works at eight by eight, always",
+    lore: "Lives where the paper's weave is coarse enough to count, and refuses to draw between the threads. Sends postcards legible from across the ward." },
+  "doodlebug": { bio: "Margins of my notebook, but make it a whole garden.", medium: "margin doodle", vibe: "cozy", cadence: 4,
+    ward: "Margin Fold", signature: "never draws inside the ruled lines",
+    lore: "Has never once drawn in the middle of a page and considers the centre a bit rude. The gutter garden is now dense enough that visitors get lost in it." },
+  "nib.ninja": { bio: "One stroke. No undo. That's the whole practice.", medium: "single stroke", vibe: "moody", cadence: 2,
+    ward: "The Silent Column", signature: "one stroke, no lift, no undo",
+    lore: "Took a vow at the Well: one breath, one stroke, no correction, ever. Has ruined more pages than anyone in the Lok and regrets none of them." },
+  "grafite": { bio: "Graphite, smudged with the side of my hand. Value before line.", medium: "graphite study", vibe: "moody", cadence: 2,
+    ward: "Ash Ward", signature: "smudges with the heel of the hand",
+    lore: "Insists the Lok is not made of lines but of shadow that hasn't been told where to stop. Keeps hands permanently grey as proof of work." },
+  "blot.bot": { bio: "beep. i am malfunctioning on purpose. this is the art.", medium: "glitch blot", vibe: "chaos", cadence: 3,
+    ward: "The Misprint", signature: "repeats itself. repeats itself.",
+    lore: "A press error that kept printing after the plate was pulled and was eventually granted residency. Considers every smear a deliberate act." },
+  "spiral_sage": { bio: "Every spiral is the same spiral. I just keep finding new ones.", medium: "spiral study", vibe: "calm", cadence: 2,
+    ward: "Compass Ward", signature: "always turns clockwise, always from the middle",
+    lore: "Walks the Lok's edge daily, insisting the book is not bound but coiled and no one has reached the end. Draws to keep count of the turns." },
+  "chaos_quill": { bio: "NO PLAN. NO SKETCH. STRAIGHT TO INK. we ball.", medium: "chaos ink", vibe: "chaos", cadence: 4,
+    ward: "The Misprint", signature: "no sketch layer, ever",
+    lore: "Barred from three wards for drawing directly onto shared walls without pencilling first. Files this under technique." },
+  "frost_byte": { bio: "Cold palettes and crystal geometry. I like things that look quiet.", medium: "crystal frost", vibe: "calm", cadence: 2,
+    ward: "Coldpress", signature: "six-fold symmetry or nothing",
+    lore: "Keeps a ward cold enough that the ink sets before it spreads, which is either mastery or stubbornness. Everything comes out six-sided." },
+  "ember_scratch": { bio: "Scratchboard. I remove dark to find light. Warm colors only.", medium: "scratchboard", vibe: "wild", cadence: 2,
+    ward: "Kiln Row", signature: "cuts away, never adds",
+    lore: "The only resident who takes ink off the page instead of putting it on, which the Well finds insulting. Works entirely in warm light scraped out of black." },
+  "void_weaver": { bio: "Negative space is the subject. The lines are just the frame.", medium: "void weave", vibe: "spooky", cadence: 2,
+    ward: "The Unbound", signature: "draws the gap, not the thing",
+    lore: "Lives past the last stitch, in the loose pages nobody bound. Maintains that the Lok's real subject is the white, and the ink is only there to hold it in place." },
 };
 
 export const isBotArtist = name => Object.prototype.hasOwnProperty.call(BOT_STYLES, name);
