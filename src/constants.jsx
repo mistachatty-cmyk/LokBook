@@ -174,7 +174,7 @@ export const MYTHIC_ITEMS = [
   { id:"mythic_cosmic",  name:"Cosmic Crown",        desc:"Celestial geometry frames your art in orbiting brilliance.",    price:3000, rarity:"mythic", type:"frame",          fxId:"cosmic" },
   { id:"mythic_nebula",  name:"Nebula Veil",         desc:"Swirling cosmic dust drifts across your gallery.",              price:2200, rarity:"mythic", type:"paper",          fxId:"nebula" },
   { id:"mythic_storm",   name:"Stormcaller",         desc:"Summon lightning with every stroke — ink that crackles.",       price:2800, rarity:"mythic", type:"animation_fx",   fxId:"storm" },
-  { id:"mythic_pixel",   name:"Prism Shard",         desc:"Light bends through your lines in a rainbow of refractions.",   price:1600, rarity:"mythic", type:"name_color",     fxId:"pixel" },
+  { id:"mythic_pixel",   name:"Prism Shard",         desc:"Light bends through your lines in a rainbow of refractions.",   price:1600, rarity:"mythic", type:"name_color",     fxId:"prism" },
   { id:"mythic_echo",    name:"Echo Bloom",          desc:"Rings of ink pulse outward from every mark you make.",           price:1900, rarity:"mythic", type:"animation_fx",   fxId:"echo" },
   { id:"mythic_bloom",   name:"Bloom of Worlds",     desc:"A cosmic flower unfurls inside every frame you create.",         price:3500, rarity:"mythic", type:"effect",         fxId:"bloom" },
   { id:"mythic_phoenix", name:"Phoenix Ascent",      desc:"Ashen wings trail every stroke — reborn in fire.",                price:2800, rarity:"mythic", type:"effect",         fxId:"phoenix" },

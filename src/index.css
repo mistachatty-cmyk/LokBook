@@ -37,15 +37,17 @@
 .rarity-rare { border-color: #3B82F6 !important; box-shadow: 0 0 8px rgba(59,130,246,0.35); }
 .rarity-epic { border-color: #A855F7 !important; box-shadow: 0 0 10px rgba(168,85,247,0.4); }
 .rarity-legendary { border-color: #F59E0B !important; box-shadow: 0 0 14px rgba(245,158,11,0.5); animation: lokglow 2s ease-in-out infinite; }
+/* Animated rainbow border via two layered backgrounds (padding-box card
+   color under a border-box gradient) — NOT `mask`, which clips the whole
+   element (including its own content, not just the background) and was
+   making every mythic card's name/desc/price/preview invisible. */
 .rarity-mythic {
-  border-color: transparent !important;
-  background: linear-gradient(135deg, #FF5DA2, #A855F7, #3B82F6, #22C55E, #F59E0B) border-box !important;
-  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+  border: 3px solid transparent !important;
+  background:
+    linear-gradient(var(--mythic-bg, #F2EDE2), var(--mythic-bg, #F2EDE2)) padding-box,
+    linear-gradient(135deg, #FF5DA2, #A855F7, #3B82F6, #22C55E, #F59E0B) border-box !important;
+  background-size: 100% 100%, 300% 300% !important;
   animation: lokmythic 3s linear infinite;
-  background-size: 300% 300% !important;
 }
 .rarity-mythic-badge {
   background: linear-gradient(90deg, #FF5DA2, #A855F7, #3B82F6, #22C55E);

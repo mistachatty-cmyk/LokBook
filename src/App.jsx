@@ -719,8 +719,8 @@ function OpenFront({kids,loks,dailyPrompt,onWager,onEarn,hinted,onHinted,blip,sa
   const pos=e=>{const r=wrapRef.current.getBoundingClientRect();return[((e.clientX-r.left)*W)/r.width,((e.clientY-r.top)*H)/r.height];};
   const scorePoint=(x,y)=>{const pts=targetPts.current;for(let i=0;i<pts.length;i++){if(!pts[i].hit&&Math.hypot((pts[i][0]??pts[i].x??pts[i][0])-x,(pts[i][1]??pts[i].y??pts[i][1])-y)<hitRadius){pts[i].hit=true;painted.current++;return true;}}return false;};
   const lastBoard=useRef(0);const pointerId=useRef(null);
-  const down=e=>{if(phase!=="play")return;e.preventDefault();wrapRef.current.setPointerCapture(e.pointerId);drawing.current=true;last.current=pos(e);paint(...last.current);};
-  const move=e=>{if(!drawing.current)return;const[x,y]=pos(e);paint(x,y);};
+  const down=e=>{if(phase!=="play")return;e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);drawing.current=true;last.current=pos(e);paint(...last.current);};
+  const move=e=>{if(!drawing.current)return;e.preventDefault();const[x,y]=pos(e);paint(x,y);};
   const paint=(x,y)=>{const ctx=inkRef.current.getContext("2d");const hit=scorePoint(x,y);ctx.strokeStyle=hit?ART.teal:ART.pink;ctx.lineWidth=12;ctx.lineCap="round";ctx.lineJoin="round";ctx.beginPath();const[px,py]=last.current||[x,y];ctx.moveTo(px,py);ctx.lineTo(x,y);ctx.stroke();last.current=[x,y];if(hit){const now=performance.now();if(now-lastBoard.current>120){lastBoard.current=now;setBoard(bd=>bd.map(p=>p.me?{...p,score:coverage()}:p));}if(Math.random()<0.12)blip&&blip("D5");}};
   const up=e=>{drawing.current=false;last.current=null;try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
   if(phase==="lobby"&&!hinted)return(<div className="mt-4 text-center" style={{animation:"lokrise .3s ease"}}>
@@ -759,10 +759,10 @@ function OpenFront({kids,loks,dailyPrompt,onWager,onEarn,hinted,onHinted,blip,sa
       <div className="text-center px-3 py-1.5 rounded-xl" style={{background:time<=4?T.accent:T.ink,color:time<=4?T.onAccent:T.paper,animation:time<=4&&time>0&&!reduceMotion?"lokpulse .5s ease-in-out infinite":"none",transition:"background .3s ease"}}><div className="lok-display text-xl font-extrabold leading-none">{time.toFixed(1)}</div><div className="text-[9px] font-bold">sec</div></div>
     </div>
     <div className="mt-2 flex items-center gap-2"><div className="flex-1 h-3 rounded-full overflow-hidden" style={{background:T.shadow}}><div style={{width:`${cov}%`,height:"100%",background:T.alt,transition:"width .1s"}}/></div><span className="lok-display font-extrabold text-sm">{cov}%</span></div>
-    <div ref={wrapRef} className="relative mt-2 rounded-2xl overflow-hidden select-none" style={{border:`3px solid ${T.ink}`,background:ART.paper,boxShadow:`6px 6px 0 ${T.shadow}`,aspectRatio:"4/5",touchAction:"none"}} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}>
+    <div ref={wrapRef} className="relative mt-2 rounded-2xl overflow-hidden select-none" style={{border:`3px solid ${T.ink}`,background:ART.paper,boxShadow:`6px 6px 0 ${T.shadow}`,aspectRatio:"4/5",touchAction:"none"}}>
       <canvas ref={guideRef} width={W} height={H} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" style={{opacity:guideOpacity,transition:guideMode==="blind"?"opacity .35s ease":"opacity .4s linear"}}/>
       <canvas ref={inkRef} width={W} height={H} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true"/>
-      <div className="absolute inset-0" role="img" aria-label="Trace Rush canvas" style={{touchAction:"none",cursor:"crosshair"}}/>
+      <div className="absolute inset-0" role="img" aria-label="Trace Rush canvas" style={{touchAction:"none",cursor:"crosshair"}} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}/>
       <button onClick={finish} className="lok-btn absolute bottom-2 right-2 px-3 py-1.5 rounded-full text-xs font-bold" style={{background:T.ink,color:T.paper}}>Lock it in</button>
     </div>
     <div className="mt-2 flex items-center gap-2"><div className="text-xs opacity-70"><span style={{color:T.alt}}>●</span> {online.toLocaleString()} online</div></div>
@@ -1190,9 +1190,8 @@ export default function LokApp(){
     <div className={`min-h-screen w-full lok-motion-${featureFlags.lokMotion||"subtle"} ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:(FONT_PACKS.find(f=>f.id===cosmetics.fontPack)?.font&&cosmetics.fontPack!=="default")?FONT_PACKS.find(f=>f.id===cosmetics.fontPack).font:"'Schibsted Grotesk',system-ui,sans-serif",animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none",zoom:{small:0.85,normal:1,large:1.15}[featureFlags.uiScale||"normal"]}}>
       <GlobalStyle T={T} pace={pace} speed={speed}/><ThemeBackdrop themeId={uiTheme} pace={pace}/><PageEffect effect={effect}/>
       {!focusMode && <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3" style={{background:T.paper,borderBottom:`3px solid ${T.ink}`}}>
-        <button onClick={()=>setTab("feed")} aria-label="Go to feed" className="lok-btn lok-display relative text-2xl font-extrabold tracking-tight select-none" style={{background:"transparent",border:"none",padding:0,whiteSpace:"nowrap"}}>
-          <span className="absolute" style={{color:T.accent,left:3,top:2,whiteSpace:"nowrap"}}>Lok{kids?" Juniors":tab==="battle"?" N Slide":"Book"}</span>
-          <span className="relative" style={{whiteSpace:"nowrap"}}>Lok{kids?" Juniors":tab==="battle"?" N Slide":"Book"}</span>
+        <button onClick={()=>setTab("feed")} aria-label="Go to feed" className="lok-btn lok-display text-2xl font-extrabold tracking-tight select-none" style={{background:"transparent",border:"none",padding:0,whiteSpace:"nowrap",textShadow:`3px 2px 0 ${T.accent}`}}>
+          Lok{kids?" Juniors":tab==="battle"?" N Slide":"Book"}
         </button>
         <div className="flex items-center gap-2">
           {kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.alt,color:"#fff"}}>SAFE</span>}

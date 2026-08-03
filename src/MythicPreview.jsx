@@ -174,10 +174,13 @@ const fx = {
       motionPath: { path: "M20,40 C20,20 60,20 60,40 C60,60 20,60 20,40 C20,20 60,20 60,40", type: "cubic" },
       duration: 4, repeat: -1, ease: "none"
     });
-  }
+  },
+  // "Prism Shard" reuses the morph-shape/star tags already on the prism SVG.
+  prism: (ref) => fx.morph(ref),
 };
 
 const itemSvgs = {
+  galaxy: () => <svg viewBox="0 0 80 80" className="w-full h-full"><path d="M40,40 Q55,20 40,10 Q25,20 40,40 Q55,60 40,70 Q25,60 40,40Z" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.25"/><circle cx="40" cy="40" r="4" fill="currentColor"/><circle cx="26" cy="22" r="2" fill="currentColor" className="dot"/><circle cx="54" cy="20" r="1.5" fill="currentColor" className="dot"/><circle cx="60" cy="46" r="2" fill="currentColor" className="dot"/><circle cx="46" cy="62" r="1.5" fill="currentColor" className="dot"/><circle cx="20" cy="52" r="2" fill="currentColor" className="dot"/><circle cx="18" cy="34" r="1.5" fill="currentColor" className="dot"/></svg>,
   prism: () => <svg viewBox="0 0 80 80" className="w-full h-full"><polygon points="40,8 72,60 8,60" fill="none" stroke="currentColor" strokeWidth="2.5" className="morph-shape" style={{transformOrigin:"center"}}/><circle cx="40" cy="42" r="8" fill="currentColor" opacity="0.2" className="star"/><circle cx="40" cy="42" r="3" fill="currentColor"/></svg>,
   aurora: () => <svg viewBox="0 0 80 80" className="w-full h-full"><defs><linearGradient id="ag" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FF5DA2"/><stop offset="1" stopColor="#2FA9A0"/></linearGradient></defs><rect x="4" y="4" width="72" height="72" rx="16" fill="url(#ag)" opacity="0.12" className="morph-shape"/><circle cx="40" cy="40" r="18" fill="none" stroke="currentColor" strokeWidth="2" className="ring"/><circle cx="40" cy="40" r="6" fill="currentColor"/><circle cx="24" cy="24" r="2" fill="currentColor" className="star"/><circle cx="56" cy="24" r="2" fill="currentColor" className="star"/><circle cx="40" cy="56" r="2" fill="currentColor" className="star"/></svg>,
   void: () => <svg viewBox="0 0 80 80" className="w-full h-full"><circle cx="40" cy="40" r="30" fill="none" stroke="currentColor" strokeWidth="1.5" className="ring" opacity="0.5"/><circle cx="40" cy="40" r="20" fill="none" stroke="currentColor" strokeWidth="1" className="ring" strokeDasharray="4 6"/><circle cx="40" cy="40" r="8" fill="currentColor" opacity="0.3"/><circle cx="40" cy="40" r="3" fill="currentColor"/><circle cx="20" cy="20" r="2" fill="currentColor" className="star"/><circle cx="60" cy="20" r="2" fill="currentColor" className="star"/><circle cx="25" cy="58" r="2" fill="currentColor" className="star"/><circle cx="55" cy="58" r="2" fill="currentColor" className="star"/></svg>,
