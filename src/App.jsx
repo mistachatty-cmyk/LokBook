@@ -32,7 +32,7 @@ import "./steam/steamStore.jsx";
 import { checkAchievements } from "./steam/achievements.jsx";
 import LOGOS from "./logos.jsx";
 import { starterHandle, isReservedName, suggestHandle } from "./identity.js";
-import { generateBotPost, pickAmbientPosts } from "./engine/botArt.js";
+import { generateBotPost, pickAmbientPosts, BOT_PERSONAS, isBotArtist, searchBotArtists, botBackCatalogue } from "./engine/botArt.js";
 import ThemeBackdrop from "./theme/ThemeBackdrop.jsx";
 import { makeMatchBots, botProgress, botMomentum, botFinalT, judgeBattle, recordBattle, botLine, pickMidLine, BOT_TYPES } from "./engine/bots.js";
 import { renderPromptArt } from "./engine/promptArt.js";
@@ -104,7 +104,31 @@ const ALL_MOODS=["","calm","wild","moody","playful","dreamy","chaos","cozy","spo
 function Feed({posts,bookmarks,following,feedMode,setFeedMode,cosmetics={},daily,streak,dailyClaimed,flipOfDay,onLine,onClaimDaily,onOpen,onVote,onLok,onBookmark,say,moodFilter,setMoodFilter,moodTags,reportedPosts,onReport,onEcho,onArtist,flair=""}){
   const T=useT();const[active,setActive]=useState(0);const cardRefs=useRef([]);
   const[searchQ,setSearchQ]=useState("");const[searchResults,setSearchResults]=useState(null);const searchTimer=useRef(null);
-  useEffect(()=>{if(!searchQ.trim()){setSearchResults(null);return;}clearTimeout(searchTimer.current);searchTimer.current=setTimeout(async()=>{try{const res=await fetch(`${SUPA_URL}/rest/v1/lok_posts?title=ilike.*${encodeURIComponent(searchQ)}*&author=ilike.*${encodeURIComponent(searchQ)}*&order=created_at.desc&limit=20`,{headers:{apikey:SUPA_KEY,Authorization:`Bearer ${SUPA_KEY}`}});const data=await res.json();setSearchResults(Array.isArray(data)?data.map(fromDbPost).filter(Boolean):[]);}catch{setSearchResults([]);}},300);},[searchQ]);
+  // Local-first search: resident AI artists and on-device posts resolve
+  // instantly and work offline; remote hits are merged in when they land.
+  // (The old query used `title=ilike..&author=ilike..`, which PostgREST ANDs,
+  // so it only matched posts whose title AND author both matched — i.e. never.)
+  useEffect(()=>{
+    const q=searchQ.trim();
+    if(!q){setSearchResults(null);return;}
+    const lq=q.toLowerCase();
+    const localPosts=posts.filter(p=>(p.title||"").toLowerCase().includes(lq)||(p.author||"").toLowerCase().includes(lq));
+    setSearchResults({artists:searchBotArtists(q),posts:localPosts});
+    clearTimeout(searchTimer.current);
+    searchTimer.current=setTimeout(async()=>{
+      try{
+        const f=`or=(title.ilike.*${encodeURIComponent(q)}*,author.ilike.*${encodeURIComponent(q)}*)`;
+        const res=await fetch(`${SUPA_URL}/rest/v1/lok_posts?${f}&order=created_at.desc&limit=20`,{headers:{apikey:SUPA_KEY,Authorization:`Bearer ${SUPA_KEY}`}});
+        const data=await res.json();
+        if(!Array.isArray(data))return;
+        const remote=data.map(fromDbPost).filter(Boolean);
+        setSearchResults(prev=>{
+          const seen=new Set((prev?.posts||[]).map(p=>p.id));
+          return{artists:prev?.artists||[],posts:[...(prev?.posts||[]),...remote.filter(r=>!seen.has(r.id))]};
+        });
+      }catch{}
+    },300);
+  },[searchQ,posts]);
   const hidden=new Set(reportedPosts||[]);
   const base=(feedMode==="following"?posts.filter(p=>following.includes(p.author||"moss.ink")):posts).filter(p=>!hidden.has(p.id));
   const list=moodFilter==="all"?base:base.filter(p=>(moodTags[p.id]||"")===moodFilter);
@@ -119,12 +143,15 @@ function Feed({posts,bookmarks,following,feedMode,setFeedMode,cosmetics={},daily
   },[list.length,feedMode,moodFilter]);
   return(<div>
     <div className="relative mt-3"><input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search posts &amp; artists…" aria-label="Search feed" className="w-full px-3 py-2 rounded-xl text-sm font-bold" style={{border:`3px solid ${T.ink}`,background:T.card,color:T.ink,outline:"none"}}/>{searchQ&&<button onClick={()=>{setSearchQ("");setSearchResults(null);}} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold" style={{color:T.accent}}>✕</button>}</div>
-    {searchResults!==null&&(<div className="mt-2">
-      {searchResults.length>0&&(()=>{const artists=[...new Set(searchResults.map(p=>p.author||"unknown"))];return(<div className="mb-2"><div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Artists</div>
-        <div className="flex flex-wrap gap-1.5">{artists.map(name=>(<button key={name} onClick={()=>onArtist&&onArtist(name)} className="lok-btn px-2.5 py-1 rounded-full text-xs font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}>👤 <NameTag name={name}/></button>))}</div>
-      </div>);})()}
-      <div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Posts ({searchResults.length})</div>
-      {searchResults.length===0?<div className="text-xs opacity-50 py-3 text-center">No results found</div>:searchResults.map(p=>(<button key={p.id} onClick={()=>onOpen(p.id)} className="lok-btn w-full text-left p-2 rounded-xl mb-1 flex items-center gap-2" style={{border:`2px solid ${T.ink}`,background:T.card}}><div className="flex-1 min-w-0"><div className="font-bold text-sm truncate">{p.title}</div><div className="text-[10px] opacity-60"><button onClick={e=>{e.stopPropagation();onArtist&&onArtist(p.author||"unknown");}} style={{background:"transparent",border:"none",padding:0,textDecoration:"underline",cursor:"pointer",color:"inherit",font:"inherit"}}><NameTag name={p.author||"unknown"}/></button></div></div><span className="text-xs font-bold shrink-0" style={{color:T.accent}}>Open ▸</span></button>))}</div>)}
+    {searchResults!==null&&(()=>{const artists=[...new Set([...(searchResults.artists||[]),...(searchResults.posts||[]).map(p=>p.author).filter(Boolean)])];const found=searchResults.posts||[];return(<div className="mt-2">
+      {artists.length>0&&(<div className="mb-2"><div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Artists ({artists.length})</div>
+        <div className="flex flex-col gap-1.5">{artists.map(name=>{const per=BOT_PERSONAS[name];return(<button key={name} onClick={()=>onArtist&&onArtist(name)} className="lok-btn w-full text-left p-2 rounded-xl flex items-center gap-2" style={{border:`2px solid ${T.ink}`,background:T.card}}>
+          <img src={renderAvatar(name.length*31)} alt="" className="w-8 h-8 rounded-full shrink-0" style={{border:`2px solid ${T.ink}`}}/>
+          <div className="min-w-0 flex-1"><div className="font-bold text-sm truncate"><NameTag name={name}/>{per&&<span className="ml-1.5 text-[9px] px-1 py-0.5 rounded align-middle" style={{background:T.alt,color:"#fff"}}>AI</span>}</div>{per&&<div className="text-[10px] opacity-60 truncate">{per.medium} · {per.vibe}</div>}</div>
+          <span className="text-xs font-bold shrink-0" style={{color:T.accent}}>View ▸</span></button>);})}</div>
+      </div>)}
+      <div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Posts ({found.length})</div>
+      {found.length===0&&artists.length===0?<div className="text-xs opacity-50 py-3 text-center">No results found</div>:found.map(p=>(<button key={p.id} onClick={()=>onOpen(p.id)} className="lok-btn w-full text-left p-2 rounded-xl mb-1 flex items-center gap-2" style={{border:`2px solid ${T.ink}`,background:T.card}}><div className="flex-1 min-w-0"><div className="font-bold text-sm truncate">{p.title}</div><div className="text-[10px] opacity-60"><button onClick={e=>{e.stopPropagation();onArtist&&onArtist(p.author||"unknown");}} style={{background:"transparent",border:"none",padding:0,textDecoration:"underline",cursor:"pointer",color:"inherit",font:"inherit"}}><NameTag name={p.author||"unknown"}/></button></div></div><span className="text-xs font-bold shrink-0" style={{color:T.accent}}>Open ▸</span></button>))}</div>);})()}
     {searchResults===null&&(<>{flipOfDay&&feedMode==="discover"&&(<button onClick={()=>onOpen(flipOfDay.id)} aria-label={`Flip of the Day: ${flipOfDay.title}`} className="lok-btn mt-3 w-full flex items-center gap-3 p-2.5 rounded-2xl text-left" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:"5px 5px 0 #E8B14B"}}>
       {flipOfDay.frames?.[0]&&<img src={flipOfDay.frames[Math.floor(flipOfDay.frames.length/2)]} alt="" className="rounded-lg shrink-0" style={{width:46,aspectRatio:"4/5",objectFit:"cover",border:`2px solid ${T.ink}`}}/>}
       <div className="min-w-0 flex-1"><div className="text-[10px] font-extrabold uppercase tracking-widest" style={{color:"#B8860B"}}>✦ Flip of the Day</div><div className="lok-display font-extrabold text-sm truncate">{flipOfDay.title}</div></div>
@@ -906,7 +933,16 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
   const isIOS=typeof navigator!=="undefined"&&/iPad|iPhone|iPod/.test(navigator.userAgent);
   const avatar=useMemo(()=>renderAvatar(profile.avatarSeed),[profile.avatarSeed]);
   const targetArtist=viewingArtist||profile.name;
-  const myPosts=posts.filter(p=>p.author===targetArtist);
+  const botPersona=viewingArtist?BOT_PERSONAS[viewingArtist]:null;
+  // Resident AI artists always have a gallery to show, even before any of
+  // their ambient posts have landed in this device's feed.
+  const backCat=useMemo(()=>(viewingArtist&&isBotArtist(viewingArtist))?botBackCatalogue(viewingArtist,6):[],[viewingArtist]);
+  const myPosts=useMemo(()=>{
+    const own=posts.filter(p=>p.author===targetArtist);
+    if(!backCat.length)return own;
+    const seen=new Set(own.map(p=>p.id));
+    return[...own,...backCat.filter(p=>!seen.has(p.id))];
+  },[posts,targetArtist,backCat]);
   const filtered=[...myPosts].filter(p=>!searchQ||p.title?.toLowerCase().includes(searchQ.toLowerCase())||p.style?.toLowerCase().includes(searchQ.toLowerCase())).sort((a,b)=>{if(filter==="loks")return b.votes-a.votes;if(filter==="views")return(b.views||0)-(a.views||0);return 0;}).filter(p=>filter==="battle"?p.from==="battle":filter==="series"?p.style==="series":filter==="weekly"?p.weeklyPrompt===WEEKLY_PROMPT:true);
   const nextMilestone=[10,25,50,100].find(m=>questsCompleted<m);
   const bookmarked=posts.filter(p=>bookmarks.includes(p.id));
@@ -914,7 +950,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
     <section className="mt-4 p-4 rounded-2xl" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`6px 6px 0 ${T.shadow}`}}>
       <div className="flex items-center gap-4">
         {!viewingArtist&&<FramedAvatar src={avatar} size={72} frame={cosmetics.frame} accent={cosmetics.avatarAccent} ink={T.ink} acc={T.accent} animated={animatedToken}/>}
-        <div className="min-w-0 flex-1"><div className="lok-display text-xl font-extrabold leading-tight flex items-center gap-2 flex-wrap"><NameTag name={viewingArtist||profile.name} color={viewingArtist?"default":cosmetics.nameColor} style={{color:T.ink}}/>{!viewingArtist&&flair&&<span className="text-[10px] ml-1 px-1 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>{flair}</span>}{!viewingArtist&&lokPass&&!kids&&<span className="text-xs px-1.5 py-0.5 rounded" style={{background:T.accent,color:T.onAccent}}>PASS</span>}</div><div className="text-sm opacity-70">{myPosts.length} flips{viewingArtist?"":" · "+wins+" "+(wins===1?"win":"wins")}</div></div>
+        <div className="min-w-0 flex-1"><div className="lok-display text-xl font-extrabold leading-tight flex items-center gap-2 flex-wrap"><NameTag name={viewingArtist||profile.name} color={viewingArtist?"default":cosmetics.nameColor} style={{color:T.ink}}/>{!viewingArtist&&flair&&<span className="text-[10px] ml-1 px-1 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>{flair}</span>}{!viewingArtist&&lokPass&&!kids&&<span className="text-xs px-1.5 py-0.5 rounded" style={{background:T.accent,color:T.onAccent}}>PASS</span>}</div><div className="text-sm opacity-70">{myPosts.length} flips{viewingArtist?"":" · "+wins+" "+(wins===1?"win":"wins")}</div>{botPersona&&(<><div className="mt-1 flex items-center gap-1.5 flex-wrap"><span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold" style={{background:T.alt,color:"#fff"}}>AI ARTIST</span><span className="text-[10px] font-bold opacity-70">{botPersona.medium}</span><span className="text-[10px] opacity-50">· {botPersona.vibe}</span></div><p className="text-xs opacity-75 mt-1 leading-snug">{botPersona.bio}</p></>)}</div>
         <div className="flex gap-1.5">
           {viewingArtist?<button onClick={onBackToMyGallery} className="lok-btn px-3 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${T.accent}`,background:T.ink,color:T.paper}}>← Back to mine</button>:<>
           {notifUnread>0&&<button onClick={()=>{setShowNotifs(v=>!v);onClearNotifs&&onClearNotifs();}} className="lok-btn relative px-2 py-1.5 rounded-full text-xs font-bold" style={{border:`2px solid ${T.accent}`,background:T.accent,color:"#fff"}} aria-label={`${notifUnread} notifications`}>🔔 {notifUnread}</button>}

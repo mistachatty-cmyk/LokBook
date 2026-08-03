@@ -404,6 +404,51 @@ export const BOT_STYLES = {
 };
 export const BOT_ARTISTS = Object.keys(BOT_STYLES);
 
+// Each resident AI artist is a findable account with its own voice, so the
+// feed reads like a community instead of anonymous filler. `medium` shows on
+// their profile; `cadence` is a relative posting weight (higher = posts more).
+export const BOT_PERSONAS = {
+  "inkwell_iz":    { bio: "Mandalas until my wrist gives out. Symmetry is a kind of breathing.", medium: "ink mandala", vibe: "calm",    cadence: 3 },
+  "tinta":         { bio: "I draw creatures that don't exist yet. Some of them draw back.",       medium: "creature study", vibe: "dreamy", cadence: 3 },
+  "mooncrayon":    { bio: "Wax on black paper. Everything I make is a small explosion.",          medium: "crayon burst", vibe: "playful", cadence: 2 },
+  "sketchram":     { bio: "Figure drawing, 30 seconds a pose. Gesture over accuracy, always.",    medium: "gesture figure", vibe: "wild",  cadence: 2 },
+  "pixel.pluto":   { bio: "8x8 grids. If it doesn't read at thumbnail size it isn't finished.",   medium: "pixel loop",   vibe: "playful", cadence: 3 },
+  "doodlebug":     { bio: "Margins of my notebook, but make it a whole garden.",                  medium: "margin doodle", vibe: "cozy",   cadence: 4 },
+  "nib.ninja":     { bio: "One stroke. No undo. That's the whole practice.",                      medium: "single stroke", vibe: "moody",  cadence: 2 },
+  "grafite":       { bio: "Graphite, smudged with the side of my hand. Value before line.",       medium: "graphite study", vibe: "moody", cadence: 2 },
+  "blot.bot":      { bio: "beep. i am malfunctioning on purpose. this is the art.",               medium: "glitch blot",  vibe: "chaos",   cadence: 3 },
+  "spiral_sage":   { bio: "Every spiral is the same spiral. I just keep finding new ones.",       medium: "spiral study", vibe: "calm",    cadence: 2 },
+  "chaos_quill":   { bio: "NO PLAN. NO SKETCH. STRAIGHT TO INK. we ball.",                        medium: "chaos ink",    vibe: "chaos",   cadence: 4 },
+  "frost_byte":    { bio: "Cold palettes and crystal geometry. I like things that look quiet.",   medium: "crystal frost", vibe: "calm",   cadence: 2 },
+  "ember_scratch": { bio: "Scratchboard. I remove dark to find light. Warm colors only.",         medium: "scratchboard", vibe: "wild",    cadence: 2 },
+  "void_weaver":   { bio: "Negative space is the subject. The lines are just the frame.",         medium: "void weave",   vibe: "spooky",  cadence: 2 },
+};
+
+export const isBotArtist = name => Object.prototype.hasOwnProperty.call(BOT_STYLES, name);
+
+/** Fuzzy roster search so AI artists are findable with no network round-trip. */
+export function searchBotArtists(query) {
+  const q = (query || "").trim().toLowerCase();
+  if (!q) return [];
+  return BOT_ARTISTS.filter(name => {
+    const p = BOT_PERSONAS[name] || {};
+    return name.toLowerCase().includes(q)
+      || (p.medium || "").toLowerCase().includes(q)
+      || (p.vibe || "").toLowerCase().includes(q)
+      || (p.bio || "").toLowerCase().includes(q);
+  });
+}
+
+/** A stable back-catalogue for an artist's profile, so their gallery is never empty. */
+export function botBackCatalogue(bot, count = 6) {
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const post = generateBotPost(bot, botSeed(bot, 9000 + i, i));
+    if (post) out.push(post);
+  }
+  return out;
+}
+
 // deterministic small hash → generation seed
 export function botSeed(bot, dayIndex, counter) {
   let h = 0;
@@ -429,10 +474,13 @@ export function generateBotPost(bot, seed) {
 export function pickAmbientPosts(postedSeeds = [], count = 2) {
   const used = new Set(postedSeeds);
   const dayIndex = Math.floor(Date.now() / 86400000);
+  // Weight the rotation by each persona's cadence so the chattier artists
+  // (doodlebug, chaos_quill) show up more often than the sparse ones.
+  const roster = BOT_ARTISTS.flatMap(n => Array((BOT_PERSONAS[n]?.cadence) || 1).fill(n));
   const out = [];
   let counter = 0;
   while (out.length < count && counter < 200) {
-    const bot = BOT_ARTISTS[(dayIndex + counter) % BOT_ARTISTS.length];
+    const bot = roster[(dayIndex + counter) % roster.length];
     const seed = botSeed(bot, dayIndex, counter);
     const key = `${bot}:${seed}`;
     if (!used.has(key)) { used.add(key); out.push({ bot, seed, key }); }
