@@ -27,14 +27,14 @@ for(const k of cats){
 // 2. studio modules: declared ids vs hasModule() ids
 const declared=[...constants.matchAll(/id:\s*"((?:brush|tool|feat|canvas|anim|layers)_[a-z0-9_]+)"/g)].map(m=>m[1]);
 const used=new Set([...allSrc.matchAll(/hasModule\([^,]+,\s*"([^"]+)"/g)].map(m=>m[1]));
-const liveSrc=[read('src/App.jsx')].join('\n');
+const liveSrc=[read('src/App.jsx'), read('src/Easel.jsx')].join('\n');
 const usedLive=new Set([...liveSrc.matchAll(/hasModule\([^,]+,\s*"([^"]+)"/g)].map(m=>m[1])
-  .concat([...liveSrc.matchAll(/\bpro\("([^"]+)"\)/g)].map(m=>m[1])));
+  .concat([...liveSrc.matchAll(/\b(?:pro|owns)\("([^"]+)"\)/g)].map(m=>m[1])));
 console.log('\n== STUDIO MODULES (declared vs honoured) ==');
 const inertMods=[];
 for(const id of [...new Set(declared)]){
   const inLive=usedLive.has(id), inAny=used.has(id);
-  const tag = inLive?'WIRED (live)':inAny?'ARCHIVE-ONLY':'INERT';
+  const tag = inLive?'WIRED (live)':inAny?'ARCHIVE-ONLY':'NOT BUILT';
   if(!inLive) inertMods.push(id);
   console.log(`${tag.padEnd(13)} ${id}`);
 }
