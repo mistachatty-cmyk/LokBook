@@ -1,6 +1,6 @@
 # LokBook — Inert Feature Audit
 
-**Generated:** August 2026 · regenerate with `node scripts/audit-inert.mjs`
+**Generated:** August 2026 · updated after the Easel migration · regenerate with `node scripts/audit-inert.mjs`
 
 "Inert" = the thing is declared, sold or toggleable in the UI, but **nothing
 consumes it** — buying or flipping it changes nothing. Every entry below is
@@ -12,10 +12,10 @@ backed by a grep for the actual consumer, not by inspection.
 
 | Area | Total | Wired | Inert |
 |---|---|---|---|
-| Cosmetic categories | 16 | 11 | **5** |
-| Studio modules | 52 | 12 | **40** |
+| Cosmetic categories | 16 | 14 | **3** |
+| Studio modules | 52 | 36 | **16** (6 are the layers_* duplicates) |
 | Equipped settings (theme/effect/sky/FX/…) | 10 | 10 | 0 |
-| Shop categories surfaced | 16 | 10 | 6 (hidden in Simple mode) |
+| Shop categories surfaced | 16 | 13 | 3 (hidden in Simple mode) |
 
 The single biggest win available is the **Easel migration** (see Priority 1).
 It alone converts ~28 inert modules into working features.

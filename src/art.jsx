@@ -103,7 +103,7 @@ export function GlobalStyle({ T, pace = "sweep", speed = 1 }) {
   const m = ((P.mult || 1) / Math.max(0.25, speed)).toFixed(3);
   const vars = Object.entries(themeVars(T)).map(([k, v]) => `${k}:${v}`).join(";");
   return (<style>{`
-  @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Schibsted+Grotesk:wght@400;500;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Schibsted+Grotesk:wght@400;500;700&family=Nunito:wght@400;700&family=Patrick+Hand&family=Press+Start+2P&display=swap');
   :root{${vars}}
   ::selection{background:${T.accent};color:${T.onAccent}}
   @keyframes lokdrift{from{transform:translateX(0)}to{transform:translateX(200vw)}}

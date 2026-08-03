@@ -3,6 +3,7 @@ import { useT, ART } from "./theme/theme.js";
 import { W, H, BLENDS, hasModule, getModuleLayers } from "./constants.jsx";
 import { getStroke } from 'perfect-freehand';
 import { paperBase } from "./engine/draw.jsx";
+import { cursorFor } from "./engine/cursors.js";
 
 const PALLETS={
   default:[ART.ink,ART.pink,ART.teal,"#E8B14B","#7A4FBF","#3E8E4B","#D94040","#5A5A5A","#FF8C42","#C4E8C2","#4EBFFF","#F7D4FF"],
@@ -21,7 +22,7 @@ const DEMO_BRUSH_PRESETS=[
   {id:"basics",name:"Bold Basics",flow:0.6,scatter:0.1,dabs:2,angleJitter:0.1,roundness:1},
 ];
 
-const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper="plain",legacyMode=false,onLegacyToggle,maxLayers:maxLayersProp,ccTier=false,animFx="none"},ref){
+const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper="plain",legacyMode=false,onLegacyToggle,maxLayers:maxLayersProp,ccTier=false,animFx="none",cursorPack="default"},ref){
   const T=useT();
   // Layer cap: the Studio TIERS system passes maxLayers explicitly; otherwise
   // fall back to whatever the owned layer modules allow.
@@ -164,7 +165,7 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
       {onionFrames.map((of,i)=>(<img key={i} src={of.src} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" style={{opacity:of.opacity,mixBlendMode:"multiply"}}/>))}
       {refImg&&<img src={refImg} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" style={{opacity:refOpacity}}/>}
       {layers.map(l=>(<canvas key={l.id} width={W} height={H} ref={el=>{if(el){canvases.current.set(l.id,el);el.getContext("2d",{willReadFrequently:true});}}} aria-hidden="true" className="absolute inset-0 w-full h-full" style={{opacity:l.opacity,display:l.visible?"block":"none",mixBlendMode:l.blend==="source-over"?"normal":l.blend}}/>))}
-      <div className="absolute inset-0" style={{touchAction:"none",cursor:pointerRef.current.pointerType==="pen"?"crosshair":"crosshair"}} role="img" aria-label="Drawing canvas" onPointerDown={down} onPointerMove={e=>{move(e);const r=wrapRef.current?.getBoundingClientRect();if(r)setCursorPos([(e.clientX-r.left)/r.width*100,(e.clientY-r.top)/r.height*100]);}} onPointerUp={e=>{up(e);setCursorPos(null);}} onPointerLeave={e=>{up(e);setCursorPos(null);}}/>
+      <div className="absolute inset-0" style={{touchAction:"none",cursor:cursorFor(cursorPack)}} role="img" aria-label="Drawing canvas" onPointerDown={down} onPointerMove={e=>{move(e);const r=wrapRef.current?.getBoundingClientRect();if(r)setCursorPos([(e.clientX-r.left)/r.width*100,(e.clientY-r.top)/r.height*100]);}} onPointerUp={e=>{up(e);setCursorPos(null);}} onPointerLeave={e=>{up(e);setCursorPos(null);}}/>
       {cursorPos&&(tool==="pen"||tool==="soft"||tool==="eraser")&&<div aria-hidden="true" className="absolute pointer-events-none" style={{left:`${cursorPos[0]}%`,top:`${cursorPos[1]}%`,width:tool==="eraser"?size*2.4:brush==="marker"?size*1.7:size,height:tool==="eraser"?size*2.4:brush==="marker"?size*1.7:size,borderRadius:"50%",border:`2px solid ${T.accent}`,background:"rgba(255,255,255,.25)",transform:"translate(-50%,-50%)",zIndex:10}}/>}
       {paper==="grid"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{backgroundImage:`repeating-linear-gradient(${T.ink}15 0 1px,transparent 1px ${H/10}px),repeating-linear-gradient(90deg,${T.ink}15 0 1px,transparent 1px ${W/10}px)`,zIndex:5}}/>}
       {paper==="dots"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{backgroundImage:`radial-gradient(circle,${T.ink}25 1px,transparent 1px)`,backgroundSize:`${W/10}px ${H/10}px`,zIndex:5}}/>}
