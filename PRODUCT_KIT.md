@@ -169,11 +169,10 @@ board, feed, Studio drawing, trace modes, battles vs bots, post editing, music
 player, LilLok, themes/effects/skies/FX, LokMotion, display size.
 
 **Known broken or inert:**
-- **40 of 52 Studio modules do nothing** — two Easel implementations exist and
-  the one that honours modules (`src/Easel.jsx`) is never rendered. 28 of those
-  are already built there and unlock on migration.
-- Six shop categories inert (paper, cursors, fonts, stickers, export, music
-  packs) — currently blocked from purchase and badged *NOT ACTIVE YET*.
+- 16 of 52 Studio modules still do nothing (down from 40 after the Easel
+  migration); 6 of those are `layers_*` ids that duplicate the TIERS system.
+- Three shop categories inert (stickers, export formats, music packs) —
+  blocked from purchase and badged *NOT ACTIVE YET*.
 - `layers_*` modules double-sell the same capability as the `TIERS` system.
 - **No payments.** Stripe edge functions exist but aren't reachable; LokPass is
   free to toggle. **There is no revenue path yet.**
@@ -181,6 +180,6 @@ player, LilLok, themes/effects/skies/FX, LokMotion, display size.
   exercised on two real devices.
 - Ecosystem integration (Passport / Lifetime / shared credits) not started.
 
-**Before any Japanese launch:** the Easel migration, payments, a native-speaker
+**Before any Japanese launch:** payments, a native-speaker
 localisation pass (the copy above is positioning, not translation), and real
 device testing on the Japanese mobile carriers' default browsers.
