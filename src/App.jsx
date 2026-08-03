@@ -36,6 +36,9 @@ import { generateBotPost, pickAmbientPosts } from "./engine/botArt.js";
 import ThemeBackdrop from "./theme/ThemeBackdrop.jsx";
 import { makeMatchBots, botProgress, botMomentum, botFinalT, judgeBattle, recordBattle, botLine, pickMidLine, BOT_TYPES } from "./engine/bots.js";
 import { renderPromptArt } from "./engine/promptArt.js";
+import { supabase } from "./supabaseClient.js";
+import { useAuth } from "./auth/AuthContext.jsx";
+import { findOrCreateDuel, fetchDuel, cancelWaitingDuel, submitDuelArt, finalizeDuel } from "./engine/duels.js";
 
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -99,7 +102,7 @@ function Onboard({onDone,onName,defaultName=""}){
 
 const ALL_MOODS=["","calm","wild","moody","playful","dreamy","chaos","cozy","spooky"];
 function Feed({posts,bookmarks,following,feedMode,setFeedMode,cosmetics={},daily,streak,dailyClaimed,flipOfDay,onLine,onClaimDaily,onOpen,onVote,onLok,onBookmark,say,moodFilter,setMoodFilter,moodTags,reportedPosts,onReport,onEcho,onArtist,flair=""}){
-  const T=useT();const[active,setActive]=useState(0);const wrapRef=useRef(null);
+  const T=useT();const[active,setActive]=useState(0);const cardRefs=useRef([]);
   const[searchQ,setSearchQ]=useState("");const[searchResults,setSearchResults]=useState(null);const searchTimer=useRef(null);
   useEffect(()=>{if(!searchQ.trim()){setSearchResults(null);return;}clearTimeout(searchTimer.current);searchTimer.current=setTimeout(async()=>{try{const res=await fetch(`${SUPA_URL}/rest/v1/lok_posts?title=ilike.*${encodeURIComponent(searchQ)}*&author=ilike.*${encodeURIComponent(searchQ)}*&order=created_at.desc&limit=20`,{headers:{apikey:SUPA_KEY,Authorization:`Bearer ${SUPA_KEY}`}});const data=await res.json();setSearchResults(Array.isArray(data)?data.map(fromDbPost).filter(Boolean):[]);}catch{setSearchResults([]);}},300);},[searchQ]);
   const hidden=new Set(reportedPosts||[]);
@@ -107,11 +110,21 @@ function Feed({posts,bookmarks,following,feedMode,setFeedMode,cosmetics={},daily
   const list=moodFilter==="all"?base:base.filter(p=>(moodTags[p.id]||"")===moodFilter);
   const moodEmojis={calm:"🌊",wild:"🔥",moody:"🌙",playful:"🎈",dreamy:"✨",chaos:"🌀",cozy:"☕",spooky:"👻",_clear:"✕"};
   const streakCol=streak>=30?"#E8B14B":streak>=7?T.accent:streak>=3?T.alt:T.ink;
-  const onScroll=()=>{const el=wrapRef.current;if(!el)return;const i=Math.round(el.scrollTop/el.clientHeight);if(i!==active){setActive(i);if(Math.random()<0.22&&onLine)onLine("feed_scroll");}};
+  useEffect(()=>{
+    const io=new IntersectionObserver(entries=>{
+      entries.forEach(e=>{if(e.isIntersecting&&e.intersectionRatio>0.55){const idx=Number(e.target.dataset.idx);setActive(idx);if(Math.random()<0.22&&onLine)onLine("feed_scroll");}});
+    },{threshold:[0.55]});
+    cardRefs.current.forEach(el=>el&&io.observe(el));
+    return()=>io.disconnect();
+  },[list.length,feedMode,moodFilter]);
   return(<div>
     <div className="relative mt-3"><input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search posts &amp; artists…" aria-label="Search feed" className="w-full px-3 py-2 rounded-xl text-sm font-bold" style={{border:`3px solid ${T.ink}`,background:T.card,color:T.ink,outline:"none"}}/>{searchQ&&<button onClick={()=>{setSearchQ("");setSearchResults(null);}} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold" style={{color:T.accent}}>✕</button>}</div>
-    {searchResults!==null&&(<div className="mt-2"><div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Search results ({searchResults.length})</div>
-      {searchResults.length===0?<div className="text-xs opacity-50 py-3 text-center">No results found</div>:searchResults.map(p=>(<button key={p.id} onClick={()=>onOpen(p.id)} className="lok-btn w-full text-left p-2 rounded-xl mb-1 flex items-center gap-2" style={{border:`2px solid ${T.ink}`,background:T.card}}><div className="flex-1 min-w-0"><div className="font-bold text-sm truncate">{p.title}</div><div className="text-[10px] opacity-60"><NameTag name={p.author||"unknown"}/></div></div><span className="text-xs font-bold shrink-0" style={{color:T.accent}}>Open ▸</span></button>))}</div>)}
+    {searchResults!==null&&(<div className="mt-2">
+      {searchResults.length>0&&(()=>{const artists=[...new Set(searchResults.map(p=>p.author||"unknown"))];return(<div className="mb-2"><div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Artists</div>
+        <div className="flex flex-wrap gap-1.5">{artists.map(name=>(<button key={name} onClick={()=>onArtist&&onArtist(name)} className="lok-btn px-2.5 py-1 rounded-full text-xs font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}>👤 <NameTag name={name}/></button>))}</div>
+      </div>);})()}
+      <div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Posts ({searchResults.length})</div>
+      {searchResults.length===0?<div className="text-xs opacity-50 py-3 text-center">No results found</div>:searchResults.map(p=>(<button key={p.id} onClick={()=>onOpen(p.id)} className="lok-btn w-full text-left p-2 rounded-xl mb-1 flex items-center gap-2" style={{border:`2px solid ${T.ink}`,background:T.card}}><div className="flex-1 min-w-0"><div className="font-bold text-sm truncate">{p.title}</div><div className="text-[10px] opacity-60"><button onClick={e=>{e.stopPropagation();onArtist&&onArtist(p.author||"unknown");}} style={{background:"transparent",border:"none",padding:0,textDecoration:"underline",cursor:"pointer",color:"inherit",font:"inherit"}}><NameTag name={p.author||"unknown"}/></button></div></div><span className="text-xs font-bold shrink-0" style={{color:T.accent}}>Open ▸</span></button>))}</div>)}
     {searchResults===null&&(<>{flipOfDay&&feedMode==="discover"&&(<button onClick={()=>onOpen(flipOfDay.id)} aria-label={`Flip of the Day: ${flipOfDay.title}`} className="lok-btn mt-3 w-full flex items-center gap-3 p-2.5 rounded-2xl text-left" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:"5px 5px 0 #E8B14B"}}>
       {flipOfDay.frames?.[0]&&<img src={flipOfDay.frames[Math.floor(flipOfDay.frames.length/2)]} alt="" className="rounded-lg shrink-0" style={{width:46,aspectRatio:"4/5",objectFit:"cover",border:`2px solid ${T.ink}`}}/>}
       <div className="min-w-0 flex-1"><div className="text-[10px] font-extrabold uppercase tracking-widest" style={{color:"#B8860B"}}>✦ Flip of the Day</div><div className="lok-display font-extrabold text-sm truncate">{flipOfDay.title}</div></div>
@@ -132,8 +145,8 @@ function Feed({posts,bookmarks,following,feedMode,setFeedMode,cosmetics={},daily
         ?<EmptyState icon="follow" title="No one yet" subtitle="Lok artists you love and their flips show up here." action="Discover artists →" onAction={()=>setFeedMode("discover")}/>
         :<EmptyState icon="feed" title="No art yet" subtitle="Be the first to publish a flip!"/>
     ):(
-      <div ref={wrapRef} onScroll={onScroll} className="mt-3 -mx-4" style={{height:"calc(100dvh - 300px)",minHeight:360,overflowY:"scroll",scrollSnapType:"y mandatory"}}>
-        {list.map((p,i)=>(<FeedCard key={p.id} p={p} live={i===active} marked={bookmarks.includes(p.id)} loked={following.includes(p.author||"moss.ink")} cosmetics={cosmetics} onOpen={onOpen} onVote={onVote} onLok={onLok} onBookmark={onBookmark} moodTags={moodTags} onReport={onReport} onEcho={onEcho} onArtist={onArtist} flair={flair}/>))}
+      <div className="mt-3 flex flex-col gap-5">
+        {list.map((p,i)=>(<div key={p.id} ref={el=>cardRefs.current[i]=el} data-idx={i}><FeedCard p={p} live={i===active} marked={bookmarks.includes(p.id)} loked={following.includes(p.author||"moss.ink")} cosmetics={cosmetics} onOpen={onOpen} onVote={onVote} onLok={onLok} onBookmark={onBookmark} moodTags={moodTags} onReport={onReport} onEcho={onEcho} onArtist={onArtist} flair={flair}/></div>))}
       </div>
     )}</>)}
   </div>);
@@ -144,8 +157,8 @@ function FeedCard({p,live,marked,loked,cosmetics={},onOpen,onVote,onLok,onBookma
   const mood=moodTags?.[p.id];const moodEmojis={calm:"🌊",wild:"🔥",moody:"🌙",playful:"🎈",dreamy:"✨",chaos:"🌀",cozy:"☕",spooky:"👻"};
   useEffect(()=>{if(!live||p.frames.length<2){setFi(0);return;}const t=setInterval(()=>setFi(f=>(f+1)%p.frames.length),p.paceMs||160);return()=>clearInterval(t);},[live,p.id,p.paceMs,p.frames.length]);
   const doVote=()=>{onVote(p.id);if(!p.voted){setPop(true);setTimeout(()=>setPop(false),320);}};
-  if(!p.frames||p.frames.length===0)return(<div className="px-4 flex flex-col justify-center" style={{height:"100%",scrollSnapAlign:"start"}}><div className="relative mx-auto rounded-2xl overflow-hidden flex items-center justify-center" style={{width:"100%",maxWidth:360,border:`3px solid ${T.ink}`,background:T.card,aspectRatio:"4/5"}}><div className="text-center opacity-40"><div className="lok-display font-extrabold text-lg">{p.title}</div><div className="text-sm mt-1">Rendering…</div></div></div></div>);
-  return(<div className="px-4 flex flex-col justify-center" style={{height:"100%",scrollSnapAlign:"start"}}>
+  if(!p.frames||p.frames.length===0)return(<div className="flex flex-col justify-center"><div className="relative mx-auto rounded-2xl overflow-hidden flex items-center justify-center" style={{width:"100%",maxWidth:360,border:`3px solid ${T.ink}`,background:T.card,aspectRatio:"4/5"}}><div className="text-center opacity-40"><div className="lok-display font-extrabold text-lg">{p.title}</div><div className="text-sm mt-1">Rendering…</div></div></div></div>);
+  return(<div className="flex flex-col justify-center">
     <div className="relative mx-auto rounded-2xl overflow-hidden" style={{width:"100%",maxWidth:360,border:`3px solid ${T.ink}`,boxShadow:live?`7px 7px 0 ${T.accent}`:`6px 6px 0 ${T.shadow}`,transform:live?"scale(1)":"scale(.97)",transition:"transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s ease"}}>
       <button onClick={()=>onOpen(p.id)} className="block w-full" aria-label={`Open ${p.title}`}><img src={p.frames[fi]} alt={p.title} className="block w-full" style={{aspectRatio:"4/5",objectFit:"cover"}}/></button>
       {mood&&<div className="absolute top-2 right-2 text-xs z-10" style={{filter:"drop-shadow(0 1px 2px rgba(0,0,0,.4))"}} aria-label={`mood: ${mood}`}>{moodEmojis[mood]}</div>}
@@ -232,7 +245,11 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
   const[savedBrushes,setSavedBrushes]=useState(()=>{try{const r=localStorage.getItem("lok:customBrushes");return r?JSON.parse(r):[];}catch{return[];}});
   const lastMoveXY=useRef(null);const lastMoveT=useRef(0);const sizeMulRef=useRef(1);const transformDrag=useRef(null);const labPreviewRef=useRef(null);
   const freehandPts=useRef([]);const freehandBaseline=useRef(null);
-  const idRef=useRef(1);const canvases=useRef(new Map());const drawing=useRef(false);const undoStack=useRef([]);const redoStack=useRef([]);const wrapRef=useRef(null);const lastPts=useRef([]);const midPts=useRef([]);const activeLayer=layers.find(l=>l.id===active);
+  const idRef=useRef(1);const canvases=useRef(new Map());const drawing=useRef(false);const undoStack=useRef([]);const redoStack=useRef([]);const wrapRef=useRef(null);const viewportRef=useRef(null);const lastPts=useRef([]);const midPts=useRef([]);const activeLayer=layers.find(l=>l.id===active);
+  const[zoom,setZoom]=useState(1);const pointers=useRef(new Map());const pinchState=useRef(null);
+  const zoomIn=()=>setZoom(z=>Math.min(3,+(z+0.25).toFixed(2)));
+  const zoomOut=()=>setZoom(z=>Math.max(1,+(z-0.25).toFixed(2)));
+  const resetZoom=()=>{setZoom(1);if(viewportRef.current){viewportRef.current.scrollLeft=0;viewportRef.current.scrollTop=0;}};
   useImperativeHandle(ref,()=>({
     composite(pageNum=null){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");paperBase(ctx,pageNum);layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv&&l.visible){ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=l.blend;ctx.drawImage(cv,0,0);}});ctx.globalAlpha=1;ctx.globalCompositeOperation="source-over";return tmp.toDataURL("image/png");},
     blankFrame(){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;paperBase(tmp.getContext("2d"),null);return tmp.toDataURL("image/png");},
@@ -278,9 +295,34 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
   };
   const fillLayer=ctx=>{ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;ctx.fillRect(0,0,W,H);};
   const eyedrop=(x,y)=>{for(let i=layers.length-1;i>=0;i--){const cv=canvases.current.get(layers[i].id);if(!cv||!layers[i].visible)continue;const d=cv.getContext("2d").getImageData(Math.floor(x),Math.floor(y),1,1).data;if(d[3]>10){setColorAndRecent(`rgb(${d[0]},${d[1]},${d[2]})`);setTool("pen");return;}}};
-  const down=e=>{e.preventDefault();const cv=canvases.current.get(active);if(!cv||!activeLayer?.visible)return;e.currentTarget.setPointerCapture(e.pointerId);const p0=pos(e);sizeMulRef.current=dynMul(e,p0[0],p0[1]);if(tool==="eyedrop"){eyedrop(...p0);return;}if(tool==="transform"){transformDrag.current={startClient:[e.clientX,e.clientY],startCanvas:p0};return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}drawing.current=true;onStroke&&onStroke();const ctx=cv.getContext("2d");if(useFreehand()){const pr=e.pointerType==="pen"&&e.pressure>0?e.pressure:0.5;freehandPts.current=[[p0[0],p0[1],pr]];freehandPts.current._simulate=e.pointerType!=="pen";freehandBaseline.current=ctx.getImageData(0,0,W,H);drawFreehandStroke(ctx);return;}stamp(ctx,...p0,true);};
-  const move=e=>{if(tool==="transform"){if(!transformDrag.current)return;const cv=canvases.current.get(active);if(cv)cv.style.transform=`translate(${e.clientX-transformDrag.current.startClient[0]}px,${e.clientY-transformDrag.current.startClient[1]}px)`;return;}if(!drawing.current)return;const cv=canvases.current.get(active);if(!cv)return;const evs=(e.getCoalescedEvents&&e.getCoalescedEvents().length)?e.getCoalescedEvents():[e];const ctx=cv.getContext("2d");if(freehandPts.current){evs.forEach(ev=>{const p=pos(ev);const pr=ev.pointerType==="pen"&&ev.pressure>0?ev.pressure:0.5;freehandPts.current.push([p[0],p[1],pr]);});drawFreehandStroke(ctx);return;}const p=pos(evs[evs.length-1]);sizeMulRef.current=dynMul(e,p[0],p[1]);evs.forEach(ev=>stamp(ctx,...pos(ev),false));};
-  const up=e=>{if(tool==="transform"){const cv=canvases.current.get(active);if(cv)cv.style.transform="";if(transformDrag.current&&e){const p1=pos(e);const[sx,sy]=transformDrag.current.startCanvas;const dx=p1[0]-sx,dy=p1[1]-sy;if(Math.abs(dx)>0.5||Math.abs(dy)>0.5)commitTranslate(dx,dy);}transformDrag.current=null;return;}freehandPts.current=null;freehandBaseline.current=null;drawing.current=false;lastPts.current=[];midPts.current=[];try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
+  const pinchDist=pts=>Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+  const pinchMid=pts=>({x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2});
+  const down=e=>{e.preventDefault();
+    pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pointers.current.size===2){
+      if(drawing.current||freehandPts.current){drawing.current=false;freehandPts.current=null;freehandBaseline.current=null;}
+      const pts=[...pointers.current.values()];const mid=pinchMid(pts);
+      pinchState.current={dist:pinchDist(pts),zoom,midX:mid.x,midY:mid.y,scrollLeft:viewportRef.current?.scrollLeft||0,scrollTop:viewportRef.current?.scrollTop||0};
+      return;
+    }
+    if(pointers.current.size>2)return;
+    const cv=canvases.current.get(active);if(!cv||!activeLayer?.visible)return;e.currentTarget.setPointerCapture(e.pointerId);const p0=pos(e);sizeMulRef.current=dynMul(e,p0[0],p0[1]);if(tool==="eyedrop"){eyedrop(...p0);return;}if(tool==="transform"){transformDrag.current={startClient:[e.clientX,e.clientY],startCanvas:p0};return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}drawing.current=true;onStroke&&onStroke();const ctx=cv.getContext("2d");if(useFreehand()){const pr=e.pointerType==="pen"&&e.pressure>0?e.pressure:0.5;freehandPts.current=[[p0[0],p0[1],pr]];freehandPts.current._simulate=e.pointerType!=="pen";freehandBaseline.current=ctx.getImageData(0,0,W,H);drawFreehandStroke(ctx);return;}stamp(ctx,...p0,true);};
+  const move=e=>{
+    if(pointers.current.has(e.pointerId))pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pointers.current.size===2&&pinchState.current){
+      const pts=[...pointers.current.values()];const dist=pinchDist(pts);const mid=pinchMid(pts);
+      const newZoom=Math.max(1,Math.min(3,pinchState.current.zoom*(dist/pinchState.current.dist)));
+      setZoom(newZoom);
+      if(viewportRef.current){viewportRef.current.scrollLeft=pinchState.current.scrollLeft-(mid.x-pinchState.current.midX);viewportRef.current.scrollTop=pinchState.current.scrollTop-(mid.y-pinchState.current.midY);}
+      return;
+    }
+    if(pointers.current.size>=2)return;
+    if(tool==="transform"){if(!transformDrag.current)return;const cv=canvases.current.get(active);if(cv)cv.style.transform=`translate(${e.clientX-transformDrag.current.startClient[0]}px,${e.clientY-transformDrag.current.startClient[1]}px)`;return;}if(!drawing.current)return;const cv=canvases.current.get(active);if(!cv)return;const evs=(e.getCoalescedEvents&&e.getCoalescedEvents().length)?e.getCoalescedEvents():[e];const ctx=cv.getContext("2d");if(freehandPts.current){evs.forEach(ev=>{const p=pos(ev);const pr=ev.pointerType==="pen"&&ev.pressure>0?ev.pressure:0.5;freehandPts.current.push([p[0],p[1],pr]);});drawFreehandStroke(ctx);return;}const p=pos(evs[evs.length-1]);sizeMulRef.current=dynMul(e,p[0],p[1]);evs.forEach(ev=>stamp(ctx,...pos(ev),false));};
+  const up=e=>{
+    if(e?.pointerId!=null)pointers.current.delete(e.pointerId);
+    if(pointers.current.size<2)pinchState.current=null;
+    if(pointers.current.size>=1)return;
+    if(tool==="transform"){const cv=canvases.current.get(active);if(cv)cv.style.transform="";if(transformDrag.current&&e){const p1=pos(e);const[sx,sy]=transformDrag.current.startCanvas;const dx=p1[0]-sx,dy=p1[1]-sy;if(Math.abs(dx)>0.5||Math.abs(dy)>0.5)commitTranslate(dx,dy);}transformDrag.current=null;return;}freehandPts.current=null;freehandBaseline.current=null;drawing.current=false;lastPts.current=[];midPts.current=[];try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
   const undo=()=>{const u=undoStack.current.pop();if(!u)return;const cv=canvases.current.get(u.id);if(cv){redoStack.current.push({id:u.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(u.snap,0,0);}};
   const redo=()=>{const r=redoStack.current.pop();if(!r)return;const cv=canvases.current.get(r.id);if(cv){undoStack.current.push({id:r.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(r.snap,0,0);}};
   const addLayer=()=>{if(layers.length>=maxLayers)return;const id=++idRef.current;setLayers(ls=>[...ls,{id,visible:true,opacity:1,blend:"source-over"}]);setActive(id);};
@@ -289,14 +331,21 @@ const Easel=forwardRef(function Easel({maxLayers,ccTier,onionFrames=[],onStroke,
   const setColorAndRecent=c=>{setColor(c);if(tool==="eraser")setTool("pen");setRecentColors(r=>[c,...r.filter(x=>x!==c)].slice(0,8));};
   const swatches=[ART.ink,ART.pink,ART.teal,"#E8B14B","#7A4FBF","#3E8E4B","#D94040","#5A5A5A","#FF8C42","#C4E8C2","#4EBFFF","#F7D4FF"];
   return(<div>
-    <div ref={wrapRef} className="relative rounded-2xl overflow-hidden select-none" style={{border:`3px solid ${T.ink}`,background:ART.paper,boxShadow:`6px 6px 0 ${T.shadow}`,aspectRatio:"4 / 5"}}>
-      {onionFrames.map((of,i)=>(<img key={i} src={of.src} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" style={{opacity:of.opacity,mixBlendMode:"multiply"}}/>))}
-      {layers.map(l=>(<canvas key={l.id} width={W} height={H} ref={el=>{if(el){canvases.current.set(l.id,el);el.getContext("2d",{willReadFrequently:true});}}} aria-hidden="true" className="absolute inset-0 w-full h-full" style={{pointerEvents:"none",opacity:l.opacity,display:l.visible?"block":"none",mixBlendMode:l.blend==="source-over"?"normal":l.blend}}/>))}
-      <div className="absolute inset-0" style={{touchAction:"none",cursor:"crosshair"}} role="img" aria-label="Drawing canvas" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}/>
-      {(symmetry==="mirrorX"||symmetry==="quad")&&<div aria-hidden="true" className="absolute top-0 bottom-0 pointer-events-none" style={{left:"50%",width:2,background:`repeating-linear-gradient(${T.accent} 0 6px, transparent 6px 12px)`}}/>}
-      {(symmetry==="mirrorY"||symmetry==="quad")&&<div aria-hidden="true" className="absolute left-0 right-0 pointer-events-none" style={{top:"50%",height:2,background:`repeating-linear-gradient(90deg,${T.accent} 0 6px, transparent 6px 12px)`}}/>}
-      {symmetry.startsWith("radial")&&<div aria-hidden="true" className="absolute pointer-events-none rounded-full" style={{left:"50%",top:"50%",width:10,height:10,transform:"translate(-50%,-50%)",border:`2.5px solid ${T.accent}`}}/>}
+    <div ref={viewportRef} className="relative rounded-2xl overflow-auto" style={{border:`3px solid ${T.ink}`,background:ART.paper,boxShadow:`6px 6px 0 ${T.shadow}`,aspectRatio:"4 / 5",touchAction:"none",overscrollBehavior:"contain"}}>
+      <div ref={wrapRef} className="relative select-none" style={{width:`${zoom*100}%`,aspectRatio:"4 / 5"}}>
+        {onionFrames.map((of,i)=>(<img key={i} src={of.src} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" style={{opacity:of.opacity,mixBlendMode:"multiply"}}/>))}
+        {layers.map(l=>(<canvas key={l.id} width={W} height={H} ref={el=>{if(el){canvases.current.set(l.id,el);el.getContext("2d",{willReadFrequently:true});}}} aria-hidden="true" className="absolute inset-0 w-full h-full" style={{pointerEvents:"none",opacity:l.opacity,display:l.visible?"block":"none",mixBlendMode:l.blend==="source-over"?"normal":l.blend}}/>))}
+        <div className="absolute inset-0" style={{touchAction:"none",cursor:"crosshair"}} role="img" aria-label="Drawing canvas" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}/>
+        {(symmetry==="mirrorX"||symmetry==="quad")&&<div aria-hidden="true" className="absolute top-0 bottom-0 pointer-events-none" style={{left:"50%",width:2,background:`repeating-linear-gradient(${T.accent} 0 6px, transparent 6px 12px)`}}/>}
+        {(symmetry==="mirrorY"||symmetry==="quad")&&<div aria-hidden="true" className="absolute left-0 right-0 pointer-events-none" style={{top:"50%",height:2,background:`repeating-linear-gradient(90deg,${T.accent} 0 6px, transparent 6px 12px)`}}/>}
+        {symmetry.startsWith("radial")&&<div aria-hidden="true" className="absolute pointer-events-none rounded-full" style={{left:"50%",top:"50%",width:10,height:10,transform:"translate(-50%,-50%)",border:`2.5px solid ${T.accent}`}}/>}
+      </div>
       <div className="absolute top-1.5 left-1.5 lok-display px-2 py-0.5 rounded-md text-xs font-extrabold pointer-events-none" style={{background:"rgba(35,48,107,.85)",color:T.paper,backdropFilter:"blur(3px)"}}>L{layers.findIndex(l=>l.id===active)+1} / {layers.length}</div>
+      <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
+        <button onClick={zoomOut} disabled={zoom<=1} aria-label="Zoom out" className="lok-btn w-7 h-7 rounded-full flex items-center justify-center font-extrabold text-sm" style={{background:"rgba(255,255,255,.92)",border:`2px solid ${T.ink}`,color:T.ink,opacity:zoom<=1?0.4:1}}>−</button>
+        <button onClick={zoomIn} disabled={zoom>=3} aria-label="Zoom in" className="lok-btn w-7 h-7 rounded-full flex items-center justify-center font-extrabold text-sm" style={{background:"rgba(255,255,255,.92)",border:`2px solid ${T.ink}`,color:T.ink,opacity:zoom>=3?0.4:1}}>+</button>
+        <button onClick={resetZoom} aria-label="Reset zoom to default" title="Reset zoom" className="lok-btn px-2 h-7 rounded-full font-bold text-[10px]" style={{background:zoom!==1?T.accent:"rgba(255,255,255,.92)",color:zoom!==1?T.onAccent:T.ink,border:`2px solid ${T.ink}`}}>{Math.round(zoom*100)}%⟲</button>
+      </div>
     </div>
     <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1" role="toolbar" aria-label="Layer controls">
       {layers.map((l,i)=>(<div key={l.id} className="shrink-0 flex items-center gap-1 px-1.5 py-1 rounded-lg" style={{border:`2.5px solid ${l.id===active?T.accent:T.ink}`,background:l.id===active?T.card:"transparent"}}>
@@ -599,6 +648,7 @@ function Battle({ownedTiers,ccTier,wins,bigBattleOwned,kids,phase,lillok,customL
   const[pstate,setPstate]=useState("lobby");const[format,setFormat]=useState(FORMATS[0]);const[duration,setDuration]=useState(60);const[tier,setTier]=useState(10);const[prompt,setPrompt]=useState(PROMPTS[0]);const[count,setCount]=useState(3);const[timeLeft,setTimeLeft]=useState(0);const[bots,setBots]=useState([]);const[botThumbs,setBotThumbs]=useState([]);const[entries,setEntries]=useState([]);const[results,setResults]=useState(null);const[shake,setShake]=useState(false);const[splat,setSplat]=useState(null);const[block,setBlock]=useState(null);const[blocked,setBlocked]=useState(0);const[myArt,setMyArt]=useState(null);const[bFrames,setBFrames]=useState([]);const[featured,setFeatured]=useState(false);const[botType,setBotType]=useState("artist");
   const[promptFilters,setPromptFilters]=useState({category:null,motion:null});
   const easel=useRef(null);const strokes=useRef(0);const tickRef=useRef(null);const matchT=useRef(0);
+  const auth=useAuth();const[duel,setDuel]=useState(null);const[duelTimeLeft,setDuelTimeLeft]=useState(60);const isPlayer1Ref=useRef(true);const duelPromptRef=useRef("");
   const filtered=PROMPT_META.filter(p=>{
     if(promptFilters.category&&p.category!==promptFilters.category)return false;
     if(promptFilters.motion&&p.motion!==promptFilters.motion)return false;
@@ -607,6 +657,29 @@ function Battle({ownedTiers,ccTier,wins,bigBattleOwned,kids,phase,lillok,customL
   const promptPool=kids?KID_PROMPTS:filtered.length>0?filtered:PROMPTS;const bigUnlocked=bigBattleOwned||wins>=1;
   const botArtOf=(b,t)=>b.type==="crecre"?renderDoodle(b.seed,t):renderPromptArt(prompt,b.seed,t,b.skill,b.name);
   const startMatch=()=>{const n=format.players-1;const nb=makeMatchBots(n,{kids,wins,botType});setBots(nb);const p=promptPool[Math.floor(Math.random()*promptPool.length)];setPrompt(p);setBotThumbs(nb.map(b=>b.type==="crecre"?renderDoodle(b.seed,0):renderPromptArt(p,b.seed,0,b.skill)));strokes.current=0;setResults(null);setBlocked(0);setMyArt(null);setBFrames([]);setCount(3);setPstate("count");};
+  const startDuelSearch=async()=>{
+    if(!supabase){say("Cloud accounts aren't configured for this build yet","error");return;}
+    if(!auth.isAuthenticated()){say("Sign in first — Settings ⚙️ on the You tab","error");return;}
+    setDuel(null);setResults(null);setMyArt(null);setPstate("duel_search");
+    const p=promptPool[Math.floor(Math.random()*promptPool.length)];
+    try{
+      const{duel:d,isPlayer1}=await findOrCreateDuel(auth.getUserId(),authorName||"artist",p);
+      isPlayer1Ref.current=isPlayer1;duelPromptRef.current=d.prompt;setPrompt(d.prompt);setDuel(d);
+      if(!isPlayer1){setDuelTimeLeft(60);setPstate("duel_draw");}
+    }catch{say("Couldn't reach matchmaking — try again","error");setPstate("lobby");}
+  };
+  const cancelDuelSearch=async()=>{if(duel)await cancelWaitingDuel(duel.id);setDuel(null);setPstate("lobby");};
+  const submitDuelNow=async()=>{if(!easel.current||!duel)return;const url=easel.current.composite();setMyArt(url);await submitDuelArt(duel.id,isPlayer1Ref.current,url);setPstate("duel_wait");};
+  useEffect(()=>{if(pstate!=="duel_search"&&pstate!=="duel_wait"||!duel)return;
+    const iv=setInterval(async()=>{
+      const fresh=await fetchDuel(duel.id);if(!fresh)return;
+      if(pstate==="duel_search"&&fresh.status==="active"){setDuel(fresh);setDuelTimeLeft(60);setPstate("duel_draw");return;}
+      if(pstate==="duel_wait"){const oppSub=isPlayer1Ref.current?fresh.submission2:fresh.submission1;if(oppSub){const final=await finalizeDuel(fresh);setDuel(final);const won=(isPlayer1Ref.current&&final.winner==="player1")||(!isPlayer1Ref.current&&final.winner==="player2");onResult(won,featured?3:1);setPstate("duel_done");}}
+    },2500);
+    return()=>clearInterval(iv);
+  },[pstate,duel?.id]);
+  useEffect(()=>{if(pstate!=="duel_draw")return;const t=setInterval(()=>setDuelTimeLeft(x=>Math.max(0,x-1)),1000);return()=>clearInterval(t);},[pstate]);
+  useEffect(()=>{if(pstate==="duel_draw"&&duelTimeLeft===0)submitDuelNow();},[duelTimeLeft,pstate]);
   const captureBattle=()=>{if(!easel.current)return;if(bFrames.length>=14){say("Max 14 pages");return;}const url=easel.current.composite(bFrames.length);setBFrames(f=>[...f,url]);blip&&blip("D5");say(`Page ${bFrames.length+1} captured`);};
   useEffect(()=>{if(pstate!=="count")return;if(count===0){setTimeLeft(duration);matchT.current=0;setPstate("draw");onLine&&onLine("battle_start");if(bots.length){const l=botLine(bots[Math.floor(Math.random()*bots.length)],"start");if(l)setTimeout(()=>say(l),400);}return;}const t=setTimeout(()=>setCount(c=>c-1),800);return()=>clearTimeout(t);},[pstate,count,duration]);
   useEffect(()=>{if(pstate!=="draw")return;tickRef.current=setInterval(()=>{matchT.current+=1;setTimeLeft(t=>Math.max(0,t-1));const frac=matchT.current/duration;if(matchT.current%2===0){const pressure=Math.min(1,strokes.current/40)-botProgress(bots[0],frac);setBotThumbs(bots.map(b=>botArtOf(b,botMomentum(b,frac,pressure))));}if(!kids&&matchT.current>2&&matchT.current%4===0){const line=pickMidLine(frac);if(line)say(line);}if(!kids&&matchT.current>3&&matchT.current%7===0)fireIntervention();},1000);return()=>clearInterval(tickRef.current);},[pstate,bots,duration,kids,phase]);
@@ -646,6 +719,7 @@ function Battle({ownedTiers,ccTier,wins,bigBattleOwned,kids,phase,lillok,customL
     <div className="mt-3 text-xs font-bold uppercase tracking-widest opacity-60">Clock</div>
     <div className="mt-1.5 flex gap-2">{[30,60,90].map(s=>(<button key={s} onClick={()=>setDuration(s)} className="lok-btn flex-1 py-1.5 rounded-full text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:duration===s?T.accent:T.card,color:duration===s?T.onAccent:T.ink}}>{s}s</button>))}</div>
     <button onClick={startMatch} className="lok-btn lok-display mt-4 w-full py-3.5 rounded-xl text-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,boxShadow:`5px 5px 0 ${T.ink}`,animation:reduceMotion?"none":"lokpulse 2.4s ease-in-out infinite"}}>{kids?"Start drawing!":"Find a match"}</button>
+    {!kids&&<button onClick={startDuelSearch} aria-label="Play against a real artist, beta" className="lok-btn lok-display mt-2 w-full py-3 rounded-xl text-sm font-extrabold" style={{background:T.card,color:T.ink,border:`3px dashed ${T.accent}`}}>🌐 Real opponent (beta) — {duration}s draw-off</button>}
   </div>);
   if(pstate==="count")return(<div className="mt-12 text-center">
     <div className="text-sm font-bold uppercase tracking-widest opacity-60">Your prompt</div>
@@ -693,6 +767,43 @@ function Battle({ownedTiers,ccTier,wins,bigBattleOwned,kids,phase,lillok,customL
       <div className="mt-3 flex flex-col gap-2">{order.map((e,idx)=>(<div key={e.i} className="flex items-center gap-3 p-2 rounded-xl" style={{border:`3px solid ${e.i===results.winnerIdx?T.accent:T.ink}`,background:T.card,animation:`lokrise .3s ease ${idx*0.06}s both`}}><span className="lok-display font-extrabold w-5 text-center" style={{color:idx===0?T.accent:T.ink}}>{idx+1}</span><img src={e.art} alt={e.name} className="rounded-md" style={{width:52,aspectRatio:"4/5",objectFit:"cover",border:`2px solid ${T.ink}`}}/><div className="font-bold flex-1">{e.name}{e.i===results.winnerIdx?" 🏆":""}</div><div className="lok-display font-extrabold">{e.votes} {e.votes===1?"vote":"votes"}</div></div>))}</div>
       <div className="mt-4 flex gap-2"><button onClick={publishMine} className="lok-btn lok-display flex-1 py-3 rounded-xl font-extrabold" style={{background:T.ink,color:T.paper}}>Publish</button><button onClick={startMatch} className="lok-btn lok-display flex-1 py-3 rounded-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}}>Rematch</button></div>
       <button onClick={()=>{const msg=`I just drew "${prompt}" in Lok N Slide — think you can beat me? lok.app/battle`;if(navigator.share){navigator.share({title:"Lok N Slide challenge",text:msg}).catch(()=>{});}else{navigator.clipboard?.writeText(msg);say("Challenge copied — send it!");}}} aria-label="Challenge a friend" className="lok-btn mt-2 w-full py-2 rounded-xl font-bold text-sm" style={{border:`2.5px dashed ${T.ink}`,color:T.ink}}>↗ Challenge a friend</button>
+      <button onClick={()=>setPstate("lobby")} className="mt-2 w-full py-2 text-sm font-bold underline opacity-70">Back to lobby</button>
+    </div>);
+  }
+  if(pstate==="duel_search")return(<div className="mt-12 text-center">
+    <div className="lok-display text-xl font-extrabold" style={{animation:reduceMotion?"none":"lokpulse 1.4s ease-in-out infinite"}}>🌐 Finding an opponent…</div>
+    <p className="text-sm opacity-70 mt-2">Prompt: "{prompt}"</p>
+    <p className="text-xs opacity-50 mt-1">Matching you with another real artist. Hang tight.</p>
+    <button onClick={cancelDuelSearch} className="lok-btn mt-6 px-4 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,color:T.ink}}>Cancel</button>
+  </div>);
+  if(pstate==="duel_draw")return(<div className="mt-3">
+    <div className="flex items-center justify-between">
+      <div className="min-w-0"><div className="text-xs font-bold uppercase tracking-widest opacity-60">Real opponent · Prompt</div><div className="lok-display font-extrabold leading-tight truncate">"{prompt}"</div></div>
+      <div className="lok-display text-2xl font-extrabold px-3 py-1 rounded-xl shrink-0" style={{background:duelTimeLeft<=10?T.accent:T.ink,color:duelTimeLeft<=10?T.onAccent:T.paper,animation:duelTimeLeft<=10&&duelTimeLeft>0&&!reduceMotion?"lokpulse .6s ease-in-out infinite":"none"}}>{duelTimeLeft}s</div>
+    </div>
+    <div className="mt-1.5 h-2 rounded-full overflow-hidden" style={{background:T.shadow}}><div style={{width:`${(duelTimeLeft/60)*100}%`,height:"100%",background:T.accent,transition:"width 1s linear"}}/></div>
+    <div className="mt-2"><Easel ref={easel} maxLayers={1} ccTier={ccTier} onStroke={()=>(strokes.current+=1)} animFx={animFx}/></div>
+    <button onClick={submitDuelNow} className="lok-btn lok-display mt-2 w-full py-3 rounded-xl text-lg font-extrabold" style={{background:T.ink,color:T.paper,boxShadow:`3px 3px 0 ${T.accent}`}}>Submit now</button>
+  </div>);
+  if(pstate==="duel_wait")return(<div className="mt-12 text-center">
+    {myArt&&<img src={myArt} alt="your submission" className="mx-auto rounded-xl" style={{width:160,border:`3px solid ${T.ink}`}}/>}
+    <div className="lok-display text-lg font-extrabold mt-4" style={{animation:reduceMotion?"none":"lokpulse 1.4s ease-in-out infinite"}}>Waiting for your opponent…</div>
+    <p className="text-xs opacity-50 mt-1">You're both drawing "{prompt}" — results appear the moment they submit.</p>
+  </div>);
+  if(pstate==="duel_done"&&duel){
+    const won=(isPlayer1Ref.current&&duel.winner==="player1")||(!isPlayer1Ref.current&&duel.winner==="player2");
+    const tie=duel.winner==="tie";
+    const mySub=isPlayer1Ref.current?duel.submission1:duel.submission2;const oppSub=isPlayer1Ref.current?duel.submission2:duel.submission1;
+    const myScore=isPlayer1Ref.current?duel.score1:duel.score2;const oppScore=isPlayer1Ref.current?duel.score2:duel.score1;
+    const oppName=isPlayer1Ref.current?duel.player2_name:duel.player1_name;
+    return(<div className="mt-4">
+      <div className="text-center" style={{animation:"lokpop .5s cubic-bezier(.34,1.56,.64,1)"}}><div className="lok-display text-3xl font-extrabold" style={{color:won?T.accent:T.ink}}>{tie?"It's a tie!":won?"You took it! 🏆":`${oppName} takes it`}</div></div>
+      <p className="text-center text-sm opacity-70 mt-1">"{prompt}"</p>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="rounded-2xl overflow-hidden" style={{border:`3px solid ${!tie&&won?T.accent:T.ink}`,background:T.card}}><img src={mySub} alt="you" className="w-full block" style={{aspectRatio:"4/5",objectFit:"cover"}}/><div className="px-2 py-1.5 font-bold text-sm flex justify-between"><span>You</span><span style={{color:T.accent}}>{myScore}</span></div></div>
+        <div className="rounded-2xl overflow-hidden" style={{border:`3px solid ${!tie&&!won?T.accent:T.ink}`,background:T.card}}><img src={oppSub} alt={oppName} className="w-full block" style={{aspectRatio:"4/5",objectFit:"cover"}}/><div className="px-2 py-1.5 font-bold text-sm flex justify-between"><span className="truncate">{oppName}</span><span style={{color:T.accent}}>{oppScore}</span></div></div>
+      </div>
+      <div className="mt-4 flex gap-2"><button onClick={publishMine} className="lok-btn lok-display flex-1 py-3 rounded-xl font-extrabold" style={{background:T.ink,color:T.paper}}>Publish</button><button onClick={startDuelSearch} className="lok-btn lok-display flex-1 py-3 rounded-xl font-extrabold" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`}}>Rematch</button></div>
       <button onClick={()=>setPstate("lobby")} className="mt-2 w-full py-2 text-sm font-bold underline opacity-70">Back to lobby</button>
     </div>);
   }
@@ -768,7 +879,7 @@ function PostCard({p,onOpen}){
 }
 function PersonRow({name,note}){const T=useT();const seed=name.length*31;return(<div className="flex items-center gap-3 p-2 rounded-xl mb-2" style={{border:`2.5px solid ${T.ink}`,background:T.card}}><img src={renderAvatar(seed)} alt={name} className="w-11 h-11 rounded-full" style={{border:`2px solid ${T.ink}`}}/><div className="font-bold flex-1">{name}</div>{note&&<span className="text-xs opacity-60">{note}</span>}</div>);}
 
-function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,xp,quests,following,lokdInCount,bookmarks,notifications=[],notifUnread=0,loks=0,totalEarned=0,questsCompleted=0,canInstall=false,onInstall,onClearNotifs,onOpen,onDelete,onRename,say,onCheat,pace="sweep",setPace,speed=1,setSpeed,soundLab=false,onUnlockSoundLab,soundQueue=[],setSoundQueue,founder=false,onFounderJoin,animatedToken=false,flair="",garden=[],setGarden,wordTwister={},setWordTwister,timeMachineIdx=-1,setTimeMachineIdx,heatmapData=[],sessionPin=null,setSessionPin,pinInput="",setPinInput,verified=false,setVerified,devTap,devTimer,devMode,setDevMode,appLogo,setAppLogo,hapticGrammar,setHapticGrammar,setPinUnlocked,setLoks,setTotalEarned,legacyStudio,setLegacyStudio,tutorialProgress={},onStartTutorial,viewingArtist,onBackToMyGallery}){
+function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,xp,quests,following,lokdInCount,bookmarks,notifications=[],notifUnread=0,loks=0,totalEarned=0,questsCompleted=0,canInstall=false,onInstall,onClearNotifs,onOpen,onDelete,onRename,say,onCheat,pace="sweep",setPace,speed=1,setSpeed,soundLab=false,onUnlockSoundLab,soundQueue=[],setSoundQueue,founder=false,onFounderJoin,animatedToken=false,flair="",garden=[],setGarden,wordTwister={},setWordTwister,timeMachineIdx=-1,setTimeMachineIdx,heatmapData=[],sessionPin=null,setSessionPin,pinInput="",setPinInput,verified=false,setVerified,devTap,devTimer,devMode,setDevMode,appLogo,setAppLogo,hapticGrammar,setHapticGrammar,setPinUnlocked,setLoks,setTotalEarned,legacyStudio,setLegacyStudio,tutorialProgress={},onStartTutorial,viewingArtist,onBackToMyGallery,featureFlags={compactUi:false,uiScale:"normal"},onSetFlag}){
   const T=useT();const[filter,setFilter]=useState("newest");const[view,setView]=useState("gallery");const[editing,setEditing]=useState(false);const[draft,setDraft]=useState(profile);const[showNotifs,setShowNotifs]=useState(false);const[searchQ,setSearchQ]=useState("");const[showSettings,setShowSettings]=useState(false);
   const tapCount=useRef(0);const tapTimer=useRef(null);const audioRef=useRef(null);const[slUrl,setSlUrl]=useState("");const[slPlaying,setSlPlaying]=useState(null);const[fHandle,setFHandle]=useState(profile.name||"");const[fEmail,setFEmail]=useState("");const[fBusy,setFBusy]=useState(false);
   const[bleepCode,setBleepCode]=useState("");
@@ -779,6 +890,10 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
   const slStop=()=>{if(audioRef.current)audioRef.current.pause();setSlPlaying(null);};
   useEffect(()=>()=>{if(audioRef.current)audioRef.current.pause();},[]);
   const joinFounders=async()=>{if(!fHandle.trim()||fHandle.trim().length<2){say("Enter a handle");return;}setFBusy(true);try{await onFounderJoin(fHandle.trim(),fEmail.trim());say("You're a founder! Data secured on the test server 🏆","success");}catch{say("Couldn't reach the server — try again","error");}setFBusy(false);};
+  const auth=useAuth();const[authEmail,setAuthEmail]=useState("");const[authSent,setAuthSent]=useState("");const[authBusy,setAuthBusy]=useState(false);const[cloudBusy,setCloudBusy]=useState(false);
+  const sendAuthLink=async()=>{const e=authEmail.trim();if(!e||!e.includes("@")){say("Enter a valid email","error");return;}setAuthBusy(true);try{await auth.signInWithEmail(e);setAuthSent(e);say("Magic link sent — check your email","success");}catch{say("Couldn't send link — try again","error");}setAuthBusy(false);};
+  const cloudSyncNow=async()=>{if(!supabase||!auth.getUserId())return;setCloudBusy(true);try{const localSave=await store.get(SAVE_KEY);const localGallery=await store.get(GALLERY_KEY);const{error}=await supabase.from("auth_saves").upsert({user_id:auth.getUserId(),save_blob:{...localSave,_gallery:localGallery},updated_at:new Date().toISOString()});if(error)throw error;say("Backed up to the cloud","success");}catch{say("Cloud sync failed — try again","error");}setCloudBusy(false);};
+  const cloudRestoreNow=async()=>{if(!supabase||!auth.getUserId())return;if(!window.confirm("Replace this device's data with your cloud backup? This device will reload."))return;setCloudBusy(true);try{const{data,error}=await supabase.from("auth_saves").select("save_blob").eq("user_id",auth.getUserId()).single();if(error)throw error;if(!data?.save_blob){say("No cloud backup found yet","error");setCloudBusy(false);return;}const{_gallery,...saveRest}=data.save_blob;await store.set(SAVE_KEY,saveRest);if(_gallery)await store.set(GALLERY_KEY,_gallery);window.location.reload();}catch{say("Restore failed — try again","error");setCloudBusy(false);}};
   const isIOS=typeof navigator!=="undefined"&&/iPad|iPhone|iPod/.test(navigator.userAgent);
   const avatar=useMemo(()=>renderAvatar(profile.avatarSeed),[profile.avatarSeed]);
   const targetArtist=viewingArtist||profile.name;
@@ -831,12 +946,29 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
       {garden.some(p=>p&&!p.harvested)&&<button onClick={()=>setGarden(g=>g.map(p=>p&&!p.harvested?{...p,growth:Math.min(100,p.growth+5+Math.random()*10)}:p))} className="lok-btn mt-1.5 w-full py-1.5 rounded-xl text-xs font-bold" style={{border:`2px solid ${T.ink}`,background:T.card}}>💧 Water all (+water each plant)</button>}
     </section>)}
     {showSettings&&(<div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,.35)"}} onClick={()=>setShowSettings(false)}>
-      <div className="w-full rounded-t-3xl p-5" style={{maxWidth:560,background:T.card,border:`3px solid ${T.ink}`,animation:"lokrise .25s ease"}} onClick={e=>e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3"><div className="lok-display text-lg font-extrabold">Settings</div><button onClick={()=>setShowSettings(false)} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Close settings">✕</button></div>
+      <div className="w-full rounded-t-3xl p-5 overflow-y-auto overscroll-contain" style={{maxWidth:560,maxHeight:"85vh",background:T.card,border:`3px solid ${T.ink}`,animation:"lokrise .25s ease",WebkitOverflowScrolling:"touch"}} onClick={e=>e.stopPropagation()}>
+        <div className="sticky top-0 flex items-center justify-between mb-3 pb-1 -mt-5 -mx-5 px-5 pt-5" style={{background:T.card,zIndex:1}}><div className="lok-display text-lg font-extrabold">Settings</div><button onClick={()=>setShowSettings(false)} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Close settings">✕</button></div>
         <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${T.ink}`,background:T.paper}}>
           <div className="lok-display font-extrabold text-sm">📱 Add Lok to your home screen</div>
           <div className="text-xs opacity-70 mt-1 leading-snug">{isIOS?"Tap the Share button in Safari, then \u201CAdd to Home Screen\u201D. Lok opens full-screen like a native app.":"Install Lok as an app — it gets its own icon and opens full-screen, no browser bars."}</div>
           {!isIOS&&<button onClick={()=>onInstall&&onInstall()} className="lok-btn lok-display mt-2 w-full py-2.5 rounded-xl font-extrabold" style={{background:canInstall?T.accent:T.shadow,color:canInstall?T.onAccent:T.ink,border:`3px solid ${T.ink}`,opacity:canInstall?1:0.7}} aria-label="Install Lok as an app">{canInstall?"Install Lok":"Install via browser menu →"}</button>}
+        </div>
+        <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${auth.isAuthenticated()?T.alt:T.ink}`,background:T.paper}}>
+          <div className="lok-display font-extrabold text-sm">🔐 Account{auth.isAuthenticated()&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>SIGNED IN</span>}</div>
+          {!supabase?(<div className="text-xs opacity-70 mt-1 leading-snug">Cloud accounts aren't configured for this build yet.</div>):auth.loading?(<div className="text-xs opacity-60 mt-1">Loading…</div>):auth.isAuthenticated()?(<>
+            <div className="text-xs opacity-70 mt-1 leading-snug">Signed in as <strong>{auth.getEmail()}</strong>. Your gallery and progress can back up to the cloud and follow you to other devices.</div>
+            <div className="mt-2 flex gap-1.5">
+              <button onClick={cloudSyncNow} disabled={cloudBusy} className="lok-btn flex-1 py-2 rounded-xl font-extrabold text-sm" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,opacity:cloudBusy?0.6:1}}>{cloudBusy?"Working…":"Back up now"}</button>
+              <button onClick={cloudRestoreNow} disabled={cloudBusy} className="lok-btn flex-1 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink,opacity:cloudBusy?0.6:1}}>Restore</button>
+            </div>
+            <button onClick={()=>auth.signOut()} className="lok-btn mt-1.5 w-full py-1.5 rounded-xl font-bold text-xs" style={{border:`2px solid ${T.shadow}`,color:T.ink,background:"transparent"}}>Sign out</button>
+          </>):authSent?(<div className="text-xs mt-1 leading-snug">✉️ Check <strong>{authSent}</strong> for a magic link to finish signing in.</div>):(<>
+            <div className="text-xs opacity-70 mt-1 leading-snug">Sign in to back up your gallery and Loks, and to be found by other artists.</div>
+            <div className="mt-2 flex gap-1.5">
+              <input value={authEmail} onChange={e=>setAuthEmail(e.target.value)} placeholder="your@email.com" type="email" aria-label="Email for account sign-in" className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}} onKeyDown={e=>e.key==="Enter"&&sendAuthLink()}/>
+              <button onClick={sendAuthLink} disabled={authBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:T.accent,color:T.onAccent,border:`3px solid ${T.ink}`,opacity:authBusy?0.6:1}}>{authBusy?"Sending…":"Send link"}</button>
+            </div>
+          </>)}
         </div>
         <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${founder?T.alt:T.ink}`,background:T.paper}}>
           <div className="lok-display font-extrabold text-sm">🏆 Founders' test server{founder&&<span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{background:T.alt,color:"#fff"}}>FOUNDER</span>}</div>
@@ -864,6 +996,13 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
             <option value="default">Default</option><option value="expressive">Expressive</option><option value="quiet">Quiet</option>
           </select></div>
           <label className="mt-2 flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={legacyStudio} onChange={e=>setLegacyStudio(e.target.checked)} style={{accentColor:T.accent}}/> Legacy Studio UI</label>
+        </div>
+        <div className="p-3 rounded-2xl mb-2" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>
+          <div className="font-bold text-sm">Display size</div>
+          <div className="text-xs opacity-70 mt-0.5 mb-1.5 leading-snug">Shrink the UI to fit more on screen, or grow it for readability.</div>
+          <div className="grid grid-cols-3 gap-1.5">{[["small","Compact"],["normal","Normal"],["large","Large"]].map(([id,label])=>(
+            <button key={id} onClick={()=>onSetFlag&&onSetFlag("uiScale",id)} aria-pressed={(featureFlags.uiScale||"normal")===id} className="lok-btn py-1.5 rounded-xl text-xs font-extrabold" style={{border:`2.5px solid ${(featureFlags.uiScale||"normal")===id?T.accent:T.ink}`,background:(featureFlags.uiScale||"normal")===id?T.ink:T.card,color:(featureFlags.uiScale||"normal")===id?T.paper:T.ink}}>{label}</button>))}</div>
+          <label className="mt-2 flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={!!featureFlags.compactUi} onChange={e=>onSetFlag&&onSetFlag("compactUi",e.target.checked)} style={{accentColor:T.accent}}/> Tighter spacing (compact layout)</label>
         </div>
         {soundLab&&(<div className="p-3 rounded-2xl mb-2" style={{border:`3px dashed ${T.accent}`,background:T.paper}}>
           <div className="lok-display font-extrabold text-sm" style={{color:T.accent}}>🔊 Sound Lab</div>
@@ -955,7 +1094,7 @@ export default function LokApp(){
   const[questsCompleted,setQuestsCompleted]=useState(0);const[totalEarned,setTotalEarned]=useState(0);const[traceHinted,setTraceHinted]=useState(false);const[fabBubble,setFabBubble]=useState("");const[adIdx,setAdIdx]=useState(0);const[installEvt,setInstallEvt]=useState(null);const[showSettings,setShowSettings]=useState(false);
   const[loks,setLoks]=useState(260);const[myRooms,setMyRooms]=useState([]);const[pendingRoomCode,setPendingRoomCode]=useState(()=>{try{return new URLSearchParams(location.search).get("room")||null;}catch{return null;}});const[pace,setPace]=useState("sweep");const[speed,setSpeed]=useState(1);const[soundLab,setSoundLab]=useState(false);const[soundQueue,setSoundQueue]=useState([]);const[founder,setFounder]=useState(false);const[totalSpent,setTotalSpent]=useState(0);const[fodHistory,setFodHistory]=useState([]);const[lokPass,setLokPass]=useState(false);const[uiTheme,setUiTheme]=useState("riso");const[ownedThemes,setOwnedThemes]=useState(["riso"]);const[effect,setEffect]=useState("none");const[ownedEffects,setOwnedEffects]=useState(["none"]);const[ownedTiers,setOwnedTiers]=useState([10]);const[ccTier,setCcTier]=useState(false);const[bigBattleOwned,setBigBattleOwned]=useState(false);const[wins,setWins]=useState(0);
   const[profile,setProfile]=useState(()=>{const seed=Math.floor(Math.random()*9999);return{name:starterHandle(seed),bio:"",avatarSeed:seed,links:[{label:"Lok page",url:"coming soon"}]};});
-  const[focusMode,setFocusMode]=useState(false);  const[featureFlags,setFeatureFlags]=useState({compactUi:false,vibe:"default"});
+  const[focusMode,setFocusMode]=useState(false);  const[featureFlags,setFeatureFlags]=useState({compactUi:false,vibe:"default",uiScale:"normal"});
   const[comebackActive,setComebackActive]=useState(false);const[legacyStudio,setLegacyStudio]=useState(false);const[legacyBrushes,setLegacyBrushes]=useState(false);
   const[studioFrames,setStudioFrames]=useState([]);const[studioFrameDurations,setStudioFrameDurations]=useState([]);const[studioTitle,setStudioTitle]=useState("");const[studioDraftImg,setStudioDraftImg]=useState(null);
   const[lastComebackAward,setLastComebackAward]=useState(0);
@@ -1075,7 +1214,7 @@ export default function LokApp(){
   </div>);
   if(!ready)return(<Loader/>);
   return(<ThemeCtx.Provider value={T}>
-    <div className={`min-h-screen w-full ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:"'Schibsted Grotesk',system-ui,sans-serif",animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none"}}>
+    <div className={`min-h-screen w-full ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:"'Schibsted Grotesk',system-ui,sans-serif",animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none",zoom:{small:0.85,normal:1,large:1.15}[featureFlags.uiScale||"normal"]}}>
       <GlobalStyle T={T} pace={pace} speed={speed}/><ThemeBackdrop themeId={uiTheme} pace={pace}/><PageEffect effect={effect}/>
       {!focusMode && <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3" style={{background:T.paper,borderBottom:`3px solid ${T.ink}`}}>
         <button onClick={()=>setTab("feed")} aria-label="Go to feed" className="lok-btn lok-display relative text-2xl font-extrabold tracking-tight select-none" style={{background:"transparent",border:"none",padding:0,whiteSpace:"nowrap"}}>
