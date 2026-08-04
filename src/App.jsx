@@ -824,6 +824,36 @@ function OpenFront({kids,loks,dailyPrompt,onWager,onEarn,hinted,onHinted,blip,sa
   </div>);
 }
 
+// Read-only preview for someone else's gallery (resident or real artist) —
+// the full Viewer's edit/delete/vote affordances assume the post is yours
+// (it infers "own" from post.from, not from author), so browsing another
+// artist's back-catalogue needs its own lightweight, non-mutating viewer.
+function GalleryPreview({posts,index,onClose,onNav}){
+  const T=useT();const post=posts[index];
+  const[fi,setFi]=useState(0);
+  useEffect(()=>{setFi(0);},[index]);
+  useEffect(()=>{
+    if(!post?.frames||post.frames.length<2)return;
+    const t=setInterval(()=>setFi(f=>(f+1)%post.frames.length),post.paceMs||160);
+    return()=>clearInterval(t);
+  },[post]);
+  useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();if(e.key==="ArrowLeft")onNav(-1);if(e.key==="ArrowRight")onNav(1);};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[onClose,onNav]);
+  if(!post)return null;
+  return(<div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:"rgba(0,0,0,.7)"}} onClick={onClose}>
+    <div className="w-full rounded-2xl overflow-hidden" style={{maxWidth:420,background:T.card,border:`3px solid ${T.ink}`,boxShadow:`6px 6px 0 ${T.shadow}`}} onClick={e=>e.stopPropagation()}>
+      <div className="relative flex items-center justify-center" style={{aspectRatio:"4/5",background:T.paper}}>
+        {post.frames?.[fi]?<img src={post.frames[fi]} alt={post.title} className="w-full h-full" style={{objectFit:"cover"}}/>:<div className="text-center opacity-40"><div className="lok-display font-extrabold">{post.title}</div><div className="text-xs">Rendering…</div></div>}
+        <button onClick={onClose} aria-label="Close preview" className="lok-btn absolute top-2 right-2 px-2.5 py-1 rounded-full font-extrabold text-xs" style={{background:T.card,border:`2px solid ${T.ink}`}}>✕</button>
+        {index>0&&<button onClick={()=>onNav(-1)} aria-label="Previous piece" className="lok-btn absolute left-2 top-1/2 -translate-y-1/2 px-2.5 py-2 rounded-full font-extrabold" style={{background:T.card,border:`2px solid ${T.ink}`}}>‹</button>}
+        {index<posts.length-1&&<button onClick={()=>onNav(1)} aria-label="Next piece" className="lok-btn absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-2 rounded-full font-extrabold" style={{background:T.card,border:`2px solid ${T.ink}`}}>›</button>}
+      </div>
+      <div className="p-3">
+        <div className="lok-display font-extrabold text-sm truncate">{post.title}</div>
+        <div className="text-xs opacity-60 mt-0.5">{post.votes||0} votes · {post.views||0} views</div>
+      </div>
+    </div>
+  </div>);
+}
 function PostCard({p,onOpen}){
   const T=useT();
   if(!p.frames||p.frames.length===0)return(<button onClick={()=>onOpen(p.id)} className="lok-btn text-left rounded-2xl overflow-hidden" style={{border:`3px solid ${T.ink}`,background:T.card,boxShadow:`5px 5px 0 ${T.shadow}`}} aria-label={p.title}><div className="flex items-center justify-center" style={{aspectRatio:"4/5",background:T.paper}}><div className="text-center opacity-40"><div className="lok-display font-extrabold">{p.title}</div><div className="text-xs">Rendering…</div></div></div></button>);
@@ -833,7 +863,8 @@ function PersonRow({name,note}){const T=useT();const seed=name.length*31;return(
 
 function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,xp,quests,following,lokdInCount,bookmarks,notifications=[],notifUnread=0,loks=0,totalEarned=0,questsCompleted=0,canInstall=false,onInstall,onClearNotifs,onOpen,onDelete,onRename,say,onCheat,pace="sweep",setPace,speed=1,setSpeed,soundLab=false,onUnlockSoundLab,soundQueue=[],setSoundQueue,founder=false,onFounderJoin,animatedToken=false,flair="",garden=[],setGarden,wordTwister={},setWordTwister,timeMachineIdx=-1,setTimeMachineIdx,heatmapData=[],sessionPin=null,setSessionPin,pinInput="",setPinInput,verified=false,setVerified,devTap,devTimer,devMode,setDevMode,appLogo,setAppLogo,hapticGrammar,setHapticGrammar,setPinUnlocked,setLoks,setTotalEarned,legacyStudio,setLegacyStudio,tutorialProgress={},onStartTutorial,viewingArtist,onBackToMyGallery,featureFlags={compactUi:false,uiScale:"normal"},onSetFlag,onOpenMusic,onMintGuestPass,onRedeemGuestPass}){
   const T=useT();const[filter,setFilter]=useState("newest");const[view,setView]=useState("gallery");const[editing,setEditing]=useState(false);const[draft,setDraft]=useState(profile);const[showNotifs,setShowNotifs]=useState(false);const[searchQ,setSearchQ]=useState("");const[showSettings,setShowSettings]=useState(false);
-  useBodyScrollLock(showSettings||editing);
+  const[previewIdx,setPreviewIdx]=useState(null);
+  useBodyScrollLock(showSettings||editing||previewIdx!==null);
   const tapCount=useRef(0);const tapTimer=useRef(null);const audioRef=useRef(null);const[slUrl,setSlUrl]=useState("");const[slPlaying,setSlPlaying]=useState(null);const[fHandle,setFHandle]=useState(profile.name||"");const[fEmail,setFEmail]=useState("");const[fBusy,setFBusy]=useState(false);
   const[bleepCode,setBleepCode]=useState("");
   // Debug-only, never persisted: stash the real balance while unlimited Loks
@@ -1109,7 +1140,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
         <button onClick={()=>setTimeMachineIdx(t=>t<0?posts.length-1:-1)} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold" style={{border:`2.5px solid ${timeMachineIdx>=0?T.accent:T.ink}`,background:timeMachineIdx>=0?T.ink:T.card,color:timeMachineIdx>=0?T.paper:T.ink}}>🕐 Time Machine</button>
       </div>
       <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search your flips…" aria-label="Search gallery" className="mt-2 w-full px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/>
-      {filtered.length?<div className="mt-2 grid grid-cols-2 gap-3">{filtered.map(p=><PostCard key={p.id} p={p} onOpen={onOpen}/>)}</div>:myPosts.length===0&&!searchQ&&filter==="newest"?(<div className="mt-3">
+      {filtered.length?<div className="mt-2 grid grid-cols-2 gap-3">{filtered.map((p,i)=><PostCard key={p.id} p={p} onOpen={()=>viewingArtist?setPreviewIdx(i):onOpen(p.id)}/>)}</div>:myPosts.length===0&&!searchQ&&filter==="newest"?(<div className="mt-3">
         <EmptyState icon="search" title="Nothing here yet" subtitle="Trace a tutorial to get moving, or jump straight into Studio."/>
         <div className="mt-3 grid grid-cols-2 gap-2.5">{TUTORIAL_PROJECTS.map(t=>{const prog=tutorialProgress[t.id];const started=prog&&prog.frames?.length>0;return(<button key={t.id} onClick={()=>onStartTutorial?.(t.id)} className="lok-btn p-3 rounded-2xl text-left" style={{border:`2.5px solid ${started?T.accent:T.ink}`,background:T.card}}><div style={{fontSize:22,lineHeight:1,marginBottom:4}}>{t.icon}</div><div className="lok-display font-extrabold text-sm">{t.title}</div><div className="text-[10px] opacity-60 mt-0.5">{t.difficulty} · {t.frameCount} pages</div><div className="text-[10px] font-bold mt-1.5" style={{color:started?T.accent:T.ink,opacity:started?1:0.6}}>{started?`Continue · ${prog.frames.length}/${t.frameCount}`:"Start tutorial →"}</div></button>);})}</div>
       </div>):<EmptyState icon="search" title={searchQ?"No flips match":"No pieces match"} subtitle={searchQ?"Try different words":"Try a different filter or publish your first flip!"}/>}
@@ -1119,6 +1150,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
         <div className="flex items-center gap-2 mt-1"><img src={posts[timeMachineIdx]?.frames?.[0]} alt="" className="w-12 rounded-lg shrink-0" style={{aspectRatio:"4/5",objectFit:"cover",border:`2px solid ${T.ink}`}}/><div className="min-w-0"><div className="font-bold text-sm truncate">{posts[timeMachineIdx]?.title}</div><div className="text-xs opacity-60">{timeMachineIdx+1} of {posts.length} · {posts[timeMachineIdx]?.votes} votes</div></div></div>
       </div>)}
     </>)}
+    {previewIdx!==null&&filtered[previewIdx]&&<GalleryPreview posts={filtered} index={previewIdx} onClose={()=>setPreviewIdx(null)} onNav={d=>setPreviewIdx(i=>Math.min(filtered.length-1,Math.max(0,i+d)))}/>}
   </div>);
 }
 
