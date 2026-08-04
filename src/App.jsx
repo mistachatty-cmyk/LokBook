@@ -1258,6 +1258,14 @@ export default function LokApp(){
     applyLogo(appLogo);
   })().finally(()=>{const elapsed=Date.now()-loadStart.current;setTimeout(()=>setReady(true),Math.max(0,3500-elapsed));});const fb=setTimeout(()=>setReady(true),10000);return()=>clearTimeout(fb);},[]);
   useEffect(()=>{applyLogo(appLogo);},[appLogo]);
+  // Scale via the root font-size, not CSS zoom: Tailwind's spacing/type scale is
+  // rem-based, so this scales the whole UI uniformly, and unlike zoom it doesn't
+  // desync position:fixed overlays (Settings, modals, previews) from the real
+  // viewport — the bug that made changing this setting visibly break the UI.
+  useEffect(()=>{
+    document.documentElement.style.fontSize={small:"87.5%",normal:"100%",large:"115%"}[featureFlags.uiScale||"normal"];
+    return()=>{document.documentElement.style.fontSize="";};
+  },[featureFlags.uiScale]);
   const getSaveBlob=useCallback(()=>({botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,stickers,lillok:{...lillok,lastSeen:Date.now()},modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,comebackStyle:celebrationStyle,lastComebackAward,lastOfflineBonus,legacyStudio,legacyBrushes,tutorialProgress}),[botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,stickers,lillok,modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,celebrationStyle,lastComebackAward,lastOfflineBonus,tutorialProgress]);
   const doSave=useCallback(()=>{store.set(SAVE_KEY,getSaveBlob());},[getSaveBlob]);
   const mintGuestPassCode=useCallback(async email=>mintGuestPass(getSaveBlob(),email),[getSaveBlob]);
@@ -1321,7 +1329,7 @@ export default function LokApp(){
   </div>);
   if(!ready)return(<Loader/>);
   return(<ThemeCtx.Provider value={T}>
-    <div className={`min-h-screen w-full lok-motion-${featureFlags.lokMotion||"subtle"} ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:(FONT_PACKS.find(f=>f.id===cosmetics.fontPack)?.font&&cosmetics.fontPack!=="default")?FONT_PACKS.find(f=>f.id===cosmetics.fontPack).font:"'Schibsted Grotesk',system-ui,sans-serif",animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none",zoom:{small:0.85,normal:1,large:1.15}[featureFlags.uiScale||"normal"]}}>
+    <div className={`min-h-screen w-full lok-motion-${featureFlags.lokMotion||"subtle"} ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:(FONT_PACKS.find(f=>f.id===cosmetics.fontPack)?.font&&cosmetics.fontPack!=="default")?FONT_PACKS.find(f=>f.id===cosmetics.fontPack).font:"'Schibsted Grotesk',system-ui,sans-serif",animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none"}}>
       <GlobalStyle T={T} pace={pace} speed={speed}/><ThemeBackdrop themeId={uiTheme} pace={pace}/><PageEffect effect={effect}/>
       {!focusMode && <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3" style={{background:T.paper,borderBottom:`3px solid ${T.ink}`}}>
         <button onClick={()=>setTab("feed")} aria-label="Go to feed" className="lok-btn lok-display text-2xl font-extrabold tracking-tight select-none" style={{background:"transparent",border:"none",padding:0,whiteSpace:"nowrap",textShadow:`3px 2px 0 ${T.accent}`}}>
