@@ -356,7 +356,7 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
   const online = Object.keys(presence).length;
   const btn = (on) => ({ border: `2.5px solid ${on ? T.accent : T.ink}`, background: on ? T.ink : T.card, color: on ? T.paper : T.ink });
 
-  return (<div className="fixed inset-0 z-40 flex flex-col" style={{ background: T.paper, color: T.ink }}>
+  return (<div className="fixed inset-0 z-50 flex flex-col" style={{ background: T.paper, color: T.ink }}>
     <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: `3px solid ${T.ink}`, background: T.paper }}>
       <button onClick={onClose} aria-label="Leave room" className="lok-btn px-3 py-1 rounded-lg font-bold" style={{ border: `2.5px solid ${T.ink}`, background: T.card }}>‹</button>
       <div className="min-w-0 flex-1">
