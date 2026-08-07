@@ -61,7 +61,7 @@ function MythicCard({item,own,equipped,onBuy}){
   </button>);
 }
 export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kids,uiTheme,ownedThemes,effect,ownedEffects,sky,ownedSkies=[],onSky,animFx,ownedAnimFx=[],onAnimFx,fontPack,onFontPack,cursorPack,onCursorPack,musicPack,onMusicPack,stickerPack,onStickerPack,postExport,onPostExport,cosmetics,owned,onBuyCosmetic,setKids,onBuyPass,onTheme,onEffect,onCc,mythicOwned,mythicEquipped,onBuyMythic,dailyOwned,weeklyOwned,celebrationStyle,onCelebrationStyle}){
-  const T=useT();const[catTab,setCatTab]=useState("featured");const[modTab,setModTab]=useState("layers");const[showAll,setShowAll]=useState(false);
+  const T=useT();const[catTab,setCatTab]=useState("featured");const[modTab,setModTab]=useState("brush");const[showAll,setShowAll]=useState(false);
   const[legacy,setLegacy]=useState(()=>{try{return localStorage.getItem("lok:shop:legacy")==="1";}catch{return false;}});
   useEffect(()=>{try{localStorage.setItem("lok:shop:legacy",legacy?"1":"0");}catch{}},[legacy]);
   const[showResetConfirm,setShowResetConfirm]=useState(false);
@@ -97,7 +97,10 @@ export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kid
   // Legacy view shows the original full shop with those marked "not active".
   const DEAD_TABS=new Set(["stickers","export","music"]);
   const cats=legacy?ALL_CATS:ALL_CATS.filter(([id])=>!DEAD_TABS.has(id));
-  const moduleTypes=[{type:"layers",label:"Layers"},{type:"brush",label:"Brushes"},{type:"tool",label:"Tools"},{type:"feature",label:"Features"},{type:"canvas",label:"Canvas"}];
+  // Layers has no shop tab: it's a duplicate of the TIERS system Studio already
+  // sells directly (10/25/50/100 · Sketch/Studio/Pro/Marathon) and which the live
+  // easel actually reads maxLayers from — layers_* modules were pure double-sell.
+  const moduleTypes=[{type:"brush",label:"Brushes"},{type:"tool",label:"Tools"},{type:"feature",label:"Features"},{type:"canvas",label:"Canvas"}];
   const activeTab=(!legacy&&DEAD_TABS.has(catTab))?"featured":catTab;
   return(<div className="mt-4">
     <h2 className="lok-display text-lg font-extrabold">Shop</h2>

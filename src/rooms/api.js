@@ -6,18 +6,35 @@ import { getApiToken } from "../auth/auth.js";
 const headers = () => ({ "Content-Type": "application/json", apikey: SUPA_KEY, Authorization: `Bearer ${getApiToken()}` });
 const q = encodeURIComponent;
 
+// A dropped/hanging connection used to leave callers (e.g. "Opening…" on
+// room creation) waiting forever with no error and no way out but a reload.
+// Every request gets a hard ceiling so callers always settle one way or another.
+const TIMEOUT_MS = 10000;
+async function timedFetch(url, opts) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("rooms request timed out — check your connection");
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function get(path) {
-  const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers: headers() });
+  const r = await timedFetch(`${SUPA_URL}/rest/v1/${path}`, { headers: headers() });
   if (!r.ok) throw new Error(`rooms get ${r.status}`);
   return r.json();
 }
 async function post(path, body, prefer = "return=representation") {
-  const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { method: "POST", headers: { ...headers(), Prefer: prefer }, body: JSON.stringify(body) });
+  const r = await timedFetch(`${SUPA_URL}/rest/v1/${path}`, { method: "POST", headers: { ...headers(), Prefer: prefer }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(`rooms post ${r.status}`);
   return prefer.includes("representation") ? r.json() : true;
 }
 async function patch(path, body) {
-  const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { method: "PATCH", headers: headers(), body: JSON.stringify(body) });
+  const r = await timedFetch(`${SUPA_URL}/rest/v1/${path}`, { method: "PATCH", headers: headers(), body: JSON.stringify(body) });
   return r.ok;
 }
 
@@ -40,7 +57,7 @@ export const roomsApi = {
   grantWrite: (roomId, userId) => patch(`lok_room_members?room_id=eq.${q(roomId)}&user_id=eq.${q(userId)}`, { role: "writer", requested_write: false }),
   insertStroke: row => post("lok_room_strokes", row, "resolution=ignore-duplicates,return=minimal").catch(() => false),
   async deleteStroke(id, authorId) {
-    const r = await fetch(`${SUPA_URL}/rest/v1/lok_room_strokes?id=eq.${q(id)}&author_id=eq.${q(authorId)}`, { method: "DELETE", headers: headers() });
+    const r = await timedFetch(`${SUPA_URL}/rest/v1/lok_room_strokes?id=eq.${q(id)}&author_id=eq.${q(authorId)}`, { method: "DELETE", headers: headers() });
     return r.ok;
   },
   // paged fetch, oldest→newest so draw order is stable

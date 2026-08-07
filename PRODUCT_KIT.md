@@ -165,20 +165,33 @@ well-made stationery product — closer to a Midori notebook than a game UI.
 Do not represent these as working. Full evidence in `INERT_FEATURES.md`.
 
 **Working and verified:** accounts, public profiles, artist search, new-artist
-board, feed, Studio drawing, trace modes, battles vs bots, post editing, music
-player, LilLok, themes/effects/skies/FX, LokMotion, display size.
+board, feed, Studio drawing (including GIF export, spritesheet export, video
+export, frame labels, a fullscreen distraction-free canvas mode available
+anywhere the Easel is used), trace modes, battles vs bots, post editing, music
+player (plus a proper header entry point — it was previously undiscoverable
+outside Settings), LilLok, themes/effects/skies/FX, LokMotion, display size,
+Rooms' lobby/canvas UI, Guest of the Pass (including proactive save prompts
+after publishing and before a guest save ages out).
 
 **Known broken or inert:**
-- 16 of 52 Studio modules still do nothing (down from 40 after the Easel
-  migration); 6 of those are `layers_*` ids that duplicate the TIERS system.
-- Three shop categories inert (stickers, export formats, music packs) —
-  blocked from purchase and badged *NOT ACTIVE YET*.
-- `layers_*` modules double-sell the same capability as the `TIERS` system.
+- 5 of 47 Studio modules still do nothing: `feat_tween` and the four
+  `canvas_*` geometry modules (infinite/circular/panorama/xl) — these need
+  real engineering (coordinate-system changes), not just wiring.
+- `musicPack` (bundled ambient soundtracks) is inert — needs real licensed
+  audio assets, which don't exist yet; blocked from purchase in the meantime.
+- Some export formats (webp/apng/pdf/mp4) are sold but have no encoder behind
+  them yet — GIF and spritesheet export both now work for real.
 - **No payments.** Stripe edge functions exist but aren't reachable; LokPass is
-  free to toggle. **There is no revenue path yet.**
+  free to toggle. **There is no revenue path yet.** (Deliberately not touched
+  in the most recent pass — flagged as the top priority, not started.)
 - Rooms and real duels are code-correct and connected but have never been
-  exercised on two real devices.
+  exercised on two real devices. A request timeout was added so a dropped
+  connection now fails with an error instead of hanging forever — that's a
+  robustness fix, not proof the realtime path works multiplayer.
 - Ecosystem integration (Passport / Lifetime / shared credits) not started.
+- Social platform connectivity (Instagram/TikTok sharing or embedding) not
+  started — needs product scoping first; see `INERT_FEATURES.md` §6 for the
+  staged options considered.
 
 **Before any Japanese launch:** payments, a native-speaker
 localisation pass (the copy above is positioning, not translation), and real

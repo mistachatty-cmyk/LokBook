@@ -16,13 +16,10 @@ This document outlines the major features and tasks remaining to bring LokBook f
 -   **Real Social Feed**: Replace the local-only feed with a real-time feed backed by the Supabase database.
 -   **Public User Profiles**: Create shareable profile pages at a `/u/:handle` URL.
 -   **Post Sharing Links**: Implement public pages for individual posts at `/p/:postId`.
--   **Pinch-to-Zoom**: Add pinch-to-zoom functionality in the Easel using a library like `@use-gesture/react`.
--   **GIF Export**: Add functionality to export animations as GIF files from the Studio.
--   **Advanced Canvas Features**:
-    -   Reference layer for tracing.
-    -   Custom color palettes.
-    -   Additional canvas sizes (Story, Square, etc.).
-    -   Stroke smoothing.
+-   **Pinch-to-Zoom**: Add pinch-to-zoom functionality in the Easel using a library like `@use-gesture/react`. (Rooms' canvas already has pinch-to-zoom; the Studio Easel doesn't yet.)
+-   ~~**GIF Export**~~: Done — `feat_gif` module now exports real animated GIFs via `engine/gif.js`.
+-   **Advanced Canvas Features**: Reference layer, custom palettes, and stroke smoothing are wired (`feat_ref`/`feat_palettes`/`feat_smooth`) — see `INERT_FEATURES.md`. Still open: additional canvas sizes/shapes (`canvas_infinite`/`circular`/`panorama`/`xl`) need real Easel coordinate-system work, and `feat_tween` (auto-tween animation presets) needs a frame-synthesis pass — both scoped but not built.
+-   **Social platform connectivity**: Share flips out to Instagram/TikTok, and eventually import/embed a Reel. Not started — needs product scoping on which tier to build first (native share-sheet vs. platform API posting vs. read-only embed); see `INERT_FEATURES.md` §6.
 
 ## Polish & Quality of Life
 

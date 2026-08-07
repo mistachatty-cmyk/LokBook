@@ -1,6 +1,7 @@
 # LokBook — Inert Feature Audit
 
-**Generated:** August 2026 · post Easel migration · regenerate with `node scripts/audit-inert.mjs`
+**Generated:** August 2026 · post Easel migration, updated post double-sell/inert-module pass ·
+regenerate with `node scripts/audit-inert.mjs`
 
 "Inert" = the thing is declared, sold or toggleable in the UI, but **nothing
 consumes it** — buying or flipping it changes nothing. Every entry below is
@@ -12,13 +13,22 @@ backed by a grep for the actual consumer, not by inspection.
 
 | Area | Total | Wired | Inert |
 |---|---|---|---|
-| Cosmetic categories | 16 | 13 | **3** |
-| Studio modules | 52 | 36 | **16** (6 are `layers_*` duplicates) |
+| Cosmetic categories | 16 | 14 | **2** |
+| Studio modules | 47 | 42 | **5** (`layers_*` double-sell delisted, not deleted) |
 | Equipped settings (theme/effect/sky/FX/…) | 10 | 10 | 0 |
 | Shop categories surfaced | 16 | 13 | 3 (hidden in Simple mode) |
 
-**Previous run:** 11/16 cosmetics and 12/52 modules. The Easel migration and the
-shop pass moved 24 modules and 3 cosmetic categories into working state.
+**This pass fixed:** `feat_gif` (real GIF export, wired to the existing
+`engine/gif.js` encoder — it was fully built and just never called),
+`feat_labels` (frame labels, built from scratch), `stickerPack` (Studio's
+sticker button now actually reads the equipped pack instead of a hardcoded
+emoji list). **This pass also found and removed a reverse bug** — `feat_batch`
+was being sold for 40 Loks for a capability (duplicate/reverse/clear frames)
+that was already free and unconditional; delisted rather than built, since
+building a second gated copy of an already-free feature would just be
+confusing. Same treatment for the `layers_*` double-sell (see §2).
+
+**Previous run:** 11/16 cosmetics and 12/52 modules.
 
 ---
 
@@ -40,40 +50,59 @@ required two pre-existing bugs in it:
 
 ---
 
-## 2. Studio modules — 16 of 52 still inert
+## 2. Studio modules — 5 of 47 still inert
 
-**Wired (36).** All brushes (marker, chalk, air, calligraphy, neon, sparkle,
+**Wired (42).** All brushes (marker, chalk, air, calligraphy, neon, sparkle,
 crayon, wash, galaxy, legacy pack), all tools (spray, glow, watercolor, pattern,
 shape, gradient, push, smudge, clone, blur, replace, rulers, transform), and
 features (blend, symmetry, palettes, reference layer, smoothing, brush-lab save,
-canvas sizes) plus the six `anim_*` modules.
+canvas sizes) plus the six `anim_*` modules — **plus, as of this pass, `feat_gif`
+and `feat_labels`.**
 
-**Not built anywhere (10)** — build or stop selling:
-`feat_gif`, `feat_batch`, `feat_tween`, `feat_labels`, `canvas_infinite`,
-`canvas_circular`, `canvas_panorama`, `canvas_xl`, `brush_cross`, `brush_ink`
-(always-on baseline — should probably not be a purchasable id at all).
+**Not built anywhere (5)** — genuinely need engineering, not just wiring:
+`feat_tween` (auto-tween bounce/shake/fade/wiggle — needs a real per-frame
+transform-synthesis pass, scoped but not attempted this round), `canvas_infinite`,
+`canvas_circular`, `canvas_panorama`, `canvas_xl` (all four need changes to the
+Easel's coordinate system and canvas geometry — comparable in scope to the Rooms
+infinite-canvas work, not a quick wire-up).
 
-**Duplicated (6).** `layers_10 … layers_500` duplicate the separate `TIERS` /
-`ownedTiers` system that actually controls layer count. The live easel takes
-`maxLayers` from TIERS and only falls back to `getModuleLayers(modules)`.
-⚠️ Selling both is double-charging for one capability — pick one system.
+**Removed from sale (2):** `feat_batch` (was charging for an always-free
+capability, see summary) and `brush_ink` was already free/default and never
+gated anything — harmless as-is, left alone rather than touched for its own sake.
+Note: `brush_cross` referenced in a previous version of this doc does not
+exist as a Studio module id (only as an unrelated cursor cosmetic) — that was
+a documentation error, corrected here.
+
+**Resolved — the `layers_*` double-sell.** `layers_10 … layers_500` duplicated
+the separate `TIERS` / `ownedTiers` system that actually controls layer count
+— the live easel always receives `maxLayers` from TIERS (Studio passes it
+explicitly) and never falls back to reading the `layers_*` modules, so buying
+them did nothing. Fixed by removing the "Layers" tab from the Shop's module
+browser (`src/pages/Shop.jsx`) so it can no longer be purchased; the module ids
+themselves are left in `constants.jsx` since existing saves may already list
+them as owned and there's no harm in an inert-but-unreachable id remaining.
 
 ---
 
-## 3. Cosmetic categories — 3 of 16 inert
+## 3. Cosmetic categories — 2 of 16 inert
 
 | Category | Status |
 |---|---|
 | nameColor, frame, reactionPack, avatarAccent, blotBorder, gear, lillokSkin, lillokAura, lillokPet, voicePack | ✅ wired |
-| `paper` | ✅ **now wired** — grid / dots / storyboard / graphite overlays |
-| `cursorPack` | ✅ **now wired** — 11 SVG data-URI cursors (`engine/cursors.js`) |
-| `fontPack` | ✅ **now wired** — sets the app root font-family |
-| `stickerPack` | ❌ inert — Studio sticker UI ignores the owned pack |
-| `postExport` | ❌ inert — export is PNG-only; `POST_EXPORTS` is decorative |
-| `musicPack` | ❌ inert — no bundled audio ships; Settings → Music supersedes it |
+| `paper` | ✅ wired — grid / dots / storyboard / graphite overlays |
+| `cursorPack` | ✅ wired — 11 SVG data-URI cursors (`engine/cursors.js`) |
+| `fontPack` | ✅ wired — sets the app root font-family |
+| `stickerPack` | ✅ **now wired** — Studio's "+sticker" button reads `STICKER_PACKS.find(p=>p.id===stickerPack)` instead of a hardcoded 30-emoji list |
+| `postExport` | 🟡 **partially wired** — owning the "gif" or "spritesheet" `postExport` item now also unlocks the real export buttons in Studio (`hasGif`/`hasSprite` check `owned.postExport` as an alternate path alongside the Studio-module gate). webp/apng/pdf/mp4 still have no real encoder behind them — those need actual libraries, not just wiring |
+| `musicPack` | ❌ still inert — this needs bundled, licensed audio *assets* shipped with the app; there's nothing to wire without real files. Not started |
 
-The three remaining are blocked from purchase and badged **NOT ACTIVE YET**, so
-no one can spend Loks on them.
+`musicPack` remains blocked from purchase and badged **NOT ACTIVE YET**. Note
+this is a different system from the on-device music player (Settings → 🎵,
+`MusicPlayer.jsx`) — that one lets a user plug in their own files and works
+correctly (verified: add → persists across reload → plays). Its bug was pure
+discoverability: the header's ♪ icon was actually the sound-effects mute
+toggle, and there was no visible entry point to the real music player anywhere
+outside Settings. Added a dedicated 🎵 button to the main header.
 
 ---
 
@@ -105,17 +134,43 @@ device. A localStorage rung was added; verified 325 Loks across a reload.
   real integration, not a bolt-on.
 - **Stripe checkout** — edge functions exist under `supabase/functions/` but are
   unreachable from the client. **LokPass is currently free to toggle; there is no
-  revenue path.**
-- **Rooms / duels on real devices** — code and RLS are correct and Supabase is
-  connected, but no genuine two-device session has been exercised.
+  revenue path.** Deliberately not touched this pass (explicitly deferred).
+- **Rooms / duels on real devices** — code and RLS are still correct and
+  Supabase is still connected, but a genuine two-device session has *still* not
+  been exercised (this pass added a 10s request timeout to every `rooms/api.js`
+  call so a dropped connection now surfaces an error instead of leaving
+  "Opening…" spinning forever with no way out — but that's a robustness fix,
+  not a substitute for a real multi-device test).
+- **Social platform connectivity** (Instagram/TikTok): explicitly requested as a
+  future direction — letting artists share their flips out to those platforms,
+  or eventually embed/import a Reel. Not started, and the realistic path is
+  staged: (1) short-term, a native share-sheet (`navigator.share`) pointing at
+  an exported video/GIF — near-zero setup, works today's export pipeline; (2)
+  medium-term, direct posting via the Instagram/TikTok Content Publishing APIs
+  — both require a registered developer app, app review, and (for Instagram)
+  a Business/Creator account on the artist's end; (3) embedding a Reel/TikTok
+  video *inside* LokBook is a read-only oEmbed, not full integration, and
+  carries no upload capability. None of this was attempted — it needs product
+  scoping (which tier of the three above is worth building first) before any
+  code.
+- **`feat_tween`** (auto-tween animation presets) and the four `canvas_*`
+  geometry modules (infinite/circular/panorama/xl) — see §2. Scoped, not
+  attempted.
 
 ---
 
 ## Priority after this pass
 
-1. **Payments** (Stripe) — now the single biggest blocker to viability.
-2. **Real-device verification** of Rooms and duels.
-3. Resolve the `layers_*` double-sell.
-4. Build or delist the 10 unbuilt modules; build `postExport` (GIF/MP4 is the
-   most-requested) and `stickerPack`.
+1. **Payments** (Stripe) — still the single biggest blocker to viability.
+2. **Real-device verification** of Rooms and duels — the timeout fix reduces
+   how badly a bad connection fails, but doesn't confirm the realtime path
+   itself works with two people.
+3. ~~Resolve the `layers_*` double-sell.~~ Done this pass.
+4. ~~Build or delist the (formerly) 10 unbuilt modules; build `stickerPack`.~~
+   Done for `feat_gif`, `feat_labels`, `feat_batch` (delisted), `stickerPack`.
+   Remaining: `feat_tween`, the four `canvas_*` modules, `musicPack` (needs
+   real audio assets), and the non-GIF/spritesheet `postExport` formats
+   (webp/apng/pdf/mp4 need actual encoders).
 5. Ecosystem integration.
+6. Social platform connectivity — scope which tier (share-sheet vs. API
+   posting vs. embed) before building anything.

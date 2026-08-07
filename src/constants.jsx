@@ -317,7 +317,6 @@ export const STUDIO_MODULES = [
   { id: "feat_ref", type: "feature", name: "Reference Layer", desc: "Import image as semi-transparent reference", price: 80 },
   { id: "feat_palettes", type: "feature", name: "Palette Packs", desc: "6 curated color palettes", price: 30 },
   { id: "feat_smooth", type: "feature", name: "Stroke Smoothing", desc: "Auto-smooth bezier line fit", price: 60 },
-  { id: "feat_batch", type: "feature", name: "Batch Ops", desc: "Duplicate, reverse, clear all frames", price: 40 },
   { id: "feat_tween", type: "feature", name: "Animation Presets", desc: "Auto-tween bounce, shake, fade, wiggle", price: 120 },
   { id: "feat_labels", type: "feature", name: "Frame Labels", desc: "Name each frame in the timeline", price: 25 },
   { id: "feat_blend", type: "feature", name: "Blend Modes", desc: "Multiply, screen, overlay & more blend modes", price: 60 },
