@@ -5,10 +5,15 @@ import { putTrack, getTrack, deleteTrack, putCover, getCover, deleteCover, ACCEP
 const LIST_KEY = "lok:music:list";
 const PREF_KEY = "lok:music:prefs";
 const PLAYLISTS_KEY = "lok:music:playlists";
+const GAINS_KEY = "lok:music:gains";
 
 const loadList = () => { try { return JSON.parse(localStorage.getItem(LIST_KEY) || "[]"); } catch { return []; } };
 const loadPrefs = () => { try { return { ticker: true, shuffle: false, loop: true, volume: 0.8, visualizerStyle: "bars", ...JSON.parse(localStorage.getItem(PREF_KEY) || "{}") }; } catch { return { ticker: true, shuffle: false, loop: true, volume: 0.8, visualizerStyle: "bars" }; } };
 const loadPlaylists = () => { try { return JSON.parse(localStorage.getItem(PLAYLISTS_KEY) || "[]"); } catch { return []; } };
+// Per-track gain multipliers (0–2, 1 = unchanged) so a quiet track and a loud
+// one don't jump — a lighter version of real loudness normalization that
+// needs no audio analysis, just a number the user sets once per track.
+const loadGains = () => { try { return JSON.parse(localStorage.getItem(GAINS_KEY) || "{}"); } catch { return {}; } };
 
 /**
  * Background music for LokBook.
@@ -27,6 +32,9 @@ export function useMusic() {
   const [idx, setIdx] = useState(-1);
   const [playing, setPlaying] = useState(false);
   const [err, setErr] = useState("");
+  const [gains, setGains] = useState(loadGains);
+  const [sleepAt, setSleepAt] = useState(null);
+  const [sleepRemainingMs, setSleepRemainingMs] = useState(0);
   const mediaRef = useRef(null);
   const urlRef = useRef(null);
   const acRef = useRef(null);
@@ -35,6 +43,7 @@ export function useMusic() {
   useEffect(() => { try { localStorage.setItem(LIST_KEY, JSON.stringify(list)); } catch {} }, [list]);
   useEffect(() => { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch {} }, [prefs]);
   useEffect(() => { try { localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(playlists)); } catch {} }, [playlists]);
+  useEffect(() => { try { localStorage.setItem(GAINS_KEY, JSON.stringify(gains)); } catch {} }, [gains]);
 
   // One <video> element rather than `new Audio()`: a video element plays
   // audio-only files identically, but can also show a picture when the track
@@ -106,7 +115,7 @@ export function useMusic() {
     if (!src) { setErr("That track's data is missing — re-add the file."); return; }
     setErr("");
     a.src = src;
-    a.volume = prefs.volume;
+    a.volume = Math.min(1, Math.max(0, prefs.volume * (gains[playable[n].id] ?? 1)));
     try {
       await a.play();
       setIdx(n); setPlaying(true);
@@ -114,7 +123,7 @@ export function useMusic() {
       if (acRef.current?.state === "suspended") acRef.current.resume().catch(() => {});
     }
     catch { setErr("Playback blocked — tap play once to allow audio."); setPlaying(false); }
-  }, [playable, srcFor, prefs.volume]);
+  }, [playable, srcFor, prefs.volume, gains]);
 
   const toggle = useCallback(async () => {
     const a = audioRef.current;
@@ -145,8 +154,40 @@ export function useMusic() {
     return () => { a.removeEventListener("ended", onEnd); a.removeEventListener("error", onErr); };
   }, [skip, prefs.loop, idx, playable.length]);
 
-  useEffect(() => { if (audioRef.current) audioRef.current.volume = prefs.volume; }, [prefs.volume]);
+  useEffect(() => {
+    if (!audioRef.current || !current) return;
+    audioRef.current.volume = Math.min(1, Math.max(0, prefs.volume * (gains[current.id] ?? 1)));
+  }, [prefs.volume, gains, current]);
   useEffect(() => () => { if (urlRef.current) URL.revokeObjectURL(urlRef.current); }, []);
+
+  const setTrackGain = useCallback((id, mult) => {
+    setGains(g => ({ ...g, [id]: Math.min(2, Math.max(0, mult)) }));
+  }, []);
+
+  // Sleep timer: pause playback once the target time passes. Ticks a display
+  // countdown every 15s rather than every second — nobody needs the extra
+  // precision and it's one less thing re-rendering constantly.
+  const setSleepMinutes = useCallback(mins => {
+    if (!mins) { setSleepAt(null); setSleepRemainingMs(0); return; }
+    setSleepAt(Date.now() + mins * 60000);
+  }, []);
+  const cancelSleep = useCallback(() => { setSleepAt(null); setSleepRemainingMs(0); }, []);
+  useEffect(() => {
+    if (!sleepAt) return;
+    const tick = () => {
+      const rem = sleepAt - Date.now();
+      if (rem <= 0) {
+        const a = audioRef.current;
+        if (a) a.pause();
+        setPlaying(false);
+        setSleepAt(null);
+        setSleepRemainingMs(0);
+      } else setSleepRemainingMs(rem);
+    };
+    tick();
+    const t = setInterval(tick, 15000);
+    return () => clearInterval(t);
+  }, [sleepAt]);
 
   const addUrl = useCallback(raw => {
     const url = (raw || "").trim();
@@ -203,6 +244,7 @@ export function useMusic() {
   const remove = useCallback(id => {
     setList(l => l.filter(t => t.id !== id));
     setPlaylists(pls => pls.map(p => ({ ...p, trackIds: p.trackIds.filter(x => x !== id) })));
+    setGains(g => { const { [id]: _drop, ...rest } = g; return rest; });
     deleteTrack(id);
     deleteCover(id);
   }, []);
@@ -234,7 +276,7 @@ export function useMusic() {
 
   const currentIsVideo = !!current && /^video\//.test(current.mime || "");
 
-  return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, toggleGlobal, playable, allPlayable, playlists, activePlaylist, createPlaylist, renamePlaylist, deletePlaylist, toggleInPlaylist, playPlaylist, clearActivePlaylist, mediaRef, analyserRef, ensureAnalyser, currentIsVideo };
+  return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, toggleGlobal, playable, allPlayable, playlists, activePlaylist, createPlaylist, renamePlaylist, deletePlaylist, toggleInPlaylist, playPlaylist, clearActivePlaylist, mediaRef, analyserRef, ensureAnalyser, currentIsVideo, gains, setTrackGain, sleepAt, sleepRemainingMs, setSleepMinutes, cancelSleep };
 }
 
 export const VISUALIZER_STYLES = [
@@ -427,10 +469,11 @@ export function MusicSheet({ music, onClose, say, devMode = false }) {
   // actual platform instead.
   const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
   const supportsFolder = !isIOS && typeof document !== "undefined" && "webkitdirectory" in document.createElement("input");
-  const { list, prefs, setPrefs, idx, playing, playable, err, allPlayable, playlists, activePlaylist, createPlaylist, deletePlaylist, playPlaylist, clearActivePlaylist, toggleInPlaylist } = music;
+  const { list, prefs, setPrefs, idx, playing, playable, err, allPlayable, playlists, activePlaylist, createPlaylist, deletePlaylist, playPlaylist, clearActivePlaylist, toggleInPlaylist, gains, setTrackGain, sleepRemainingMs, setSleepMinutes, cancelSleep } = music;
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [picked, setPicked] = useState(() => new Set());
+  const [gainOpenId, setGainOpenId] = useState(null);
 
   const linkOuts = list.filter(t => t.kind !== "file");
   const startCreate = () => { setCreating(true); setNewName(""); setPicked(new Set()); };
@@ -504,6 +547,15 @@ export function MusicSheet({ music, onClose, say, devMode = false }) {
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={prefs.ticker} onChange={e => setPrefs(p => ({ ...p, ticker: e.target.checked }))} style={{ accentColor: T.accent }} />Now-playing bar</label>
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={prefs.visualizer !== false} onChange={e => setPrefs(p => ({ ...p, visualizer: e.target.checked }))} style={{ accentColor: T.accent }} />Visualiser</label>
           </div>
+          <div className="mt-2 flex items-center gap-1.5 text-xs font-bold flex-wrap">
+            <span className="opacity-70">Sleep timer:</span>
+            {sleepRemainingMs > 0 ? (<>
+              <span style={{ color: T.accent }}>{Math.ceil(sleepRemainingMs / 60000)} min left</span>
+              <button onClick={cancelSleep} className="lok-btn px-2 py-0.5 rounded-full text-[10px] font-extrabold" style={{ border: `2px solid ${T.ink}` }}>Cancel</button>
+            </>) : [15, 30, 60].map(m => (
+              <button key={m} onClick={() => setSleepMinutes(m)} className="lok-btn px-2 py-0.5 rounded-full text-[10px] font-extrabold" style={{ border: `2px solid ${T.ink}`, background: T.card }}>{m}m</button>
+            ))}
+          </div>
         </div>
 
         <div className="p-3 rounded-2xl mb-2" style={{ border: `2px solid ${T.shadow}`, background: T.paper }}>
@@ -539,12 +591,22 @@ export function MusicSheet({ music, onClose, say, devMode = false }) {
         <div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Queue ({playable.length}{activePlaylist ? ` · ${activePlaylist.name}` : ""})</div>
         {playable.length === 0 && <div className="text-xs opacity-50 py-3 text-center">Nothing queued yet — add a file above.</div>}
         {playable.map((t, i) => (
-          <div key={t.id} className="flex items-center gap-2 p-2 rounded-xl mb-1" style={{ border: `2px solid ${i === idx ? T.accent : T.shadow}`, background: i === idx ? T.card : "transparent" }}>
-            <button onClick={() => music.playAt(i)} aria-label={`Play ${t.title}`} className="lok-btn shrink-0 w-8 h-8 rounded-full font-bold" style={{ border: `2px solid ${T.ink}`, background: T.card }}>{i === idx && playing ? "❚❚" : "▶"}</button>
-            {t.hasCover && <CoverThumb trackId={t.id} />}
-            <div className="min-w-0 flex-1"><div className="font-bold text-sm truncate">{t.title}{t.global && <span className="ml-1.5 text-[9px] font-extrabold uppercase align-middle" style={{ color: T.accent }}>GLOBAL</span>}</div><div className="text-[10px] opacity-50">{t.src === "idb" ? "on device · offline ready" : "link"}</div></div>
-            {devMode && <button onClick={() => music.toggleGlobal(t.id)} aria-pressed={!!t.global} aria-label={`${t.global ? "Unset" : "Set"} ${t.title} as global`} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-extrabold" style={{ border: `2px solid ${T.ink}`, background: t.global ? T.accent : T.card, color: t.global ? T.onAccent : T.ink }}>{t.global ? "★" : "☆"}</button>}
-            <button onClick={() => music.remove(t.id)} aria-label={`Remove ${t.title}`} className="lok-btn shrink-0 text-xs font-bold opacity-60 px-1.5">✕</button>
+          <div key={t.id} className="mb-1 rounded-xl" style={{ border: `2px solid ${i === idx ? T.accent : T.shadow}`, background: i === idx ? T.card : "transparent" }}>
+            <div className="flex items-center gap-2 p-2">
+              <button onClick={() => music.playAt(i)} aria-label={`Play ${t.title}`} className="lok-btn shrink-0 w-8 h-8 rounded-full font-bold" style={{ border: `2px solid ${T.ink}`, background: T.card }}>{i === idx && playing ? "❚❚" : "▶"}</button>
+              {t.hasCover && <CoverThumb trackId={t.id} />}
+              <div className="min-w-0 flex-1"><div className="font-bold text-sm truncate">{t.title}{t.global && <span className="ml-1.5 text-[9px] font-extrabold uppercase align-middle" style={{ color: T.accent }}>GLOBAL</span>}</div><div className="text-[10px] opacity-50">{t.src === "idb" ? "on device · offline ready" : "link"}</div></div>
+              <button onClick={() => setGainOpenId(o => o === t.id ? null : t.id)} aria-expanded={gainOpenId === t.id} aria-label={`Volume for ${t.title}`} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-extrabold" style={{ border: `2px solid ${T.ink}`, background: (gains[t.id] ?? 1) !== 1 ? T.accent : T.card, color: (gains[t.id] ?? 1) !== 1 ? T.onAccent : T.ink }}>🔊</button>
+              {devMode && <button onClick={() => music.toggleGlobal(t.id)} aria-pressed={!!t.global} aria-label={`${t.global ? "Unset" : "Set"} ${t.title} as global`} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-extrabold" style={{ border: `2px solid ${T.ink}`, background: t.global ? T.accent : T.card, color: t.global ? T.onAccent : T.ink }}>{t.global ? "★" : "☆"}</button>}
+              <button onClick={() => music.remove(t.id)} aria-label={`Remove ${t.title}`} className="lok-btn shrink-0 text-xs font-bold opacity-60 px-1.5">✕</button>
+            </div>
+            {gainOpenId === t.id && (
+              <div className="flex items-center gap-2 px-2 pb-2 text-xs font-bold">
+                <span className="opacity-60 shrink-0">Track volume</span>
+                <input type="range" min="0" max="2" step="0.1" value={gains[t.id] ?? 1} onChange={e => setTrackGain(t.id, +e.target.value)} className="flex-1" style={{ accentColor: T.accent }} aria-label={`${t.title} volume multiplier`} />
+                <span className="tabular-nums opacity-60 w-9 text-right">{Math.round((gains[t.id] ?? 1) * 100)}%</span>
+              </div>
+            )}
           </div>
         ))}
 
