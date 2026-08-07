@@ -418,7 +418,15 @@ export function MusicSheet({ music, onClose, say, devMode = false }) {
   const [url, setUrl] = useState("");
   const fileRef = useRef(null);
   const folderRef = useRef(null);
-  const supportsFolder = typeof document !== "undefined" && "webkitdirectory" in document.createElement("input");
+  // `'webkitdirectory' in input` is true on basically every engine, including
+  // iOS Safari — it's a spec'd IDL property that exists whether or not the OS
+  // actually honors it. iOS never offers a real folder-picker dialog for file
+  // inputs (Android and desktop browsers do), so that check alone falsely
+  // claimed the folder button was "hidden on iOS" when it would have shown
+  // there and silently failed to behave like a folder picker. Gate on the
+  // actual platform instead.
+  const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const supportsFolder = !isIOS && typeof document !== "undefined" && "webkitdirectory" in document.createElement("input");
   const { list, prefs, setPrefs, idx, playing, playable, err, allPlayable, playlists, activePlaylist, createPlaylist, deletePlaylist, playPlaylist, clearActivePlaylist, toggleInPlaylist } = music;
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -443,11 +451,12 @@ export function MusicSheet({ music, onClose, say, devMode = false }) {
 
         <div className="p-3 rounded-2xl mb-2" style={{ border: `3px solid ${T.ink}`, background: T.paper }}>
           <div className="lok-display font-extrabold text-sm">Plug in your music</div>
-          <div className="text-xs opacity-70 mt-0.5 leading-snug">Add MP3/M4A/MP4/WAV/FLAC files — they're stored on-device and keep playing offline. Select an album's cover image alongside its tracks (or a whole folder) and every track in it picks up that cover. Streaming links are saved as shortcuts.</div>
+          <div className="text-xs opacity-70 mt-0.5 leading-snug">Add MP3/M4A/MP4/WAV/FLAC files — they're stored on-device and keep playing offline. {isIOS ? "Multi-select an album's tracks together with its cover image in Files/Photos and every track picks up that cover." : "Select an album's cover image alongside its tracks (or a whole folder) and every track in it picks up that cover."} Streaming links are saved as shortcuts.</div>
           <div className="mt-2 flex gap-1.5">
             <button onClick={() => fileRef.current?.click()} className="lok-btn lok-display flex-1 py-2.5 rounded-xl font-extrabold text-sm" style={{ background: T.accent, color: T.onAccent, border: `3px solid ${T.ink}` }}>＋ Add files</button>
             {supportsFolder && <button onClick={() => folderRef.current?.click()} className="lok-btn lok-display flex-1 py-2.5 rounded-xl font-extrabold text-sm" style={{ background: T.card, color: T.ink, border: `3px solid ${T.ink}` }}>＋ Add a folder</button>}
           </div>
+          {isIOS && <div className="mt-1.5 text-[10px] opacity-50 leading-snug">iOS doesn't offer a real folder picker (Apple platform limit, not a LokBook gap) — but selecting several tracks plus one cover image together in one go gets you the same result.</div>}
           <input ref={fileRef} type="file" accept={ACCEPTED + ",image/png,image/jpeg,image/webp,image/gif"} multiple hidden aria-hidden="true"
             onChange={async e => { const f = [...(e.target.files || [])]; e.target.value = ""; if (!f.length) return; await music.addFiles(f); say && say(`${f.length} file${f.length > 1 ? "s" : ""} added`, "success"); }} />
           {supportsFolder && <input ref={folderRef} type="file" webkitdirectory="" directory="" multiple hidden aria-hidden="true"
