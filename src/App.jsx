@@ -461,7 +461,7 @@ function NewStudioUI({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt,animFx,mo
   // A short periodic snapshot means switching tabs mid-stroke never loses more than ~2s of work.
   useEffect(()=>{const t=setInterval(()=>{if(easel.current)Promise.resolve(easel.current.composite()).then(setDraftImg).catch(()=>{});},2000);return()=>clearInterval(t);},[]);
   const[fps,setFps]=useState(24);const[playing,setPlaying]=useState(false);const[loop,setLoop]=useState(true);const[timelineZoom,setTimelineZoom]=useState(1);const[lightboxFrame,setLightboxFrame]=useState(null);const[autoAdvance,setAutoAdvance]=useState(false);const[onionCrosshair,setOnionCrosshair]=useState(false);const[clipboardFrame,setClipboardFrame]=useState(null);
-  const hasFps=hasModule(modules,"anim_fps");const hasPlayback=hasModule(modules,"anim_playback");const hasOnionPro=hasModule(modules,"anim_onion_pro");const hasZoom=hasModule(modules,"anim_timeline_zoom");const hasVideo=hasModule(modules,"anim_export_video");const hasSprite=hasModule(modules,"anim_export_spritesheet")||postExport==="spritesheet";const hasGif=hasModule(modules,"feat_gif")||postExport==="gif";const hasLabels=hasModule(modules,"feat_labels");
+  const hasFps=hasModule(modules,"anim_fps");const hasPlayback=hasModule(modules,"anim_playback");const hasOnionPro=hasModule(modules,"anim_onion_pro");const hasZoom=hasModule(modules,"anim_timeline_zoom");const hasVideo=hasModule(modules,"anim_export_video");const hasSprite=hasModule(modules,"anim_export_spritesheet")||postExport==="spritesheet";const hasGif=hasModule(modules,"feat_gif")||postExport==="gif";const hasLabels=hasModule(modules,"feat_labels");const hasTween=hasModule(modules,"feat_tween");
   const[frameLabels,setFrameLabels]=useState([]);const[editingLabel,setEditingLabel]=useState(null);
   const[showShare,setShowShare]=useState(false);
   const pastPrompts=useMemo(()=>{const doy=d=>Math.floor((d-new Date(d.getFullYear(),0,0))/86400000);return Array.from({length:5},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(i+1));return PROMPTS[(d.getFullYear()*366+doy(d))%PROMPTS.length];});},[]);
@@ -485,6 +485,37 @@ function NewStudioUI({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt,animFx,mo
   const togglePlay=()=>{if(frames.length<2){say("Need at least 2 pages");return;}setPlaying(p=>!p);};
   const exportVideo=async()=>{if(!frames.length)return;say("Exporting video...");const c=document.createElement("canvas");c.width=W;c.height=H;const ctx=c.getContext("2d");const stream=c.captureStream(30);const recorder=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm"});const chunks=[];recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};recorder.onstop=()=>{const blob=new Blob(chunks,{type:"video/webm"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(title.trim()||"flip")+".webm";a.click();URL.revokeObjectURL(url);say("Video exported!","success");};recorder.start();for(let i=0;i<frames.length;i++){const img=new Image();await new Promise(r=>{img.onload=r;img.src=frames[i];});ctx.clearRect(0,0,W,H);paperBase(ctx,i);ctx.drawImage(img,0,0);await new Promise(r=>setTimeout(r,frameDurations[i]||paceMs));}recorder.stop();};
   const exportSpritesheet=async()=>{if(!frames.length)return;const cols=Math.min(frames.length,8);const rows=Math.ceil(frames.length/cols);const c=document.createElement("canvas");c.width=W*cols;c.height=H*rows;const ctx=c.getContext("2d");for(let i=0;i<frames.length;i++){const img=new Image();await new Promise(r=>{img.onload=r;img.src=frames[i];});ctx.drawImage(img,(i%cols)*W,Math.floor(i/cols)*H,W,H);}const a=document.createElement("a");a.href=c.toDataURL("image/png");a.download=(title.trim()||"flip")+"_spritesheet.png";a.click();say("Spritesheet exported!","success");};
+  // feat_tween: synthesise in-between pages from one drawn page by replaying
+  // it under a per-frame transform. Cheaper than drawing the motion by hand
+  // and it keeps whatever the source page already had (transparency included),
+  // because each output is just the source re-drawn onto a clear W×H canvas.
+  const TWEENS={
+    bounce:{n:8,label:"Bounce",at:(ctx,img,t)=>{const y=-Math.abs(Math.sin(t*Math.PI))*H*0.13;ctx.translate(0,y);}},
+    shake: {n:6,label:"Shake", at:(ctx,img,t,i)=>{const x=(i%2?1:-1)*(1-t)*W*0.035;ctx.translate(x,0);}},
+    fade:  {n:6,label:"Fade",  at:(ctx,img,t)=>{ctx.globalAlpha=1-t*0.85;}},
+    wiggle:{n:8,label:"Wiggle",at:(ctx,img,t)=>{ctx.translate(W/2,H/2);ctx.rotate(Math.sin(t*Math.PI*2)*0.06);ctx.translate(-W/2,-H/2);}},
+  };
+  const applyTween=async key=>{
+    const spec=TWEENS[key];
+    const srcUrl=frames[frames.length-1];
+    if(!spec||!srcUrl){say("Capture a page first","error");return;}
+    say(`${spec.label}…`);
+    try{
+      const img=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=srcUrl;});
+      const out=[];
+      for(let i=0;i<spec.n;i++){
+        const t=spec.n===1?0:i/(spec.n-1);
+        const c=document.createElement("canvas");c.width=W;c.height=H;
+        const ctx=c.getContext("2d");
+        ctx.save();spec.at(ctx,img,t,i);ctx.drawImage(img,0,0,W,H);ctx.restore();
+        out.push(c.toDataURL("image/png"));
+      }
+      setFrames(f=>[...f,...out]);
+      setFrameDurations(d=>[...d,...out.map(()=>Math.max(40,Math.round(paceMs*0.6)))]);
+      setFrameLabels(l=>[...l,...out.map((_,i)=>`${key}${i+1}`)]);
+      say(`${spec.label} · +${out.length} pages`,"success");
+    }catch(e){console.warn("tween",e);say("Couldn't build that motion","error");}
+  };
   const exportGif=async()=>{if(frames.length<2)return;say("Encoding GIF…");try{const canvases=await Promise.all(frames.map((src,i)=>new Promise((res,rej)=>{const img=new Image();img.onload=()=>{const c=document.createElement("canvas");c.width=W;c.height=H;const ctx=c.getContext("2d");paperBase(ctx,i);ctx.drawImage(img,0,0);c.userDelay=Math.round((frameDurations[i]||paceMs)/10);res(c);};img.onerror=rej;img.src=src;})));const blob=encodeGIF(canvases,{delay:Math.round(paceMs/10),loop:0});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(title.trim()||"flip")+".gif";a.click();URL.revokeObjectURL(url);say(`GIF exported · ${(blob.size/1024).toFixed(1)}KB`,"success");}catch(e){console.warn("exportGif",e);say("GIF export failed — try fewer/smaller pages","error");}};
   const exportLok=async()=>{if(frames.length<2)return;try{const blob=await encodeLok(frames,{title:title.trim()||"Untitled flip",paceMs:frameDurations,loop:true});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(title.trim()||"flip")+".lok";a.click();URL.revokeObjectURL(a.href);say(`.lok exported · ${(blob.size/1024).toFixed(1)}KB`,"success");}catch(e){console.warn("exportLok",e);say("Export failed","error");}};
   return(<div className="mt-4">
@@ -534,6 +565,10 @@ function NewStudioUI({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt,animFx,mo
       <button onClick={()=>setShowShare(true)} disabled={frames.length<2} className="lok-btn px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.accent}`,color:T.accent,opacity:frames.length<2?0.35:1}}>📤 Share</button>
       <button onClick={exportLok} disabled={frames.length<2} aria-label="Export as .lok — LokBook's open animation format" className="lok-btn px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.accent}`,color:T.accent,opacity:frames.length<2?0.35:1}}>🔗 .lok</button>
     </div>
+    {hasTween&&<div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-0.5">
+      <span className="text-[10px] font-bold opacity-60 shrink-0">auto-motion</span>
+      {Object.entries(TWEENS).map(([k,v])=>(<button key={k} onClick={()=>applyTween(k)} disabled={!frames.length} title={`Add ${v.n} ${v.label.toLowerCase()} pages from the last page`} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,color:T.ink,opacity:frames.length?1:0.35}}>{v.label}</button>))}
+    </div>}
     <button onClick={capture} aria-label={`Capture page ${frames.length+1}`} className="lok-btn lok-display mt-3 w-full py-3.5 rounded-xl text-lg font-extrabold flex items-center justify-center gap-2" style={{background:T.ink,color:T.paper,boxShadow:`4px 4px 0 ${T.accent}`,transform:justCap?"scale(.97)":"scale(1)",transition:"transform .2s"}}>
       <span style={{fontSize:20,lineHeight:1}}>＋</span> Capture page {frames.length+1}
     </button>

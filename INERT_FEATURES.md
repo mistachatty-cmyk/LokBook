@@ -3,7 +3,17 @@
 **Generated:** August 2026 · post Easel migration, updated post double-sell/inert-module pass,
 updated again post crash-fix/sharing/playlists pass · regenerate with `node scripts/audit-inert.mjs`
 
-## 0a. Latest pass — skins, living backdrops, music A/V
+## 0a. Latest pass — skins, living backdrops, music A/V, feat_tween
+
+- **`feat_tween` is no longer inert.** It was sold for 120 Loks and did
+  nothing; it now synthesises in-between pages from the last drawn page by
+  replaying it under a per-frame transform (Bounce / Shake / Fade / Wiggle).
+  Each output is the source page re-drawn onto a clear W×H canvas, so
+  transparency is preserved. Verified through the real UI: bought the module,
+  the "auto-motion" row appeared (correctly hidden until owned), 1 page became
+  9 after Bounce, and a pixel comparison of the thumbnails found 5 distinct
+  images — which is exactly right for a bounce, since the arc is symmetric and
+  the up/down halves share heights. Only `canvas_*` geometry remains unbuilt.
 
 - **Skins 23 → 45.** New ones are drawn from the named wards in the world
   bible rather than invented palettes. Contrast verified programmatically
@@ -88,7 +98,7 @@ backed by a grep for the actual consumer, not by inspection.
 | Area | Total | Wired | Inert |
 |---|---|---|---|
 | Cosmetic categories | 16 | 14 | **2** |
-| Studio modules | 47 | 42 | **5** (`layers_*` double-sell delisted, not deleted) |
+| Studio modules | 47 | 43 | **4** (`layers_*` double-sell delisted, not deleted) |
 | Equipped settings (theme/effect/sky/FX/…) | 10 | 10 | 0 |
 | Shop categories surfaced | 16 | 13 | 3 (hidden in Simple mode) |
 
@@ -124,18 +134,17 @@ required two pre-existing bugs in it:
 
 ---
 
-## 2. Studio modules — 5 of 47 still inert
+## 2. Studio modules — 4 of 47 still inert
 
-**Wired (42).** All brushes (marker, chalk, air, calligraphy, neon, sparkle,
+**Wired (43).** All brushes (marker, chalk, air, calligraphy, neon, sparkle,
 crayon, wash, galaxy, legacy pack), all tools (spray, glow, watercolor, pattern,
 shape, gradient, push, smudge, clone, blur, replace, rulers, transform), and
 features (blend, symmetry, palettes, reference layer, smoothing, brush-lab save,
-canvas sizes) plus the six `anim_*` modules — **plus, as of this pass, `feat_gif`
-and `feat_labels`.**
+canvas sizes) plus the six `anim_*` modules — **plus `feat_gif`, `feat_labels`
+and `feat_tween`.**
 
-**Not built anywhere (5)** — genuinely need engineering, not just wiring:
-`feat_tween` (auto-tween bounce/shake/fade/wiggle — needs a real per-frame
-transform-synthesis pass, scoped but not attempted this round), `canvas_infinite`,
+**Not built anywhere (4)** — genuinely need engineering, not just wiring:
+`canvas_infinite`,
 `canvas_circular`, `canvas_panorama`, `canvas_xl` (all four need changes to the
 Easel's coordinate system and canvas geometry — comparable in scope to the Rooms
 infinite-canvas work, not a quick wire-up).
