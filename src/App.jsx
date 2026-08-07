@@ -30,6 +30,7 @@ import LilLokPanel, { LilLokBubble, LilLokSprite } from "./LilLok.jsx";
 import InterventionFX from "./InterventionFX.jsx";
 import EmptyState from "./EmptyState.jsx";
 import GuestSavePrompt from "./GuestSavePrompt.jsx";
+import SharePreview from "./SharePreview.jsx";
 import Rooms from "./pages/Rooms.jsx";
 import { resolveCheat } from "./engine/bleepbox.js";
 import MythicPreview from "./MythicPreview.jsx";
@@ -462,6 +463,7 @@ function NewStudioUI({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt,animFx,mo
   const[fps,setFps]=useState(24);const[playing,setPlaying]=useState(false);const[loop,setLoop]=useState(true);const[timelineZoom,setTimelineZoom]=useState(1);const[lightboxFrame,setLightboxFrame]=useState(null);const[autoAdvance,setAutoAdvance]=useState(false);const[onionCrosshair,setOnionCrosshair]=useState(false);const[clipboardFrame,setClipboardFrame]=useState(null);
   const hasFps=hasModule(modules,"anim_fps");const hasPlayback=hasModule(modules,"anim_playback");const hasOnionPro=hasModule(modules,"anim_onion_pro");const hasZoom=hasModule(modules,"anim_timeline_zoom");const hasVideo=hasModule(modules,"anim_export_video");const hasSprite=hasModule(modules,"anim_export_spritesheet")||postExport==="spritesheet";const hasGif=hasModule(modules,"feat_gif")||postExport==="gif";const hasLabels=hasModule(modules,"feat_labels");
   const[frameLabels,setFrameLabels]=useState([]);const[editingLabel,setEditingLabel]=useState(null);
+  const[showShare,setShowShare]=useState(false);
   const pastPrompts=useMemo(()=>{const doy=d=>Math.floor((d-new Date(d.getFullYear(),0,0))/86400000);return Array.from({length:5},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(i+1));return PROMPTS[(d.getFullYear()*366+doy(d))%PROMPTS.length];});},[]);
   const activePrompt=promptPick||dailyPrompt;
   const playRef=useRef(null);useEffect(()=>{if(!playing||frames.length<2)return;const t=setInterval(()=>{setPv(p=>{if(p+1>=frames.length){if(loop)return 0;setPlaying(false);return p;}return p+1;});},paceMs);playRef.current=t;return()=>clearInterval(t);},[playing,frames.length,paceMs,loop]);
@@ -529,6 +531,7 @@ function NewStudioUI({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt,animFx,mo
       {hasVideo&&<button onClick={exportVideo} disabled={frames.length<2} className="lok-btn px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,color:T.ink,opacity:frames.length<2?0.35:1}}>🎬 Video</button>}
       {hasSprite&&<button onClick={exportSpritesheet} disabled={frames.length<2} className="lok-btn px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,color:T.ink,opacity:frames.length<2?0.35:1}}>📦 Sheet</button>}
       {hasGif&&<button onClick={exportGif} disabled={frames.length<2} className="lok-btn px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,color:T.ink,opacity:frames.length<2?0.35:1}}>🖼 GIF</button>}
+      <button onClick={()=>setShowShare(true)} disabled={frames.length<2} className="lok-btn px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.accent}`,color:T.accent,opacity:frames.length<2?0.35:1}}>📤 Share</button>
       <button onClick={exportLok} disabled={frames.length<2} aria-label="Export as .lok — LokBook's open animation format" className="lok-btn px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.accent}`,color:T.accent,opacity:frames.length<2?0.35:1}}>🔗 .lok</button>
     </div>
     <button onClick={capture} aria-label={`Capture page ${frames.length+1}`} className="lok-btn lok-display mt-3 w-full py-3.5 rounded-xl text-lg font-extrabold flex items-center justify-center gap-2" style={{background:T.ink,color:T.paper,boxShadow:`4px 4px 0 ${T.accent}`,transform:justCap?"scale(.97)":"scale(1)",transition:"transform .2s"}}>
@@ -581,7 +584,7 @@ function NewStudioUI({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt,animFx,mo
         <div><div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Style</div><div className="flex gap-2">{[["bold","Bold"],["series","Series"]].map(([id,l])=>(<button key={id} onClick={()=>setStyle(id)} aria-pressed={style===id} className="lok-btn flex-1 py-2 rounded-xl text-xs font-bold" style={{border:`2.5px solid ${style===id?T.accent:T.ink}`,background:style===id?T.alt:T.card,color:style===id?"#fff":T.ink}}>{l}</button>))}</div></div>
       </div>
       <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Name this flip…" aria-label="Flip title" className="mt-3 w-full px-3 py-2.5 rounded-xl font-bold" style={{border:`3px solid ${T.ink}`,background:T.card,color:T.ink}}/>
-      <button disabled={!ready} aria-label={ready?"Publish to gallery":"Need 2+ pages"} onClick={()=>{if(!ready){say("Capture at least 2 pages first");return;}onPublish({id:"p"+Date.now(),title:title.trim()||"Untitled flip",frames,frameDurations,paceMs,mode,style,weeklyPrompt:activePrompt===WEEKLY_PROMPT?WEEKLY_PROMPT:null,votes:0,voted:false,viewed:false,views:0,reactions:{splat:0,heart:0,drip:0},from:"studio",author:authorName});setFrames([]);setFrameDurations([]);setTitle("");setClipboardFrame(null);setDraftImg(null);easel.current.clearAll();}} className="lok-btn lok-display mt-3 w-full py-3.5 rounded-xl text-lg font-extrabold" style={{background:ready?T.accent:T.shadow,color:ready?T.onAccent:T.ink,border:`3px solid ${T.ink}`,boxShadow:ready?`4px 4px 0 ${T.ink}`:"none",opacity:ready?1:0.6}}>
+      <button disabled={!ready} aria-label={ready?"Publish to gallery":"Need 2+ pages"} onClick={()=>{if(!ready){say("Capture at least 2 pages first");return;}onPublish({id:"p"+Date.now(),title:title.trim()||"Untitled flip",frames,frameDurations,paceMs,mode,style,weeklyPrompt:activePrompt===WEEKLY_PROMPT?WEEKLY_PROMPT:null,votes:0,voted:false,viewed:false,views:0,reactions:{splat:0,heart:0,drip:0},from:"studio",author:authorName});setFrames([]);setFrameDurations([]);setFrameLabels([]);setTitle("");setClipboardFrame(null);setDraftImg(null);easel.current.clearAll();}} className="lok-btn lok-display mt-3 w-full py-3.5 rounded-xl text-lg font-extrabold" style={{background:ready?T.accent:T.shadow,color:ready?T.onAccent:T.ink,border:`3px solid ${T.ink}`,boxShadow:ready?`4px 4px 0 ${T.ink}`:"none",opacity:ready?1:0.6}}>
         {ready?"Publish to gallery →":`Capture ${2-frames.length} more page${2-frames.length===1?"":"s"}`}
       </button>
     </div>)}
@@ -589,6 +592,7 @@ function NewStudioUI({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt,animFx,mo
       <img src={lightboxFrame} alt="Frame preview" className="max-w-[80vw] max-h-[90vh] rounded-2xl" style={{border:`4px solid ${T.paper}`}}/>
       <button onClick={()=>setLightboxFrame(null)} className="absolute top-4 right-4 text-2xl font-bold" style={{color:"#fff",textShadow:"0 2px 4px rgba(0,0,0,.5)"}}>✕</button>
     </div>}
+    {showShare&&<SharePreview frames={frames} frameDurations={frameDurations} paceMs={paceMs} title={title} say={say} onClose={()=>setShowShare(false)}/>}
   </div>);
 }
 
@@ -1017,7 +1021,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
               <input value={passEmail} onChange={e=>setPassEmail(e.target.value)} type="email" placeholder="email (optional)" aria-label="Email for guest pass" className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}/>
               <button onClick={mintPass} disabled={passBusy} className="lok-btn shrink-0 px-3 py-2 rounded-xl font-extrabold text-sm" style={{background:T.alt,color:T.onAccent,border:`2.5px solid ${T.ink}`,opacity:passBusy?0.6:1}}>{passBusy?"…":"Stash my ink"}</button>
             </div>
-            <div className="text-[10px] opacity-50 mt-1">Get a code you can redeem later — on this device or a new one.</div>
+            <div className="text-[10px] opacity-50 mt-1">Get a code you can redeem later, on this device or a new one — it brings back your whole gallery, Loks, and LilLok exactly as you left them. Full control, no account required.</div>
           </>)}
           <button onClick={()=>setRedeemOpen(v=>!v)} className="mt-2 text-[11px] font-bold underline opacity-60">have a code already?</button>
           {redeemOpen&&(<div className="mt-1.5 flex gap-1.5">

@@ -43,18 +43,25 @@ The unit is a finished flip, not a scroll session.
   custom presets, and a growing set of paid Studio modules (brushes, tools,
   animation features) that unlock real capability, not cosmetic-only tiers.
 - **Export that leaves the app.** Animated GIF, spritesheet, WebM video, and
-  a native `.lok` open animation format — your work isn't trapped here.
+  a native `.lok` open animation format — your work isn't trapped here. A
+  Share preview also renders your flip at the exact size Instagram/TikTok/
+  YouTube expect (Reel/Story/Short, Square, or native) before handing it to
+  your phone's share sheet or a download.
 - **A fullscreen, distraction-free canvas.** Every drawing surface in the app
-  has a one-tap fullscreen toggle that hides all app chrome and lets the
-  canvas fill the screen — for when you just want to draw.
-- **Guest-friendly by design, not by accident.** You can use the entire app
-  without an account. If you're a guest, LokBook actively looks out for your
-  work: a dismissible prompt after publishing offers sign-in or a **Guest
-  Pass** — a ghost-themed recovery code (e.g. `hollow-well-4821`) that lets
-  you recover your gallery from any device, no account required, and never
-  expires. A second prompt watches for guest saves aging past a
+  has a one-tap fullscreen toggle that hides all app chrome; a second toggle
+  collapses the toolbar too, so the canvas can use nearly the entire screen
+  for detail work.
+- **Full control back, guaranteed — this is a core feature, not a fallback.**
+  You can use the entire app without an account, and LokBook actively
+  protects guest work rather than leaving it to chance: a dismissible prompt
+  after publishing offers sign-in or a **Guest Pass** — a ghost-themed
+  recovery code (e.g. `hollow-well-4821`, minted and redeemed server-side,
+  verified end-to-end) that hands back your *entire* gallery, Loks, and
+  LilLok exactly as you left them, from any device, with no account and no
+  expiration. A second prompt watches for guest saves aging past a
   user-configurable window (default 7 days) and nudges again before local
-  storage might quietly clear it.
+  storage might quietly clear it. Coming back and picking up exactly where
+  you left off is meant to always work — that's the point of the feature.
 - **A world, not just a UI.** LokBook has a light in-world vocabulary — the
   **Well** ink is drawn from, **wards** (neighborhoods) residents belong to,
   a LilLok as "ink that stayed long enough to grow an opinion." It's shallow

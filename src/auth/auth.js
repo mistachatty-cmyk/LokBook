@@ -44,21 +44,33 @@ export function getApiToken() {
   return currentSession?.access_token || SUPA_KEY;
 }
 
+// A dropped/hanging connection used to leave the sign-in button stuck on
+// "Sending…" forever with no error and no way out but a reload — the
+// Supabase client has no built-in request timeout. Every auth call below
+// races against a hard ceiling so the caller's UI always settles.
+const AUTH_TIMEOUT_MS = 10000;
+function withTimeout(promise, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), AUTH_TIMEOUT_MS)),
+  ]);
+}
+
 export async function signInWithEmail(email) {
   if (!supabase) throw new Error("Supabase not configured");
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { shouldCreateUser: true },
-  });
+  const { error } = await withTimeout(
+    supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } }),
+    "Sign-in timed out — check your connection and try again"
+  );
   if (error) throw error;
 }
 
 export async function signInWithOAuth(provider) {
   if (!supabase) throw new Error("Supabase not configured");
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider,
-    options: { redirectTo: window.location.origin },
-  });
+  const { error } = await withTimeout(
+    supabase.auth.signInWithOAuth({ provider, options: { redirectTo: window.location.origin } }),
+    "Sign-in timed out — check your connection and try again"
+  );
   if (error) throw error;
 }
 

@@ -44,7 +44,7 @@ export default function GuestSavePrompt({ reason = "publish", guestDays = 7, onS
         <div className="mt-3 p-3 rounded-2xl text-center" style={{ border: `2px dashed ${T.ink}`, background: T.paper }}>
           <div className="text-[10px] font-bold uppercase tracking-widest opacity-50">your code — write it down</div>
           <div className="lok-display font-extrabold text-lg my-1" style={{ color: T.accent, letterSpacing: 0.5 }}>{passCode}</div>
-          <div className="text-[11px] opacity-60">Doesn't expire — redeem it anytime, on any device.</div>
+          <div className="text-[11px] opacity-60">Doesn't expire — redeem it anytime, on any device, and you get your whole gallery, Loks, and LilLok back exactly as you left them. Full control, no account required.</div>
         </div>
       ) : sent ? (
         <div className="mt-3 text-sm leading-snug">✉️ Check <strong>{email}</strong> for your magic link.</div>

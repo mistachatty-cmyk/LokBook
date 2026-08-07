@@ -1,7 +1,52 @@
 # LokBook — Inert Feature Audit
 
-**Generated:** August 2026 · post Easel migration, updated post double-sell/inert-module pass ·
-regenerate with `node scripts/audit-inert.mjs`
+**Generated:** August 2026 · post Easel migration, updated post double-sell/inert-module pass,
+updated again post crash-fix/sharing/playlists pass · regenerate with `node scripts/audit-inert.mjs`
+
+## 0. This pass — bug fixes and new capability
+
+- **Fixed a real Easel crash.** Pinch-zoom divided by the initial two-finger
+  distance; if both touches land at ~the same point (a common way a pinch
+  gesture starts on a touchscreen), that distance is ~0, producing `NaN` that
+  poisoned `zoom`/`pan` state and broke the canvas transform permanently
+  (no recovery without a reload). Fixed at the source (guard degenerate
+  distances) plus a self-healing effect that resets zoom/pan to sane defaults
+  if either ever goes non-finite, as a safety net against any other path.
+  Verified via a simulated zero-distance pinch (CDP touch events) that the
+  canvas survives and stays drawable afterward.
+- **Fixed the sign-in button getting stuck on "Sending…" forever.** Same root
+  cause as the Rooms timeout fix from earlier: `src/auth/auth.js` had no
+  timeout on the Supabase auth calls, so a dropped/slow connection left the
+  button spinning with no error and no way out but a reload. Added a 10s
+  timeout to `signInWithEmail`/`signInWithOAuth`; verified the button now
+  correctly reverts and shows an error instead of hanging.
+- **Guest of the Pass — verified end-to-end at the database level**, not just
+  read: minted a real code, redeemed it (got the exact save blob back),
+  redeemed it again (still works — not single-use), and confirmed an unknown
+  code returns null safely. This is the app's core answer to "what happens to
+  my work if I never made an account" and should be treated as a primary,
+  load-bearing feature, not a secondary safety net — messaging in both the
+  post-publish prompt and Settings now says explicitly that redeeming returns
+  "your whole gallery, Loks, and LilLok back exactly as you left them."
+- **Fullscreen canvas can now fully take over the screen.** Previously capped
+  at 62vh to leave room for the toolbar; added a second toggle (visible only
+  in fullscreen) that collapses the toolbar so the canvas grows to ~92vh —
+  for detail work where every pixel of screen matters.
+- **New: Share preview for Instagram/TikTok/YouTube** (`src/SharePreview.jsx`).
+  LokBook cannot post directly to those platforms — that requires a
+  registered developer app and review on each platform's side, which doesn't
+  exist. What this does honestly: renders a live, correctly-sized preview at
+  each platform's real aspect ratio (Reel/Story/Short 9:16, Square post 1:1,
+  or LokBook's native 4:5), then exports a video at that exact size and hands
+  it to the OS share sheet (`navigator.share`, which lists Instagram/TikTok/
+  YouTube if installed) or downloads it for manual upload.
+- **New: user playlists** in the on-device music player (`src/MusicPlayer.jsx`).
+  Named subsets of your own added tracks — create, delete, play a playlist
+  (scopes the queue to just those tracks), "back to full queue" to clear.
+  Verified end-to-end. Curated/official artist playlists with cover art and
+  attribution links (the "clearance box" discovery concept, per-play reward
+  tokens, remixing) are intentionally **not** built — see `TODO.md`, they need
+  real content/assets and product scoping first.
 
 "Inert" = the thing is declared, sold or toggleable in the UI, but **nothing
 consumes it** — buying or flipping it changes nothing. Every entry below is

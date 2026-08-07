@@ -4,9 +4,11 @@ import { putTrack, getTrack, deleteTrack, ACCEPTED, kindOfUrl, titleFromUrl } fr
 
 const LIST_KEY = "lok:music:list";
 const PREF_KEY = "lok:music:prefs";
+const PLAYLISTS_KEY = "lok:music:playlists";
 
 const loadList = () => { try { return JSON.parse(localStorage.getItem(LIST_KEY) || "[]"); } catch { return []; } };
 const loadPrefs = () => { try { return { ticker: true, shuffle: false, loop: true, volume: 0.8, ...JSON.parse(localStorage.getItem(PREF_KEY) || "{}") }; } catch { return { ticker: true, shuffle: false, loop: true, volume: 0.8 }; } };
+const loadPlaylists = () => { try { return JSON.parse(localStorage.getItem(PLAYLISTS_KEY) || "[]"); } catch { return []; } };
 
 /**
  * Background music for LokBook.
@@ -20,6 +22,8 @@ const loadPrefs = () => { try { return { ticker: true, shuffle: false, loop: tru
 export function useMusic() {
   const [list, setList] = useState(loadList);
   const [prefs, setPrefs] = useState(loadPrefs);
+  const [playlists, setPlaylists] = useState(loadPlaylists);
+  const [activePlaylistId, setActivePlaylistId] = useState(null);
   const [idx, setIdx] = useState(-1);
   const [playing, setPlaying] = useState(false);
   const [err, setErr] = useState("");
@@ -28,10 +32,13 @@ export function useMusic() {
 
   useEffect(() => { try { localStorage.setItem(LIST_KEY, JSON.stringify(list)); } catch {} }, [list]);
   useEffect(() => { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch {} }, [prefs]);
+  useEffect(() => { try { localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(playlists)); } catch {} }, [playlists]);
 
   if (!audioRef.current && typeof Audio !== "undefined") audioRef.current = new Audio();
 
-  const playable = list.filter(t => t.kind === "file");
+  const activePlaylist = playlists.find(p => p.id === activePlaylistId) || null;
+  const allPlayable = list.filter(t => t.kind === "file");
+  const playable = activePlaylist ? allPlayable.filter(t => activePlaylist.trackIds.includes(t.id)) : allPlayable;
   const current = idx >= 0 ? playable[idx] : null;
   const next = playable.length ? playable[(idx + 1) % playable.length] : null;
 
@@ -111,10 +118,32 @@ export function useMusic() {
 
   const remove = useCallback(id => {
     setList(l => l.filter(t => t.id !== id));
+    setPlaylists(pls => pls.map(p => ({ ...p, trackIds: p.trackIds.filter(x => x !== id) })));
     deleteTrack(id);
   }, []);
 
-  return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, playable };
+  // Playlists are just named subsets of your own on-device library — no
+  // separate storage for audio, just which track ids belong to which list.
+  const createPlaylist = useCallback((name, trackIds = []) => {
+    const id = `pl${Date.now()}`;
+    setPlaylists(pls => [...pls, { id, name: (name || "New playlist").slice(0, 40), trackIds }]);
+    return id;
+  }, []);
+  const renamePlaylist = useCallback((id, name) => setPlaylists(pls => pls.map(p => p.id === id ? { ...p, name: (name || p.name).slice(0, 40) } : p)), []);
+  const deletePlaylist = useCallback(id => {
+    setPlaylists(pls => pls.filter(p => p.id !== id));
+    setActivePlaylistId(a => a === id ? null : a);
+  }, []);
+  const toggleInPlaylist = useCallback((playlistId, trackId) => {
+    setPlaylists(pls => pls.map(p => p.id !== playlistId ? p : { ...p, trackIds: p.trackIds.includes(trackId) ? p.trackIds.filter(x => x !== trackId) : [...p.trackIds, trackId] }));
+  }, []);
+  const playPlaylist = useCallback(id => {
+    setActivePlaylistId(id);
+    setIdx(-1); setPlaying(false);
+  }, []);
+  const clearActivePlaylist = useCallback(() => { setActivePlaylistId(null); setIdx(-1); setPlaying(false); }, []);
+
+  return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, playable, allPlayable, playlists, activePlaylist, createPlaylist, renamePlaylist, deletePlaylist, toggleInPlaylist, playPlaylist, clearActivePlaylist };
 }
 
 /** Slim now-playing ticker — sits with the ad rail at the bottom of the app. */
@@ -139,9 +168,19 @@ export function MusicSheet({ music, onClose, say }) {
   const T = useT();
   const [url, setUrl] = useState("");
   const fileRef = useRef(null);
-  const { list, prefs, setPrefs, idx, playing, playable, err } = music;
+  const { list, prefs, setPrefs, idx, playing, playable, err, allPlayable, playlists, activePlaylist, createPlaylist, deletePlaylist, playPlaylist, clearActivePlaylist, toggleInPlaylist } = music;
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [picked, setPicked] = useState(() => new Set());
 
   const linkOuts = list.filter(t => t.kind !== "file");
+  const startCreate = () => { setCreating(true); setNewName(""); setPicked(new Set()); };
+  const finishCreate = () => {
+    if (!picked.size) { say?.("Pick at least one track", "error"); return; }
+    createPlaylist(newName, [...picked]);
+    say?.(`Playlist "${newName || "New playlist"}" created`, "success");
+    setCreating(false);
+  };
 
   return (
     <div className="fixed inset-0 z-[55] flex items-end justify-center" style={{ background: "rgba(0,0,0,.35)" }} onClick={onClose}>
@@ -181,7 +220,31 @@ export function MusicSheet({ music, onClose, say }) {
           </div>
         </div>
 
-        <div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Queue ({playable.length})</div>
+        <div className="p-3 rounded-2xl mb-2" style={{ border: `2px solid ${T.shadow}`, background: T.paper }}>
+          <div className="flex items-center justify-between mb-1">
+            <div className="lok-display font-extrabold text-sm">Playlists</div>
+            {!creating && <button onClick={startCreate} className="lok-btn px-2.5 py-1 rounded-full text-xs font-extrabold" style={{ background: T.accent, color: T.onAccent, border: `2px solid ${T.ink}` }}>＋ New</button>}
+          </div>
+          {activePlaylist && <div className="mb-1.5 flex items-center gap-2 text-xs font-bold"><span>Playing: {activePlaylist.name}</span><button onClick={clearActivePlaylist} className="lok-btn underline opacity-60">back to full queue</button></div>}
+          {!creating ? (<>
+            {playlists.length === 0 && <div className="text-xs opacity-50 py-1">No playlists yet — group your own tracks into one.</div>}
+            {playlists.map(p => (<div key={p.id} className="flex items-center gap-2 py-1">
+              <button onClick={() => playPlaylist(p.id)} aria-pressed={activePlaylist?.id === p.id} className="lok-btn flex-1 text-left px-2 py-1.5 rounded-xl text-sm font-bold" style={{ border: `2px solid ${activePlaylist?.id === p.id ? T.accent : T.ink}`, background: activePlaylist?.id === p.id ? T.ink : T.card, color: activePlaylist?.id === p.id ? T.paper : T.ink }}>▶ {p.name} <span className="opacity-60 font-normal">· {p.trackIds.length}</span></button>
+              <button onClick={() => deletePlaylist(p.id)} aria-label={`Delete playlist ${p.name}`} className="lok-btn text-xs font-bold opacity-60 px-1.5">✕</button>
+            </div>))}
+          </>) : (<div className="mt-1">
+            <input value={newName} onChange={e => setNewName(e.target.value.slice(0, 40))} placeholder="Playlist name" aria-label="New playlist name" autoFocus className="w-full px-3 py-2 rounded-xl font-bold text-sm mb-2" style={{ border: `2.5px solid ${T.ink}`, background: T.card, color: T.ink }} />
+            {allPlayable.length === 0 ? <div className="text-xs opacity-50 py-1">Add some tracks first.</div> : allPlayable.map(t => (
+              <label key={t.id} className="flex items-center gap-2 py-1 text-sm font-bold"><input type="checkbox" checked={picked.has(t.id)} onChange={e => setPicked(s => { const n = new Set(s); e.target.checked ? n.add(t.id) : n.delete(t.id); return n; })} style={{ accentColor: T.accent }} />{t.title}</label>
+            ))}
+            <div className="mt-2 flex gap-2">
+              <button onClick={() => setCreating(false)} className="lok-btn flex-1 py-2 rounded-xl text-sm font-bold" style={{ border: `2.5px solid ${T.ink}` }}>Cancel</button>
+              <button onClick={finishCreate} className="lok-btn flex-1 lok-display py-2 rounded-xl font-extrabold" style={{ background: T.accent, color: T.onAccent, border: `3px solid ${T.ink}` }}>Create</button>
+            </div>
+          </div>)}
+        </div>
+
+        <div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Queue ({playable.length}{activePlaylist ? ` · ${activePlaylist.name}` : ""})</div>
         {playable.length === 0 && <div className="text-xs opacity-50 py-3 text-center">Nothing queued yet — add a file above.</div>}
         {playable.map((t, i) => (
           <div key={t.id} className="flex items-center gap-2 p-2 rounded-xl mb-1" style={{ border: `2px solid ${i === idx ? T.accent : T.shadow}`, background: i === idx ? T.card : "transparent" }}>

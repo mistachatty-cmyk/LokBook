@@ -38,7 +38,16 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const[layers,setLayers]=useState([{id:1,visible:true,opacity:1,blend:"source-over"}]);
   const[active,setActive]=useState(1);const[tool,setTool]=useState("pen");const[color,setColor]=useState(ART.ink);  const[recentColors,setRecentColors]=useState(()=>{try{const r=localStorage.getItem("lok:recentColors");return r?JSON.parse(r):[];}catch{return[];}});const[size,setSize]=useState(7);const[symmetry,setSymmetry]=useState("none");const[brush,setBrush]=useState("ink");const[cursorPos,setCursorPos]=useState(null);const[zoom,setZoom]=useState(1);const[pan,setPan]=useState({x:0,y:0});const[clonePt,setClonePt]=useState(null);const[shapeMode,setShapeMode]=useState("rect");const[showGuides,setShowGuides]=useState(false);const[anchorPt,setAnchorPt]=useState(null);const[blurAmount,setBlurAmount]=useState(5);  const[refImg,setRefImg]=useState(null);const[refOpacity,setRefOpacity]=useState(0.3);const[smoothStrength,setSmoothStrength]=useState(0.5);const[palette,setPalette]=useState("default");const[canvasSize,setCanvasSize]=useState("default");const isPanning=useRef(false);const panStart=useRef({x:0,y:0});const pinchRef=useRef(null);
   const[dynamics,setDynamics]=useState(true);const[brushLabOpen,setBrushLabOpen]=useState(false);const[customBrushParams,setCustomBrushParams]=useState({flow:0.35,scatter:0.15,dabs:3,angleJitter:0.2,roundness:1});
-  const[fullscreen,setFullscreen]=useState(false);useBodyScrollLock(fullscreen);
+  const[fullscreen,setFullscreen]=useState(false);const[fsToolsHidden,setFsToolsHidden]=useState(false);useBodyScrollLock(fullscreen);
+  // Belt-and-suspenders: a degenerate pinch (both touches at ~the same point)
+  // used to divide by ~0 and poison zoom/pan with NaN, which crashes the
+  // canvas transform permanently. The pinch math is now guarded at the
+  // source, but this recovers automatically from any other path that ever
+  // produces a non-finite value instead of leaving the canvas dead.
+  useEffect(()=>{
+    if(!Number.isFinite(zoom)||zoom<=0){setZoom(1);setPan({x:0,y:0});return;}
+    if(!Number.isFinite(pan.x)||!Number.isFinite(pan.y))setPan({x:0,y:0});
+  },[zoom,pan]);
   const hasBrushLabSave=owns("feat_brushlab_save");
   const[savedBrushes,setSavedBrushes]=useState(()=>{try{const r=localStorage.getItem("lok:customBrushes");return r?JSON.parse(r):[];}catch{return[];}});
   const lastMoveXY=useRef(null);const lastMoveT=useRef(0);const transformDrag=useRef(null);const labPreviewRef=useRef(null);
@@ -155,10 +164,11 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const swatches=owns("feat_palettes")&&PALLETS[palette]?PALLETS[palette]:PALLETS.default;
   return(<div className={fullscreen?"fixed inset-0 z-[70] flex flex-col items-center justify-center gap-2 p-3 overflow-y-auto":"relative"} style={fullscreen?{background:T.paper}:undefined}>
     <button onClick={()=>setFullscreen(f=>!f)} aria-label={fullscreen?"Exit fullscreen canvas":"Fullscreen canvas"} className="lok-btn absolute top-2 right-2 z-10 w-9 h-9 rounded-full flex items-center justify-center text-base transition-opacity duration-200" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink,opacity:fullscreen?1:0.45}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=fullscreen?1:0.45}>{fullscreen?"⤡":"⤢"}</button>
-    <div ref={wrapRef} className="relative rounded-2xl overflow-hidden select-none" style={{border:`3px solid ${T.ink}`,background:ART.paper,boxShadow:`6px 6px 0 ${T.shadow}`,aspectRatio:"4 / 5",...(fullscreen?{height:"62vh",width:"auto",maxWidth:"100%"}:{}),cursor:zoom!==1?"grab":"default"}}
+    {fullscreen&&<button onClick={()=>setFsToolsHidden(h=>!h)} aria-label={fsToolsHidden?"Show tools":"Hide tools for more canvas"} aria-pressed={fsToolsHidden} className="lok-btn absolute top-2 z-10 w-9 h-9 rounded-full flex items-center justify-center text-base" style={{right:48,border:`2px solid ${T.ink}`,background:fsToolsHidden?T.accent:T.card,color:fsToolsHidden?T.onAccent:T.ink}}>{fsToolsHidden?"⛶":"🛠"}</button>}
+    <div ref={wrapRef} className="relative rounded-2xl overflow-hidden select-none" style={{border:`3px solid ${T.ink}`,background:ART.paper,boxShadow:`6px 6px 0 ${T.shadow}`,aspectRatio:"4 / 5",...(fullscreen?{height:fsToolsHidden?"92vh":"62vh",width:"auto",maxWidth:"100%",transition:"height .25s ease"}:{}),cursor:zoom!==1?"grab":"default"}}
       onWheel={e=>{e.preventDefault();const d=e.deltaY>0?-0.1:0.1;const r=wrapRef.current?.getBoundingClientRect();if(!r)return;const mx=(e.clientX-r.left)/r.width,my=(e.clientY-r.top)/r.height;setZoom(z=>{const nz=Math.max(0.25,Math.min(4,z+d));setPan(p=>({x:mx-(mx-p.x)*nz/z,y:my-(my-p.y)*nz/z}));return nz;});}}
-      onTouchStart={e=>{if(e.touches.length===2){e.preventDefault();const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;pinchRef.current={dist:Math.sqrt(dx*dx+dy*dy),zoom:zoom};}}}
-      onTouchMove={e=>{if(e.touches.length===2&&pinchRef.current){e.preventDefault();const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;const nd=Math.sqrt(dx*dx+dy*dy);const d=nd/pinchRef.current.dist;const r=wrapRef.current?.getBoundingClientRect();if(!r)return;const mx=((e.touches[0].clientX+e.touches[1].clientX)/2-r.left)/r.width,my=((e.touches[0].clientY+e.touches[1].clientY)/2-r.top)/r.height;setZoom(z=>{const nz=Math.max(0.25,Math.min(4,pinchRef.current.zoom*d));setPan(p=>({x:mx-(mx-p.x)*nz/z,y:my-(my-p.y)*nz/z}));return nz;});}}}
+      onTouchStart={e=>{if(e.touches.length===2){e.preventDefault();const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;const dist=Math.hypot(dx,dy);if(dist<2)return;pinchRef.current={dist,zoom:zoom};}}}
+      onTouchMove={e=>{if(e.touches.length===2&&pinchRef.current){e.preventDefault();const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;const nd=Math.hypot(dx,dy);if(nd<2)return;const d=nd/pinchRef.current.dist;const r=wrapRef.current?.getBoundingClientRect();if(!r)return;const mx=((e.touches[0].clientX+e.touches[1].clientX)/2-r.left)/r.width,my=((e.touches[0].clientY+e.touches[1].clientY)/2-r.top)/r.height;setZoom(z=>{const raw=pinchRef.current.zoom*d;const nz=Number.isFinite(raw)?Math.max(0.25,Math.min(4,raw)):z;if(nz===z)return z;setPan(p=>{const px=mx-(mx-p.x)*nz/z,py=my-(my-p.y)*nz/z;return Number.isFinite(px)&&Number.isFinite(py)?{x:px,y:py}:p;});return nz;});}}}
       onTouchEnd={e=>{if(e.touches.length<2)pinchRef.current=null;}}
       onMouseDown={e=>{if(e.button===1){e.preventDefault();isPanning.current=true;panStart.current={x:e.clientX-pan.x,y:e.clientY-pan.y};}}}
       onMouseMove={e=>{if(!isPanning.current)return;setPan({x:e.clientX-panStart.current.x,y:e.clientY-panStart.current.y});}}
@@ -182,6 +192,7 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
     </div>
     {zoom!==1&&<div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold pointer-events-none" style={{background:"rgba(0,0,0,.6)",color:"#fff"}}>{Math.round(zoom*100)}%</div>}
     </div>
+    <div style={fullscreen&&fsToolsHidden?{maxHeight:0,overflow:"hidden",opacity:0}:{maxHeight:"none",opacity:1,transition:"opacity .2s ease"}}>
     <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1" role="toolbar" aria-label="Layer controls">
       {layers.map((l,i)=>(<div key={l.id} className="shrink-0 flex items-center gap-1 px-1.5 py-1 rounded-lg" style={{border:`2.5px solid ${l.id===active?T.accent:T.ink}`,background:l.id===active?T.card:"transparent"}}>
         <button onClick={()=>setActive(l.id)} aria-label={`Select layer ${i+1}`} aria-pressed={l.id===active} className="font-bold text-xs px-1" style={{color:T.ink}}>L{i+1}</button>
@@ -287,6 +298,7 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
       <button onClick={()=>setRefImg(null)} className="text-[10px] font-bold underline opacity-60">clear</button>
     </div>)}
     {showGuides&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{zIndex:20}}><div style={{position:"absolute",left:"33.33%",top:0,bottom:0,width:1,background:`repeating-linear-gradient(${T.alt}40 0 4px,transparent 4px 8px)`}}/><div style={{position:"absolute",left:"66.66%",top:0,bottom:0,width:1,background:`repeating-linear-gradient(${T.alt}40 0 4px,transparent 4px 8px)`}}/><div style={{position:"absolute",top:"33.33%",left:0,right:0,height:1,background:`repeating-linear-gradient(90deg,${T.alt}40 0 4px,transparent 4px 8px)`}}/><div style={{position:"absolute",top:"66.66%",left:0,right:0,height:1,background:`repeating-linear-gradient(90deg,${T.alt}40 0 4px,transparent 4px 8px)`}}/><div style={{position:"absolute",left:"50%",top:0,bottom:0,width:1,background:`repeating-linear-gradient(${T.alt}60 0 6px,transparent 6px 12px)`}}/><div style={{position:"absolute",top:"50%",left:0,right:0,height:1,background:`repeating-linear-gradient(90deg,${T.alt}60 0 6px,transparent 6px 12px)`}}/></div>}
+    </div>
   </div>);
 });
 
