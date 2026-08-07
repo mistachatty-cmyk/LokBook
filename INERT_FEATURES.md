@@ -3,7 +3,36 @@
 **Generated:** August 2026 · post Easel migration, updated post double-sell/inert-module pass,
 updated again post crash-fix/sharing/playlists pass · regenerate with `node scripts/audit-inert.mjs`
 
-## 0. This pass — bug fixes and new capability
+## 0a. Latest pass — skins, living backdrops, music A/V
+
+- **Skins 23 → 45.** New ones are drawn from the named wards in the world
+  bible rather than invented palettes. Contrast verified programmatically
+  across all 45 (ink-on-paper, ink-on-card, onAccent-on-accent): every pairing
+  clears WCAG AA 4.5:1, zero flagged.
+- **Five new living backdrops**, now selected by a `backdrop` field instead of
+  hardcoded theme ids. Four are CSS (`wellrise`, `ashfall`, `misregister`,
+  `driftpages`); `livedraw` is a canvas that generates strokes with the same
+  parametric curve maths the resident artists use and draws them a few points
+  per frame, then washes them out — the page is genuinely being drawn behind
+  the app. Runs at 1× DPR / ~30fps / one stroke in flight, and is skipped
+  entirely under reduced-motion or the "kill" pace preset.
+- **Music visualiser** driven by a real Web Audio `AnalyserNode`, created
+  lazily on first play and always reconnected to destination; any failure
+  falls back to an idle pulse rather than risking silent playback (verified
+  live that audio still plays after the rewire).
+- **Video playback** — the player now uses a persistent `<video>` element
+  instead of `new Audio()`, so the `.mp4`/`.webm` files the picker already
+  accepted are watchable. It stays detached from the DOM for background audio
+  and is only re-parented into the sheet for video tracks.
+- **Volume** already existed but read as an unlabelled slider; added a
+  mute/restore button and a numeric readout.
+- **Five shop customizations**, each wired to a real renderer: Perspective
+  guide + Isometric grid (Easel paper overlays), Riso offset frame, Ink drip
+  avatar accent, Well blue / Ember name colours. Verified by buying one
+  through the real UI and asserting the overlay is in the DOM — deliberately
+  not another batch of decorative ids.
+
+## 0. Earlier pass — bug fixes and new capability
 
 - **Fixed a real Easel crash.** Pinch-zoom divided by the initial two-finger
   distance; if both touches land at ~the same point (a common way a pinch
