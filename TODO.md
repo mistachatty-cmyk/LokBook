@@ -26,12 +26,13 @@ This document outlines the major features and tasks remaining to bring LokBook f
 Things adjacent to what was requested that are *not* done, so they don't get
 assumed working:
 
-- **Album art / cover images.** The "drop a folder of MP3s and they all inherit
-  the album cover PNG" flow does not exist. The player has no artwork concept
-  at all — no per-track image, no folder import (browsers hand over a flat file
-  list; folder structure needs `webkitdirectory`, which is desktop-only and
-  unavailable on iOS Safari, so mobile would need a different affordance).
-  This is the single biggest missing piece of the music vision.
+- ~~**Album art / cover images.**~~ Done — `musicStore.js` stores cover blobs
+  in a second IndexedDB store keyed by track id. Adding files that include an
+  image (or a whole folder via the desktop-only `webkitdirectory` picker)
+  makes every audio file in that folder inherit the cover; it shows as a
+  thumbnail in the queue and now-playing line and as a large stage above the
+  transport. Folder import is feature-detected and simply absent on iOS
+  Safari (no such API there) rather than silently broken.
 - **Streaming playback.** Spotify/YouTube/SoundCloud links are stored as
   shortcuts that open out, and that is a hard platform limit, not a shortcut —
   those services forbid raw playback outside their own SDKs. Only files you
@@ -40,8 +41,11 @@ assumed working:
   app, but there's no Media Session metadata, so the OS lock screen shows
   nothing and hardware/headphone controls don't drive it. `navigator.
   mediaSession` would fix this and is small — just not done.
-- **Visualiser styles.** There is one (bars). Making it a purchasable cosmetic
-  category with several styles is an obvious shop fit and isn't built.
+- ~~**Visualiser styles.**~~ Done — Bars, Waveform, Radial and Pulse, all
+  driven by the same analyser data, switchable from the player sheet and
+  persisted in prefs. Not (yet) a purchasable shop category — currently free
+  for anyone with the player, which is a deliberate choice pending a decision
+  on whether visual styles should cost Loks like everything else in Shop.
 - **Per-track volume / normalisation.** One global volume only, so a quiet
   track and a loud one jump. No gain staging.
 

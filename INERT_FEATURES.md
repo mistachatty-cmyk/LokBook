@@ -3,7 +3,37 @@
 **Generated:** August 2026 · post Easel migration, updated post double-sell/inert-module pass,
 updated again post crash-fix/sharing/playlists pass · regenerate with `node scripts/audit-inert.mjs`
 
-## 0a. Latest pass — skins, living backdrops, music A/V, feat_tween
+## 0. Latest pass — onboarding, 10 more skins/fonts, album art, visualiser styles
+
+- **Onboarding emoji removal.** User feedback: the icon-badge circles
+  (📖/🎨/🔒/📲/✏️) added in an earlier "streamline onboarding" pass didn't
+  fit the app's front door. Replaced with a plain accent-color bar; also
+  stripped the inline ✓/✉️/📲/⬆ glyphs from the copy in that same component.
+- **Skins 45 → 55.** A second, ungated batch (Cinder Row, The Paper Moon,
+  Verdigris Hall, Salt Line, The Loom, Amber Vault, Chalkline Court, The
+  Hollow Press, Windward Steps, Ferrous Yard) — priced like the original
+  wave-1 wards rather than behind a new wave gate, except two slotted into
+  existing wave 2/3 gates for variety. Every pairing re-checked against
+  WCAG AA before landing.
+- **Font packs 10 → 20**, and 5 *pre-existing* packs (Zine Bold, Editorial
+  Serif, Marker Felt, Fira Code, Vintage Ink) that referenced Google Fonts
+  never actually loaded — fixed by extending the shared `@import` in
+  `art.jsx` to cover every pack's real font family, so purchased fonts now
+  render as advertised instead of silently falling back to a generic family.
+- **Album art / cover images** — previously the single biggest named gap.
+  `musicStore.js` gained a second IndexedDB store for cover blobs keyed by
+  track id; `addFiles()` detects image files in a batch and assigns them to
+  every audio file sharing their folder (or the whole batch, for a single
+  image with no folder). Shows as a thumbnail in the queue/now-playing line
+  and as a large stage above the transport. Folder import via a second
+  button uses `webkitdirectory`, feature-detected so it's simply absent on
+  iOS Safari rather than silently broken there.
+- **Visualiser styles** — was hardcoded to one bar style; now four (Bars,
+  Waveform, Radial, Pulse), all reading the same analyser data, switchable
+  from the player sheet and persisted in prefs. Not gated behind Shop —
+  free for anyone with the player.
+
+## 0a. Prior pass — skins, living backdrops, music A/V, feat_tween
 
 - **`feat_tween` is no longer inert.** It was sold for 120 Loks and did
   nothing; it now synthesises in-between pages from the last drawn page by
