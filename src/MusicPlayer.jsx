@@ -27,14 +27,26 @@ export function useMusic() {
   const [idx, setIdx] = useState(-1);
   const [playing, setPlaying] = useState(false);
   const [err, setErr] = useState("");
-  const audioRef = useRef(null);
+  const mediaRef = useRef(null);
   const urlRef = useRef(null);
+  const acRef = useRef(null);
+  const analyserRef = useRef(null);
 
   useEffect(() => { try { localStorage.setItem(LIST_KEY, JSON.stringify(list)); } catch {} }, [list]);
   useEffect(() => { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch {} }, [prefs]);
   useEffect(() => { try { localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(playlists)); } catch {} }, [playlists]);
 
-  if (!audioRef.current && typeof Audio !== "undefined") audioRef.current = new Audio();
+  // One <video> element rather than `new Audio()`: a video element plays
+  // audio-only files identically, but can also show a picture when the track
+  // is an .mp4/.webm. It stays detached from the DOM (so playback survives tab
+  // switches) and is only re-parented into the sheet when there's video to see.
+  if (!mediaRef.current && typeof document !== "undefined") {
+    const el = document.createElement("video");
+    el.playsInline = true; el.setAttribute("playsinline", "");
+    el.preload = "metadata";
+    mediaRef.current = el;
+  }
+  const audioRef = mediaRef;
 
   const activePlaylist = playlists.find(p => p.id === activePlaylistId) || null;
   const allPlayable = list.filter(t => t.kind === "file");
@@ -55,6 +67,30 @@ export function useMusic() {
     return t.url;
   }, []);
 
+  // Lazily route playback through a Web Audio analyser so the visualiser has
+  // real amplitude data to draw. Created on first play (needs a user gesture
+  // in most browsers) and always re-connected to destination — if any of this
+  // fails we bail out entirely rather than risk leaving playback silent.
+  const ensureAnalyser = useCallback(() => {
+    if (analyserRef.current) return analyserRef.current;
+    const el = mediaRef.current;
+    if (!el) return null;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      const ac = new AC();
+      const src = ac.createMediaElementSource(el);
+      const an = ac.createAnalyser();
+      an.fftSize = 128;
+      an.smoothingTimeConstant = 0.8;
+      src.connect(an);
+      an.connect(ac.destination);
+      acRef.current = ac;
+      analyserRef.current = an;
+      return an;
+    } catch { return null; }
+  }, []);
+
   const playAt = useCallback(async i => {
     const a = audioRef.current;
     if (!a || !playable.length) return;
@@ -64,7 +100,12 @@ export function useMusic() {
     setErr("");
     a.src = src;
     a.volume = prefs.volume;
-    try { await a.play(); setIdx(n); setPlaying(true); }
+    try {
+      await a.play();
+      setIdx(n); setPlaying(true);
+      ensureAnalyser();
+      if (acRef.current?.state === "suspended") acRef.current.resume().catch(() => {});
+    }
     catch { setErr("Playback blocked — tap play once to allow audio."); setPlaying(false); }
   }, [playable, srcFor, prefs.volume]);
 
@@ -112,7 +153,7 @@ export function useMusic() {
       const id = `f${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const ok = await putTrack(id, f);
       if (!ok) { setErr("Couldn't save that file for offline play."); continue; }
-      setList(l => [...l, { id, title: f.name.replace(/\.[^.]+$/, "").slice(0, 60), kind: "file", src: "idb", size: f.size }]);
+      setList(l => [...l, { id, title: f.name.replace(/\.[^.]+$/, "").slice(0, 60), kind: "file", src: "idb", size: f.size, mime: f.type || "" }]);
     }
   }, []);
 
@@ -143,7 +184,73 @@ export function useMusic() {
   }, []);
   const clearActivePlaylist = useCallback(() => { setActivePlaylistId(null); setIdx(-1); setPlaying(false); }, []);
 
-  return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, playable, allPlayable, playlists, activePlaylist, createPlaylist, renamePlaylist, deletePlaylist, toggleInPlaylist, playPlaylist, clearActivePlaylist };
+  const currentIsVideo = !!current && /^video\//.test(current.mime || "");
+
+  return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, playable, allPlayable, playlists, activePlaylist, createPlaylist, renamePlaylist, deletePlaylist, toggleInPlaylist, playPlaylist, clearActivePlaylist, mediaRef, analyserRef, ensureAnalyser, currentIsVideo };
+}
+
+/**
+ * Live bar visualiser driven by real amplitude data from the Web Audio
+ * analyser. If the analyser couldn't be created (older browser, blocked
+ * AudioContext) it falls back to a calm idle pulse rather than showing
+ * nothing — so the panel never looks broken.
+ */
+function MusicVisualizer({ music, height = 56 }) {
+  const T = useT();
+  const ref = useRef(null);
+  const { analyserRef, playing } = music;
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv) return;
+    const ctx = cv.getContext("2d");
+    let raf, run = true, t = 0;
+    const fit = () => { const r = cv.getBoundingClientRect(); cv.width = r.width; cv.height = height; };
+    fit();
+    window.addEventListener("resize", fit);
+    const BARS = 32;
+    const draw = () => {
+      if (!run) return;
+      const an = analyserRef.current;
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      const bw = cv.width / BARS;
+      let data = null;
+      if (an) { data = new Uint8Array(an.frequencyBinCount); an.getByteFrequencyData(data); }
+      t += 0.05;
+      for (let i = 0; i < BARS; i++) {
+        let v;
+        if (data) v = (data[Math.floor(i * data.length / BARS)] || 0) / 255;
+        else v = playing ? 0.18 + Math.abs(Math.sin(t + i * 0.35)) * 0.22 : 0.06;
+        const h = Math.max(2, v * cv.height);
+        ctx.fillStyle = i % 3 === 0 ? T.accent : T.alt;
+        ctx.globalAlpha = 0.55 + v * 0.45;
+        ctx.fillRect(i * bw + 1, cv.height - h, bw - 2, h);
+      }
+      ctx.globalAlpha = 1;
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => { run = false; cancelAnimationFrame(raf); window.removeEventListener("resize", fit); };
+  }, [analyserRef, playing, height, T.accent, T.alt]);
+  return <canvas ref={ref} aria-hidden="true" style={{ width: "100%", height, display: "block", borderRadius: 10 }} />;
+}
+
+/**
+ * Re-parents the persistent media element into the sheet so a video track is
+ * actually visible, and puts it back on unmount so audio keeps playing after
+ * the sheet closes.
+ */
+function VideoStage({ music }) {
+  const T = useT();
+  const host = useRef(null);
+  const { mediaRef } = music;
+  useEffect(() => {
+    const el = mediaRef.current, box = host.current;
+    if (!el || !box) return;
+    el.style.width = "100%"; el.style.height = "100%"; el.style.objectFit = "contain";
+    box.appendChild(el);
+    return () => { if (el.parentNode === box) box.removeChild(el); };
+  }, [mediaRef]);
+  return <div ref={host} className="w-full rounded-xl overflow-hidden mb-2" style={{ aspectRatio: "16/9", background: "#000", border: `2.5px solid ${T.ink}` }} />;
 }
 
 /** Slim now-playing ticker — sits with the ad rail at the bottom of the app. */
@@ -207,16 +314,26 @@ export function MusicSheet({ music, onClose, say }) {
         {err && <div className="px-3 py-2 rounded-xl mb-2 text-xs font-bold" style={{ background: "#C23B22", color: "#fff" }}>{err}</div>}
 
         <div className="p-3 rounded-2xl mb-2" style={{ border: `2px solid ${T.shadow}`, background: T.paper }}>
+          {music.currentIsVideo && <VideoStage music={music} />}
+          {prefs.visualizer !== false && (<div className="mb-2">
+            <MusicVisualizer music={music} />
+            {music.current && <div className="text-[11px] font-bold truncate mt-1" style={{ color: T.ink }}>{music.playing ? "♪ " : "❚❚ "}{music.current.title}</div>}
+          </div>)}
           <div className="flex items-center gap-2">
             <button onClick={() => music.skip(-1)} disabled={!playable.length} aria-label="Previous track" className="lok-btn w-10 h-10 rounded-full font-extrabold" style={{ border: `2.5px solid ${T.ink}`, background: T.card, opacity: playable.length ? 1 : .4 }}>◀◀</button>
             <button onClick={music.toggle} disabled={!playable.length} aria-label={playing ? "Pause" : "Play"} className="lok-btn flex-1 py-2.5 rounded-xl lok-display font-extrabold" style={{ background: T.accent, color: T.onAccent, border: `3px solid ${T.ink}`, opacity: playable.length ? 1 : .4 }}>{playing ? "❚❚ Pause" : "▶ Play"}</button>
             <button onClick={() => music.skip(1)} disabled={!playable.length} aria-label="Next track" className="lok-btn w-10 h-10 rounded-full font-extrabold" style={{ border: `2.5px solid ${T.ink}`, background: T.card, opacity: playable.length ? 1 : .4 }}>▶▶</button>
           </div>
-          <label className="mt-2 flex items-center gap-2 text-xs font-bold">Volume<input type="range" min="0" max="1" step="0.05" value={prefs.volume} onChange={e => setPrefs(p => ({ ...p, volume: +e.target.value }))} className="flex-1" style={{ accentColor: T.accent }} aria-label="Volume" /></label>
+          <label className="mt-2 flex items-center gap-2 text-xs font-bold">
+            <button type="button" onClick={() => setPrefs(p => ({ ...p, volume: p.volume > 0 ? 0 : 0.8 }))} aria-label={prefs.volume > 0 ? "Mute music" : "Unmute music"} className="lok-btn w-7 h-7 rounded-full shrink-0" style={{ border: `2px solid ${T.ink}`, background: T.card }}>{prefs.volume === 0 ? "🔇" : prefs.volume < 0.5 ? "🔉" : "🔊"}</button>
+            <input type="range" min="0" max="1" step="0.05" value={prefs.volume} onChange={e => setPrefs(p => ({ ...p, volume: +e.target.value }))} className="flex-1" style={{ accentColor: T.accent }} aria-label="Music volume" />
+            <span className="tabular-nums opacity-60 w-8 text-right">{Math.round(prefs.volume * 100)}</span>
+          </label>
           <div className="mt-1.5 flex flex-wrap gap-3 text-xs font-bold">
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={prefs.shuffle} onChange={e => setPrefs(p => ({ ...p, shuffle: e.target.checked }))} style={{ accentColor: T.accent }} />Shuffle</label>
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={prefs.loop} onChange={e => setPrefs(p => ({ ...p, loop: e.target.checked }))} style={{ accentColor: T.accent }} />Loop queue</label>
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={prefs.ticker} onChange={e => setPrefs(p => ({ ...p, ticker: e.target.checked }))} style={{ accentColor: T.accent }} />Now-playing bar</label>
+            <label className="flex items-center gap-1.5"><input type="checkbox" checked={prefs.visualizer !== false} onChange={e => setPrefs(p => ({ ...p, visualizer: e.target.checked }))} style={{ accentColor: T.accent }} />Visualiser</label>
           </div>
         </div>
 
