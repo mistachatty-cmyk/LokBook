@@ -24,10 +24,49 @@ export const THEMES = {
   aurora:  { name:"Aurora Borealis",  desc:"Northern lights, crisp arctic air. Wave 4.", price:180,wave:4, animated:true, paper:"#0B0C10", ink:"#E0FBFC", accent:"#00FFAA", alt:"#7F5AF0", shadow:"rgba(0,0,0,.6)", card:"#1F2029", onAccent:"#0B0C10" },
   vapor:   { name:"Vaporwave",        desc:"Neon grids, sunset chrome, retro futures. Wave 4.", price:190,wave:4, animated:true, paper:"#07041A", ink:"#F8EFFF", accent:"#FF2E97", alt:"#00D4FF", shadow:"rgba(255,46,151,.25)", card:"#120B2B", onAccent:"#07041A" },
   smile:  { name:"Smile",            desc:"Warm sunshine, happy accidents. Wave 4.",     price:180,wave:4, paper:"#FEF9E7", ink:"#4A3728", accent:"#F39C12", alt:"#E74C3C", shadow:"#EBDCB8", card:"#FFFDF5", onAccent:"#000" },
+
+  // ---- Ward skins ------------------------------------------------------
+  // Each one is pulled from a named ward in the world bible (PRODUCT_KIT §4)
+  // rather than invented as a generic palette, so the shop reads as places
+  // you can visit instead of a swatch grid.
+  coldpress:   { name:"Coldpress",          desc:"Heavy watercolour stock, cold to the touch.", price:45, paper:"#E8E4DA", ink:"#33454D", accent:"#2E7D8F", alt:"#8FA3A8", shadow:"#CFCABB", card:"#F5F2EA", onAccent:"#fff" },
+  quickyard:   { name:"The Quickyard",      desc:"Newsprint and a red pencil. Draw fast.",      price:45, paper:"#F0EDE6", ink:"#2E2E2E", accent:"#D62828", alt:"#4C6EF5", shadow:"#DAD5CB", card:"#FAF8F3", onAccent:"#fff" },
+  marginfold:  { name:"Margin Fold",        desc:"Ruled lines, red margin, doodles anyway.",    price:50, paper:"#FBFBF6", ink:"#2B3A67", accent:"#D33F55", alt:"#6C8AC4", shadow:"#E2E2D8", card:"#FFFFFC", onAccent:"#fff" },
+  gridquarter: { name:"Grid Quarter",       desc:"Graph paper. Everything squares up.",         price:50, paper:"#EDF3F5", ink:"#1C3E4A", accent:"#00807F", alt:"#5B7C8D", shadow:"#D2E0E5", card:"#F7FBFC", onAccent:"#fff" },
+  kilnrow:     { name:"Kiln Row",           desc:"Fired clay, ash, and a hot orange seam.",     price:55, paper:"#F2E6D8", ink:"#4A2C1A", accent:"#C2551A", alt:"#8C6239", shadow:"#DCC9B4", card:"#FBF2E7", onAccent:"#fff" },
+  compass:     { name:"Compass Ward",       desc:"Chart paper and brass instruments.",          price:55, paper:"#F3E7CE", ink:"#3E2E1E", accent:"#1F6F8B", alt:"#A5791F", shadow:"#E0CFAF", card:"#FBF3E2", onAccent:"#fff" },
+  duotone:     { name:"Two-Ink Duotone",    desc:"One blue drum, one red. Nothing else.",       price:60, paper:"#F5F1E8", ink:"#1B3A8C", accent:"#D62246", alt:"#3A5CB8", shadow:"#DFD9CB", card:"#FCF9F2", onAccent:"#fff" },
+  silentcolumn:{ name:"The Silent Column",  desc:"Grey stone, gold leaf, no conversation.",     price:60, paper:"#E6E4E0", ink:"#33322F", accent:"#9A7639", alt:"#7A7873", shadow:"#CFCCC6", card:"#F4F3F1", onAccent:"#fff" },
+
+  // ---- Wave 2 ----------------------------------------------------------
+  thermal:     { name:"Thermal Receipt",    desc:"Printed hot, fades by morning. Wave 2.",      price:85, wave:2, paper:"#FAFAF8", ink:"#1A1A1A", accent:"#4A4A4A", alt:"#9A9A9A", shadow:"#E6E6E2", card:"#FFFFFF", onAccent:"#fff" },
+  honeycomb:   { name:"Honeycomb",          desc:"Amber light, slow and warm. Wave 2.",         price:85, wave:2, paper:"#FFF6E0", ink:"#5C3D14", accent:"#B87910", alt:"#C97B30", shadow:"#F0E0BC", card:"#FFFBEF", onAccent:"#fff" },
+  frostpane:   { name:"Frostpane",          desc:"Breath on cold glass. Wave 2.",               price:90, wave:2, paper:"#EDF6FA", ink:"#1E4257", accent:"#2E88AA", alt:"#9FC7DA", shadow:"#D6E7EF", card:"#F8FCFE", onAccent:"#fff" },
+  carboncopy:  { name:"Carbon Copy",        desc:"Second sheet, softer impression. Wave 2.",    price:90, wave:2, paper:"#E9E7EC", ink:"#35313C", accent:"#6B5B8C", alt:"#8E88A0", shadow:"#D5D2DA", card:"#F4F3F6", onAccent:"#fff" },
+
+  // ---- Wave 3 ----------------------------------------------------------
+  nightleaf:   { name:"Nightleaf",          desc:"Moth-wing green after dark. Wave 3.",         price:115, wave:3, paper:"#0F1A14", ink:"#DCE8DC", accent:"#4FAF6B", alt:"#B08CD8", shadow:"rgba(0,0,0,.55)", card:"#16241C", onAccent:"#fff" },
+  blueprint:   { name:"Blueprint",          desc:"Cyanotype and chalk lines. Wave 3.",          price:115, wave:3, paper:"#0D3B66", ink:"#E0ECF8", accent:"#FFD166", alt:"#7FB2D9", shadow:"rgba(0,0,0,.45)", card:"#124A80", onAccent:"#000" },
+  lilacdusk:   { name:"Lilac Dusk",         desc:"The hour the wards go quiet. Wave 3.",        price:120, wave:3, paper:"#F0EAF5", ink:"#3F2E52", accent:"#8B4FC4", alt:"#C08AC8", shadow:"#DDD2E6", card:"#F9F5FC", onAccent:"#fff" },
+  oxblood:     { name:"Oxblood Press",      desc:"Deep red leather and gilt. Wave 3.",          price:120, wave:3, paper:"#F2ECE4", ink:"#4A1520", accent:"#8C1C2B", alt:"#B08D4F", shadow:"#DED5C8", card:"#FBF7F1", onAccent:"#fff" },
+
+  // ---- Wave 4 · living backdrops ---------------------------------------
+  inkwell:     { name:"The Well",           desc:"Ink rising from the source. Wave 4.",         price:190, wave:4, animated:true, backdrop:"wellrise",   paper:"#0E1420", ink:"#D8E4F0", accent:"#3AA8DC", alt:"#7E8CA8", shadow:"rgba(0,0,0,.6)", card:"#162030", onAccent:"#fff" },
+  ashward:     { name:"Ash Ward",           desc:"Warm ash, still falling. Wave 4.",            price:190, wave:4, animated:true, backdrop:"ashfall",    paper:"#1A1917", ink:"#E4DFD6", accent:"#E2551F", alt:"#8D8578", shadow:"rgba(0,0,0,.6)", card:"#232220", onAccent:"#fff" },
+  misprint:    { name:"The Misprint",       desc:"Off-register on purpose. Wave 4.",            price:200, wave:4, animated:true, backdrop:"misregister",paper:"#F7F3EC", ink:"#2B2B2B", accent:"#D6215F", alt:"#0090B0", shadow:"#E0DAD0", card:"#FFFCF6", onAccent:"#fff" },
+  unbound:     { name:"The Unbound",        desc:"Loose pages nobody bound. Wave 4.",           price:200, wave:4, animated:true, backdrop:"driftpages", paper:"#F7F7F9", ink:"#4A4A55", accent:"#7A66B8", alt:"#B0AAC4", shadow:"#E4E4E9", card:"#FFFFFF", onAccent:"#fff" },
+
+  // ---- Wave 5 · the drawing hand ---------------------------------------
+  // These two run the `livedraw` backdrop: real strokes, generated by the
+  // same parametric engine the resident artists draw with, being drawn and
+  // erased behind the whole app. Nothing else in the shop does this.
+  livingink:   { name:"Living Ink",         desc:"The page draws itself behind you. Wave 5.",   price:260, wave:5, animated:true, backdrop:"livedraw", paper:"#F4EFE3", ink:"#232A3D", accent:"#C4487A", alt:"#2FA9A0", shadow:"#DFD8C8", card:"#FFFDF7", onAccent:"#fff" },
+  voidhand:    { name:"The Void Hand",      desc:"Something is still drawing. Wave 5.",         price:280, wave:5, animated:true, backdrop:"livedraw", paper:"#0B0B10", ink:"#EDE9F5", accent:"#8B7BD8", alt:"#4FC3C0", shadow:"rgba(0,0,0,.65)", card:"#14141C", onAccent:"#fff" },
 };
 export const SKIN_WAVE_GATE = 2;
 export const SKIN_WAVE_3_GATE = 5;
 export const SKIN_WAVE_4_GATE = 10;
+export const SKIN_WAVE_5_GATE = 18;
 export const ThemeCtx = createContext(THEMES.riso);
 export const useT = () => useContext(ThemeCtx);
 export const ART = { paper:"#F2EDE2", ink:"#23306B", pink:"#FF5DA2", teal:"#2FA9A0" };
