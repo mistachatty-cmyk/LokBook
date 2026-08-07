@@ -33,6 +33,18 @@ assumed working:
   thumbnail in the queue and now-playing line and as a large stage above the
   transport. Folder import is feature-detected and simply absent on iOS
   Safari (no such API there) rather than silently broken.
+- ~~**Cloud backup for music (the "we lose everything" risk).**~~ Done, as
+  LokCloud — a private Supabase Storage bucket, RLS-scoped per user, wired
+  as a LokPass perk. Manual only (a tap, never automatic) so it costs
+  nothing until a paying, signed-in user actually uses it. A
+  "🔒 On this device only" badge in the music sheet explains the risk to
+  everyone and points non-LokPass users at Shop, and LokPass-without-
+  sign-in users at Settings. Once backed up, the badge reads "🌐 In
+  LokCloud" with a one-time thank-you beat. Pricing/tiering discussion
+  (LokPass $10/mo, one-time $2.99 per-app pass, $500 lifetime Founders-style
+  tier) is a business decision, not something coded — the technical side
+  (bucket + RLS + client) is built and ready regardless of which tier
+  structure ships.
 - **Streaming playback.** Spotify/YouTube/SoundCloud links are stored as
   shortcuts that open out, and that is a hard platform limit, not a shortcut —
   those services forbid raw playback outside their own SDKs. Only files you
