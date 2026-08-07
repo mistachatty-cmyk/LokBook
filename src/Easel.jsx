@@ -184,6 +184,15 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
       {paper==="dots"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{backgroundImage:`radial-gradient(circle,${T.ink}25 1px,transparent 1px)`,backgroundSize:`${W/10}px ${H/10}px`,zIndex:5}}/>}
       {paper==="storyboard"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{backgroundImage:[`linear-gradient(${T.ink}20 0 1px,transparent 1px)`,`linear-gradient(90deg,${T.ink}20 0 1px,transparent 1px)`].join(","),backgroundSize:[`100% ${H/3}px`,`${W/2}px 100%`].join(","),zIndex:5}}><div className="absolute left-1/2 top-0 bottom-0" style={{width:1,background:T.ink+"30"}}/><div className="absolute top-[33.33%] left-0 right-0" style={{height:1,background:T.ink+"30"}}/><div className="absolute top-[66.66%] left-0 right-0" style={{height:1,background:T.ink+"30"}}/></div>}
       {paper==="graphite"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{background:`repeating-conic-gradient(${T.ink}08 0% 25%,transparent 0% 50%) 0 0 / 4px 4px`,opacity:0.5,zIndex:5}}/>}
+      {/* One-point perspective: a horizon with rays converging on a centred
+          vanishing point, so you can rough in depth without guessing. */}
+      {paper==="perspective"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{zIndex:5}}>
+        <div className="absolute left-0 right-0" style={{top:"42%",height:1,background:`${T.ink}33`}}/>
+        {Array.from({length:16}).map((_,i)=>{const a=(i/16)*Math.PI*2;return(<div key={i} className="absolute" style={{left:"50%",top:"42%",width:"140%",height:1,background:`${T.ink}1A`,transformOrigin:"0 0",transform:`rotate(${(a*180/Math.PI).toFixed(2)}deg)`}}/>);})}
+        <div className="absolute rounded-full" style={{left:"50%",top:"42%",width:5,height:5,marginLeft:-2.5,marginTop:-2.5,background:`${T.accent}66`}}/>
+      </div>}
+      {/* Isometric: 30° lattice for boxes, tiles and pixel-ish constructions. */}
+      {paper==="isometric"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{zIndex:5,backgroundImage:[`repeating-linear-gradient(30deg,${T.ink}18 0 1px,transparent 1px ${W/9}px)`,`repeating-linear-gradient(-30deg,${T.ink}18 0 1px,transparent 1px ${W/9}px)`,`repeating-linear-gradient(90deg,${T.ink}10 0 1px,transparent 1px ${W/9}px)`].join(",")}}/>}
       {(symmetry==="mirrorX"||symmetry==="quad")&&<div aria-hidden="true" className="absolute top-0 bottom-0 pointer-events-none" style={{left:"50%",width:2,background:`repeating-linear-gradient(${T.accent} 0 6px, transparent 6px 12px)`}}/>}
       {(symmetry==="mirrorY"||symmetry==="quad")&&<div aria-hidden="true" className="absolute left-0 right-0 pointer-events-none" style={{top:"50%",height:2,background:`repeating-linear-gradient(90deg,${T.accent} 0 6px, transparent 6px 12px)`}}/>}
       {symmetry.startsWith("radial")&&<div aria-hidden="true" className="absolute pointer-events-none rounded-full" style={{left:"50%",top:"50%",width:10,height:10,transform:"translate(-50%,-50%)",border:`2.5px solid ${T.accent}`}}/>}
