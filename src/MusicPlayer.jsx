@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useT } from "./theme/theme.js";
-import { putTrack, getTrack, deleteTrack, ACCEPTED, kindOfUrl, titleFromUrl } from "./engine/musicStore.js";
+import { putTrack, getTrack, deleteTrack, putCover, getCover, deleteCover, ACCEPTED, IMAGE_TYPES, kindOfUrl, titleFromUrl } from "./engine/musicStore.js";
 
 const LIST_KEY = "lok:music:list";
 const PREF_KEY = "lok:music:prefs";
 const PLAYLISTS_KEY = "lok:music:playlists";
 
 const loadList = () => { try { return JSON.parse(localStorage.getItem(LIST_KEY) || "[]"); } catch { return []; } };
-const loadPrefs = () => { try { return { ticker: true, shuffle: false, loop: true, volume: 0.8, ...JSON.parse(localStorage.getItem(PREF_KEY) || "{}") }; } catch { return { ticker: true, shuffle: false, loop: true, volume: 0.8 }; } };
+const loadPrefs = () => { try { return { ticker: true, shuffle: false, loop: true, volume: 0.8, visualizerStyle: "bars", ...JSON.parse(localStorage.getItem(PREF_KEY) || "{}") }; } catch { return { ticker: true, shuffle: false, loop: true, volume: 0.8, visualizerStyle: "bars" }; } };
 const loadPlaylists = () => { try { return JSON.parse(localStorage.getItem(PLAYLISTS_KEY) || "[]"); } catch { return []; } };
 
 /**
@@ -148,19 +148,35 @@ export function useMusic() {
     setList(l => [...l, { id: `u${Date.now()}`, title: titleFromUrl(url), url, kind, src: "url" }]);
   }, []);
 
+  // Accepts a plain file list (button/drop) or a whole folder (webkitdirectory
+  // input, desktop only). Either way: any image files in the batch are treated
+  // as album art and inherited by every audio file that shares their folder —
+  // "drop a folder of MP3s + one cover.jpg" makes every track in it show that
+  // cover, without asking the user to tag each file individually.
   const addFiles = useCallback(async files => {
-    for (const f of files) {
+    const arr = [...files];
+    const dirOf = f => (f.webkitRelativePath || "").split("/").slice(0, -1).join("/");
+    const images = arr.filter(f => IMAGE_TYPES.test(f.type));
+    const audio = arr.filter(f => !IMAGE_TYPES.test(f.type));
+    if (!audio.length && images.length) { setErr("That's just image files — add the audio tracks too."); return; }
+    const soleCover = images.length === 1 ? images[0] : null;
+    const added = [];
+    for (const f of audio) {
       const id = `f${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const ok = await putTrack(id, f);
       if (!ok) { setErr("Couldn't save that file for offline play."); continue; }
-      setList(l => [...l, { id, title: f.name.replace(/\.[^.]+$/, "").slice(0, 60), kind: "file", src: "idb", size: f.size, mime: f.type || "" }]);
+      const cover = images.find(im => dirOf(im) === dirOf(f)) || soleCover;
+      if (cover) await putCover(id, cover);
+      added.push({ id, title: f.name.replace(/\.[^.]+$/, "").slice(0, 60), kind: "file", src: "idb", size: f.size, mime: f.type || "", hasCover: !!cover });
     }
+    if (added.length) setList(l => [...l, ...added]);
   }, []);
 
   const remove = useCallback(id => {
     setList(l => l.filter(t => t.id !== id));
     setPlaylists(pls => pls.map(p => ({ ...p, trackIds: p.trackIds.filter(x => x !== id) })));
     deleteTrack(id);
+    deleteCover(id);
   }, []);
 
   // Playlists are just named subsets of your own on-device library — no
@@ -189,13 +205,21 @@ export function useMusic() {
   return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, playable, allPlayable, playlists, activePlaylist, createPlaylist, renamePlaylist, deletePlaylist, toggleInPlaylist, playPlaylist, clearActivePlaylist, mediaRef, analyserRef, ensureAnalyser, currentIsVideo };
 }
 
+export const VISUALIZER_STYLES = [
+  { id: "bars", name: "Bars", desc: "Classic frequency bars" },
+  { id: "wave", name: "Waveform", desc: "Oscilloscope line" },
+  { id: "circle", name: "Radial", desc: "Bars ringing a center" },
+  { id: "pulse", name: "Pulse", desc: "One breathing blob" },
+];
+
 /**
- * Live bar visualiser driven by real amplitude data from the Web Audio
- * analyser. If the analyser couldn't be created (older browser, blocked
- * AudioContext) it falls back to a calm idle pulse rather than showing
- * nothing — so the panel never looks broken.
+ * Visualiser driven by real amplitude data from the Web Audio analyser, in
+ * one of a few purely cosmetic drawing styles. If the analyser couldn't be
+ * created (older browser, blocked AudioContext) every style falls back to a
+ * calm idle animation rather than showing nothing — so the panel never looks
+ * broken.
  */
-function MusicVisualizer({ music, height = 56 }) {
+function MusicVisualizer({ music, height = 56, style = "bars" }) {
   const T = useT();
   const ref = useRef(null);
   const { analyserRef, playing } = music;
@@ -208,30 +232,116 @@ function MusicVisualizer({ music, height = 56 }) {
     fit();
     window.addEventListener("resize", fit);
     const BARS = 32;
-    const draw = () => {
-      if (!run) return;
+    const sample = () => {
       const an = analyserRef.current;
-      ctx.clearRect(0, 0, cv.width, cv.height);
+      if (an) { const data = new Uint8Array(an.frequencyBinCount); an.getByteFrequencyData(data); return data; }
+      return null;
+    };
+    const timeSample = () => {
+      const an = analyserRef.current;
+      if (an) { const data = new Uint8Array(an.fftSize); an.getByteTimeDomainData(data); return data; }
+      return null;
+    };
+    const drawBars = data => {
       const bw = cv.width / BARS;
-      let data = null;
-      if (an) { data = new Uint8Array(an.frequencyBinCount); an.getByteFrequencyData(data); }
-      t += 0.05;
       for (let i = 0; i < BARS; i++) {
-        let v;
-        if (data) v = (data[Math.floor(i * data.length / BARS)] || 0) / 255;
-        else v = playing ? 0.18 + Math.abs(Math.sin(t + i * 0.35)) * 0.22 : 0.06;
+        let v = data ? (data[Math.floor(i * data.length / BARS)] || 0) / 255 : (playing ? 0.18 + Math.abs(Math.sin(t + i * 0.35)) * 0.22 : 0.06);
         const h = Math.max(2, v * cv.height);
         ctx.fillStyle = i % 3 === 0 ? T.accent : T.alt;
         ctx.globalAlpha = 0.55 + v * 0.45;
         ctx.fillRect(i * bw + 1, cv.height - h, bw - 2, h);
       }
       ctx.globalAlpha = 1;
+    };
+    const drawWave = () => {
+      const data = timeSample();
+      ctx.lineWidth = 2; ctx.strokeStyle = T.accent; ctx.beginPath();
+      const N = data ? data.length : 64;
+      for (let i = 0; i < N; i++) {
+        const v = data ? data[i] / 128 - 1 : (playing ? Math.sin(t * 2 + i * 0.3) * 0.5 : Math.sin(i * 0.4) * 0.05);
+        const x = (i / (N - 1)) * cv.width, y = cv.height / 2 + v * (cv.height / 2 - 3);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    };
+    const drawCircle = data => {
+      const cx = cv.width / 2, cy = cv.height / 2, base = Math.min(cv.width, cv.height) * 0.18;
+      for (let i = 0; i < BARS; i++) {
+        let v = data ? (data[Math.floor(i * data.length / BARS)] || 0) / 255 : (playing ? 0.2 + Math.abs(Math.sin(t + i * 0.4)) * 0.2 : 0.05);
+        const len = base * 0.6 + v * base * 1.4;
+        const a = (i / BARS) * Math.PI * 2;
+        const x1 = cx + Math.cos(a) * base, y1 = cy + Math.sin(a) * base;
+        const x2 = cx + Math.cos(a) * (base + len), y2 = cy + Math.sin(a) * (base + len);
+        ctx.strokeStyle = i % 3 === 0 ? T.accent : T.alt;
+        ctx.globalAlpha = 0.55 + v * 0.45; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    };
+    const drawPulse = data => {
+      let v = 0.15;
+      if (data) { let sum = 0; for (const d of data) sum += d; v = (sum / data.length) / 255; }
+      else if (playing) v = 0.25 + Math.abs(Math.sin(t)) * 0.25;
+      const cx = cv.width / 2, cy = cv.height / 2, r = Math.min(cv.width, cv.height) * (0.22 + v * 0.55);
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grad.addColorStop(0, T.accent); grad.addColorStop(1, T.alt);
+      ctx.globalAlpha = 0.75; ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    };
+    const draw = () => {
+      if (!run) return;
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      t += 0.05;
+      if (style === "wave") drawWave();
+      else if (style === "circle") drawCircle(sample());
+      else if (style === "pulse") drawPulse(sample());
+      else drawBars(sample());
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
     return () => { run = false; cancelAnimationFrame(raf); window.removeEventListener("resize", fit); };
-  }, [analyserRef, playing, height, T.accent, T.alt]);
+  }, [analyserRef, playing, height, style, T.accent, T.alt]);
   return <canvas ref={ref} aria-hidden="true" style={{ width: "100%", height, display: "block", borderRadius: 10 }} />;
+}
+
+/** Small lazy-loaded cover-art thumbnail for a track that has one stored. */
+function CoverThumb({ trackId, size = 32, radius = 8 }) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    let obj = null, cancelled = false;
+    getCover(trackId).then(blob => {
+      if (cancelled || !blob) return;
+      obj = URL.createObjectURL(blob);
+      setUrl(obj);
+    });
+    return () => { cancelled = true; if (obj) URL.revokeObjectURL(obj); };
+  }, [trackId]);
+  if (!url) return null;
+  return <img src={url} alt="" aria-hidden="true" style={{ width: size, height: size, borderRadius: radius, objectFit: "cover", flexShrink: 0 }} />;
+}
+
+/** Big square cover-art stage shown for a non-video track that has art. */
+function CoverStage({ music }) {
+  const T = useT();
+  const { current } = music;
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    if (!current?.hasCover) { setUrl(null); return; }
+    let obj = null, cancelled = false;
+    getCover(current.id).then(blob => {
+      if (cancelled || !blob) return;
+      obj = URL.createObjectURL(blob);
+      setUrl(obj);
+    });
+    return () => { cancelled = true; if (obj) URL.revokeObjectURL(obj); };
+  }, [current?.id, current?.hasCover]);
+  if (!url) return null;
+  return (
+    <div className="w-full rounded-xl overflow-hidden mb-2" style={{ aspectRatio: "1/1", maxHeight: 220, background: T.card, border: `2.5px solid ${T.ink}` }}>
+      <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+    </div>
+  );
 }
 
 /**
@@ -275,6 +385,8 @@ export function MusicSheet({ music, onClose, say }) {
   const T = useT();
   const [url, setUrl] = useState("");
   const fileRef = useRef(null);
+  const folderRef = useRef(null);
+  const supportsFolder = typeof document !== "undefined" && "webkitdirectory" in document.createElement("input");
   const { list, prefs, setPrefs, idx, playing, playable, err, allPlayable, playlists, activePlaylist, createPlaylist, deletePlaylist, playPlaylist, clearActivePlaylist, toggleInPlaylist } = music;
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -299,10 +411,15 @@ export function MusicSheet({ music, onClose, say }) {
 
         <div className="p-3 rounded-2xl mb-2" style={{ border: `3px solid ${T.ink}`, background: T.paper }}>
           <div className="lok-display font-extrabold text-sm">Plug in your music</div>
-          <div className="text-xs opacity-70 mt-0.5 leading-snug">Add MP3/M4A/MP4/WAV/FLAC files — they're stored on-device and keep playing offline. Streaming links are saved as shortcuts.</div>
-          <button onClick={() => fileRef.current?.click()} className="lok-btn lok-display mt-2 w-full py-2.5 rounded-xl font-extrabold" style={{ background: T.accent, color: T.onAccent, border: `3px solid ${T.ink}` }}>＋ Add files from this device</button>
-          <input ref={fileRef} type="file" accept={ACCEPTED} multiple hidden aria-hidden="true"
-            onChange={async e => { const f = [...(e.target.files || [])]; e.target.value = ""; if (!f.length) return; await music.addFiles(f); say && say(`${f.length} track${f.length > 1 ? "s" : ""} added`, "success"); }} />
+          <div className="text-xs opacity-70 mt-0.5 leading-snug">Add MP3/M4A/MP4/WAV/FLAC files — they're stored on-device and keep playing offline. Select an album's cover image alongside its tracks (or a whole folder) and every track in it picks up that cover. Streaming links are saved as shortcuts.</div>
+          <div className="mt-2 flex gap-1.5">
+            <button onClick={() => fileRef.current?.click()} className="lok-btn lok-display flex-1 py-2.5 rounded-xl font-extrabold text-sm" style={{ background: T.accent, color: T.onAccent, border: `3px solid ${T.ink}` }}>＋ Add files</button>
+            {supportsFolder && <button onClick={() => folderRef.current?.click()} className="lok-btn lok-display flex-1 py-2.5 rounded-xl font-extrabold text-sm" style={{ background: T.card, color: T.ink, border: `3px solid ${T.ink}` }}>＋ Add a folder</button>}
+          </div>
+          <input ref={fileRef} type="file" accept={ACCEPTED + ",image/png,image/jpeg,image/webp,image/gif"} multiple hidden aria-hidden="true"
+            onChange={async e => { const f = [...(e.target.files || [])]; e.target.value = ""; if (!f.length) return; await music.addFiles(f); say && say(`${f.length} file${f.length > 1 ? "s" : ""} added`, "success"); }} />
+          {supportsFolder && <input ref={folderRef} type="file" webkitdirectory="" directory="" multiple hidden aria-hidden="true"
+            onChange={async e => { const f = [...(e.target.files || [])]; e.target.value = ""; if (!f.length) return; await music.addFiles(f); say && say(`Folder added (${f.length} file${f.length > 1 ? "s" : ""})`, "success"); }} />}
           <div className="mt-2 flex gap-1.5">
             <input value={url} onChange={e => setUrl(e.target.value)} placeholder="…or paste an album / track link" aria-label="Music URL"
               className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{ border: `2.5px solid ${T.ink}`, background: T.card, color: T.ink }}
@@ -315,9 +432,20 @@ export function MusicSheet({ music, onClose, say }) {
 
         <div className="p-3 rounded-2xl mb-2" style={{ border: `2px solid ${T.shadow}`, background: T.paper }}>
           {music.currentIsVideo && <VideoStage music={music} />}
+          {!music.currentIsVideo && <CoverStage music={music} />}
           {prefs.visualizer !== false && (<div className="mb-2">
-            <MusicVisualizer music={music} />
-            {music.current && <div className="text-[11px] font-bold truncate mt-1" style={{ color: T.ink }}>{music.playing ? "♪ " : "❚❚ "}{music.current.title}</div>}
+            <MusicVisualizer music={music} style={prefs.visualizerStyle} />
+            <div className="mt-1.5 flex gap-1.5">
+              {VISUALIZER_STYLES.map(v => (
+                <button key={v.id} onClick={() => setPrefs(p => ({ ...p, visualizerStyle: v.id }))} aria-pressed={prefs.visualizerStyle === v.id}
+                  className="lok-btn px-2 py-1 rounded-full text-[10px] font-extrabold" title={v.desc}
+                  style={{ border: `2px solid ${T.ink}`, background: prefs.visualizerStyle === v.id ? T.ink : T.card, color: prefs.visualizerStyle === v.id ? T.paper : T.ink }}>{v.name}</button>
+              ))}
+            </div>
+            {music.current && <div className="flex items-center gap-1.5 text-[11px] font-bold truncate mt-1" style={{ color: T.ink }}>
+              {music.current.hasCover && <CoverThumb trackId={music.current.id} size={18} radius={4} />}
+              <span className="truncate">{music.playing ? "♪ " : "❚❚ "}{music.current.title}</span>
+            </div>}
           </div>)}
           <div className="flex items-center gap-2">
             <button onClick={() => music.skip(-1)} disabled={!playable.length} aria-label="Previous track" className="lok-btn w-10 h-10 rounded-full font-extrabold" style={{ border: `2.5px solid ${T.ink}`, background: T.card, opacity: playable.length ? 1 : .4 }}>◀◀</button>
@@ -366,6 +494,7 @@ export function MusicSheet({ music, onClose, say }) {
         {playable.map((t, i) => (
           <div key={t.id} className="flex items-center gap-2 p-2 rounded-xl mb-1" style={{ border: `2px solid ${i === idx ? T.accent : T.shadow}`, background: i === idx ? T.card : "transparent" }}>
             <button onClick={() => music.playAt(i)} aria-label={`Play ${t.title}`} className="lok-btn shrink-0 w-8 h-8 rounded-full font-bold" style={{ border: `2px solid ${T.ink}`, background: T.card }}>{i === idx && playing ? "❚❚" : "▶"}</button>
+            {t.hasCover && <CoverThumb trackId={t.id} />}
             <div className="min-w-0 flex-1"><div className="font-bold text-sm truncate">{t.title}</div><div className="text-[10px] opacity-50">{t.src === "idb" ? "on device · offline ready" : "link"}</div></div>
             <button onClick={() => music.remove(t.id)} aria-label={`Remove ${t.title}`} className="lok-btn shrink-0 text-xs font-bold opacity-60 px-1.5">✕</button>
           </div>
