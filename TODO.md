@@ -46,8 +46,10 @@ assumed working:
   persisted in prefs. Not (yet) a purchasable shop category — currently free
   for anyone with the player, which is a deliberate choice pending a decision
   on whether visual styles should cost Loks like everything else in Shop.
-- **Per-track volume / normalisation.** One global volume only, so a quiet
-  track and a loud one jump. No gain staging.
+- ~~**Per-track volume / normalisation.**~~ Done, as a manual version —
+  each track has a 🔊 control (0–200% multiplier on top of master volume),
+  set once and remembered. Not automatic loudness analysis (no audio
+  processing happens), just a per-track number the listener sets.
 
 ## Music (new direction, staged)
 
