@@ -50,7 +50,14 @@ export function useMusic() {
 
   const activePlaylist = playlists.find(p => p.id === activePlaylistId) || null;
   const allPlayable = list.filter(t => t.kind === "file");
-  const playable = activePlaylist ? allPlayable.filter(t => activePlaylist.trackIds.includes(t.id)) : allPlayable;
+  // "Global" tracks (dev-mode flagged) stay in the queue no matter which
+  // playlist is active, so a small always-on ambient set can run through
+  // regardless of what else is playing. Local-only — there's no backend
+  // here, so this doesn't distribute to other users, just pins tracks into
+  // every scope on this one device.
+  const globalTracks = allPlayable.filter(t => t.global);
+  const scoped = activePlaylist ? allPlayable.filter(t => activePlaylist.trackIds.includes(t.id)) : allPlayable;
+  const playable = activePlaylist ? [...scoped, ...globalTracks.filter(g => !scoped.some(s => s.id === g.id))] : scoped;
   const current = idx >= 0 ? playable[idx] : null;
   const next = playable.length ? playable[(idx + 1) % playable.length] : null;
 
@@ -153,18 +160,39 @@ export function useMusic() {
   // as album art and inherited by every audio file that shares their folder —
   // "drop a folder of MP3s + one cover.jpg" makes every track in it show that
   // cover, without asking the user to tag each file individually.
+  //
+  // Storage durability: tracks live in IndexedDB, which the browser is
+  // allowed to evict under disk pressure unless the origin has been granted
+  // "persistent" storage — so every add attempts that grant (best-effort,
+  // silently ignored where unsupported/denied, e.g. Safari private
+  // browsing where IndexedDB may not work at all). We also check the quota
+  // estimate up front so a too-big batch fails with a clear message instead
+  // of partway through with a vague one. None of this helps across devices —
+  // this storage is local to the one browser it was added in, with no cloud
+  // backup, so switching phones or clearing site data loses it.
   const addFiles = useCallback(async files => {
     const arr = [...files];
     const dirOf = f => (f.webkitRelativePath || "").split("/").slice(0, -1).join("/");
     const images = arr.filter(f => IMAGE_TYPES.test(f.type));
     const audio = arr.filter(f => !IMAGE_TYPES.test(f.type));
     if (!audio.length && images.length) { setErr("That's just image files — add the audio tracks too."); return; }
+    if (navigator.storage?.persist) { try { await navigator.storage.persist(); } catch {} }
+    if (navigator.storage?.estimate) {
+      try {
+        const { quota, usage } = await navigator.storage.estimate();
+        const totalBytes = audio.reduce((s, f) => s + f.size, 0);
+        if (quota && (usage + totalBytes) > quota * 0.95) {
+          setErr("Not enough device storage left for that — free up space or add fewer/smaller files.");
+          return;
+        }
+      } catch {}
+    }
     const soleCover = images.length === 1 ? images[0] : null;
     const added = [];
     for (const f of audio) {
       const id = `f${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const ok = await putTrack(id, f);
-      if (!ok) { setErr("Couldn't save that file for offline play."); continue; }
+      if (!ok) { setErr("Couldn't save that file for offline play — storage may be full or unavailable in this browsing mode."); continue; }
       const cover = images.find(im => dirOf(im) === dirOf(f)) || soleCover;
       if (cover) await putCover(id, cover);
       added.push({ id, title: f.name.replace(/\.[^.]+$/, "").slice(0, 60), kind: "file", src: "idb", size: f.size, mime: f.type || "", hasCover: !!cover });
@@ -177,6 +205,10 @@ export function useMusic() {
     setPlaylists(pls => pls.map(p => ({ ...p, trackIds: p.trackIds.filter(x => x !== id) })));
     deleteTrack(id);
     deleteCover(id);
+  }, []);
+
+  const toggleGlobal = useCallback(id => {
+    setList(l => l.map(t => t.id === id ? { ...t, global: !t.global } : t));
   }, []);
 
   // Playlists are just named subsets of your own on-device library — no
@@ -202,7 +234,7 @@ export function useMusic() {
 
   const currentIsVideo = !!current && /^video\//.test(current.mime || "");
 
-  return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, playable, allPlayable, playlists, activePlaylist, createPlaylist, renamePlaylist, deletePlaylist, toggleInPlaylist, playPlaylist, clearActivePlaylist, mediaRef, analyserRef, ensureAnalyser, currentIsVideo };
+  return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, toggleGlobal, playable, allPlayable, playlists, activePlaylist, createPlaylist, renamePlaylist, deletePlaylist, toggleInPlaylist, playPlaylist, clearActivePlaylist, mediaRef, analyserRef, ensureAnalyser, currentIsVideo };
 }
 
 export const VISUALIZER_STYLES = [
@@ -381,7 +413,7 @@ export function MusicTicker({ music, onOpen }) {
 }
 
 /** Full player sheet: plug in files or links, queue, transport, preferences. */
-export function MusicSheet({ music, onClose, say }) {
+export function MusicSheet({ music, onClose, say, devMode = false }) {
   const T = useT();
   const [url, setUrl] = useState("");
   const fileRef = useRef(null);
@@ -489,13 +521,20 @@ export function MusicSheet({ music, onClose, say }) {
           </div>)}
         </div>
 
+        {devMode && (
+          <div className="p-3 rounded-2xl mb-2" style={{ border: `2px dashed ${T.accent}`, background: T.paper }}>
+            <div className="lok-display font-extrabold text-sm">Dev: global songs</div>
+            <div className="text-[11px] opacity-70 mt-0.5 leading-snug">Mark any track below "Global" and it stays in the queue no matter which playlist is active — an always-on set that keeps running through. This is local to this device only, not shared to other users.</div>
+          </div>
+        )}
         <div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Queue ({playable.length}{activePlaylist ? ` · ${activePlaylist.name}` : ""})</div>
         {playable.length === 0 && <div className="text-xs opacity-50 py-3 text-center">Nothing queued yet — add a file above.</div>}
         {playable.map((t, i) => (
           <div key={t.id} className="flex items-center gap-2 p-2 rounded-xl mb-1" style={{ border: `2px solid ${i === idx ? T.accent : T.shadow}`, background: i === idx ? T.card : "transparent" }}>
             <button onClick={() => music.playAt(i)} aria-label={`Play ${t.title}`} className="lok-btn shrink-0 w-8 h-8 rounded-full font-bold" style={{ border: `2px solid ${T.ink}`, background: T.card }}>{i === idx && playing ? "❚❚" : "▶"}</button>
             {t.hasCover && <CoverThumb trackId={t.id} />}
-            <div className="min-w-0 flex-1"><div className="font-bold text-sm truncate">{t.title}</div><div className="text-[10px] opacity-50">{t.src === "idb" ? "on device · offline ready" : "link"}</div></div>
+            <div className="min-w-0 flex-1"><div className="font-bold text-sm truncate">{t.title}{t.global && <span className="ml-1.5 text-[9px] font-extrabold uppercase align-middle" style={{ color: T.accent }}>GLOBAL</span>}</div><div className="text-[10px] opacity-50">{t.src === "idb" ? "on device · offline ready" : "link"}</div></div>
+            {devMode && <button onClick={() => music.toggleGlobal(t.id)} aria-pressed={!!t.global} aria-label={`${t.global ? "Unset" : "Set"} ${t.title} as global`} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-extrabold" style={{ border: `2px solid ${T.ink}`, background: t.global ? T.accent : T.card, color: t.global ? T.onAccent : T.ink }}>{t.global ? "★" : "☆"}</button>}
             <button onClick={() => music.remove(t.id)} aria-label={`Remove ${t.title}`} className="lok-btn shrink-0 text-xs font-bold opacity-60 px-1.5">✕</button>
           </div>
         ))}

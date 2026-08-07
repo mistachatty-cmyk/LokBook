@@ -1418,8 +1418,8 @@ export default function LokApp(){
         <div className="flex items-center gap-2">
           {kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.alt,color:onColor(T.alt,T)}}>SAFE</span>}
           {lokPass&&!kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.accent,color:T.onAccent}}>PASS</span>}
-          <button onClick={()=>setShowMusic(true)} aria-label="Open music player" className="lok-btn w-11 h-11 rounded-full flex items-center justify-center text-lg" style={{border:`2.5px solid ${T.ink}`,background:music.playing?T.accent:T.card,color:music.playing?T.onAccent:T.ink}}>🎵</button>
-          <button onClick={()=>setSound(s=>!s)} aria-label={sound?"Mute sound":"Enable sound"} className="lok-btn w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:sound?T.ink:T.card,color:sound?T.paper:T.ink}}>{sound?"♪":"♪̸"}</button>
+          <button onClick={()=>setShowMusic(true)} aria-label="Open music player" className="lok-btn w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold" style={{border:`2.5px solid ${T.ink}`,background:music.playing?T.accent:T.card,color:music.playing?T.onAccent:T.ink}}>♪</button>
+          <button onClick={()=>setSound(s=>!s)} aria-label={sound?"Mute sound":"Enable sound"} className="lok-btn w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:sound?T.ink:T.card,color:sound?T.paper:T.ink}}>{sound?"🔔":"🔕"}</button>
           <span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.ink,color:T.paper}} aria-label={`Level ${level}`}>Lv {level}{verified&&<span style={{color:"#E8B14B",marginLeft:2}}>✦</span>}</span>
           <div className="flex items-center gap-2 px-3 py-1 rounded-full font-bold" style={{border:`2.5px solid ${T.ink}`,background:T.card}} aria-label={`${loks} Loks`}>
             <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="11" cy="11" r="8" fill={T.accent}/><circle cx="9" cy="9" r="8" fill="none" stroke={T.ink} strokeWidth="2.4"/><path d="M7 5.5 V12.5 H12" fill="none" stroke={T.ink} strokeWidth="2.4" strokeLinecap="round"/></svg>
@@ -1450,7 +1450,7 @@ export default function LokApp(){
       {!focusMode && music.current && (<div className="fixed inset-x-0 z-40" style={{bottom:`calc(60px + env(safe-area-inset-bottom)${(!lokPass&&!kids)?" + 28px":""})`}}>
         <MusicTicker music={music} onOpen={()=>setShowMusic(true)}/>
       </div>)}
-      {showMusic&&<MusicSheet music={music} say={say} onClose={()=>setShowMusic(false)}/>}
+      {showMusic&&<MusicSheet music={music} say={say} devMode={devMode} onClose={()=>setShowMusic(false)}/>}
       {!focusMode && !lokPass&&!kids&&(<div className="fixed inset-x-0 z-40 flex items-center justify-between gap-2 px-4 py-1.5 text-xs font-bold" {...(AD_PROVIDER!=="placeholder"?{"data-ad-slot":ADS[adIdx].slot,"data-ad-format":"banner"}:{})} style={{bottom:62,background:T.card,borderTop:`2px dashed ${T.ink}`,color:T.ink,opacity:adVisible?1:0,transition:"opacity .3s ease",pointerEvents:adVisible?"auto":"none"}}>
         {/* AdSense: replace inner span with <ins class="adsbygoogle"> at deploy; slot id in data-ad-slot. data-ad-* attrs only emitted once a real provider is wired — placeholder mode ships no ad-network markup */}
         <span className="opacity-70 truncate" key={adIdx} style={{animation:"lokrise .3s ease"}}>Ad · {ADS[adIdx].text}</span>
