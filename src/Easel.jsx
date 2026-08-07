@@ -39,6 +39,12 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const[active,setActive]=useState(1);const[tool,setTool]=useState("pen");const[color,setColor]=useState(ART.ink);  const[recentColors,setRecentColors]=useState(()=>{try{const r=localStorage.getItem("lok:recentColors");return r?JSON.parse(r):[];}catch{return[];}});const[size,setSize]=useState(7);const[symmetry,setSymmetry]=useState("none");const[brush,setBrush]=useState("ink");const[cursorPos,setCursorPos]=useState(null);const[zoom,setZoom]=useState(1);const[pan,setPan]=useState({x:0,y:0});const[clonePt,setClonePt]=useState(null);const[shapeMode,setShapeMode]=useState("rect");const[showGuides,setShowGuides]=useState(false);const[anchorPt,setAnchorPt]=useState(null);const[blurAmount,setBlurAmount]=useState(5);  const[refImg,setRefImg]=useState(null);const[refOpacity,setRefOpacity]=useState(0.3);const[smoothStrength,setSmoothStrength]=useState(0.5);const[palette,setPalette]=useState("default");const[canvasSize,setCanvasSize]=useState("default");const isPanning=useRef(false);const panStart=useRef({x:0,y:0});const pinchRef=useRef(null);
   const[dynamics,setDynamics]=useState(true);const[brushLabOpen,setBrushLabOpen]=useState(false);const[customBrushParams,setCustomBrushParams]=useState({flow:0.35,scatter:0.15,dabs:3,angleJitter:0.2,roundness:1});
   const[fullscreen,setFullscreen]=useState(false);const[fsToolsHidden,setFsToolsHidden]=useState(false);useBodyScrollLock(fullscreen);
+  // Vanishing point for the perspective guide paper, as a % of the canvas so
+  // it survives resizing. Persisted because re-placing it every time you come
+  // back to Studio would make the guide useless for a multi-session drawing.
+  const[vp,setVp]=useState(()=>{try{const r=localStorage.getItem("lok:vp");return r?JSON.parse(r):{x:50,y:42};}catch{return{x:50,y:42};}});
+  const vpDrag=useRef(false);
+  useEffect(()=>{try{localStorage.setItem("lok:vp",JSON.stringify(vp));}catch{}},[vp]);
   // Belt-and-suspenders: a degenerate pinch (both touches at ~the same point)
   // used to divide by ~0 and poison zoom/pan with NaN, which crashes the
   // canvas transform permanently. The pinch math is now guarded at the
@@ -186,10 +192,22 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
       {paper==="graphite"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{background:`repeating-conic-gradient(${T.ink}08 0% 25%,transparent 0% 50%) 0 0 / 4px 4px`,opacity:0.5,zIndex:5}}/>}
       {/* One-point perspective: a horizon with rays converging on a centred
           vanishing point, so you can rough in depth without guessing. */}
-      {paper==="perspective"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{zIndex:5}}>
-        <div className="absolute left-0 right-0" style={{top:"42%",height:1,background:`${T.ink}33`}}/>
-        {Array.from({length:16}).map((_,i)=>{const a=(i/16)*Math.PI*2;return(<div key={i} className="absolute" style={{left:"50%",top:"42%",width:"140%",height:1,background:`${T.ink}1A`,transformOrigin:"0 0",transform:`rotate(${(a*180/Math.PI).toFixed(2)}deg)`}}/>);})}
-        <div className="absolute rounded-full" style={{left:"50%",top:"42%",width:5,height:5,marginLeft:-2.5,marginTop:-2.5,background:`${T.accent}66`}}/>
+      {paper==="perspective"&&<div className="absolute inset-0 pointer-events-none" style={{zIndex:6}}>
+        <div className="absolute left-0 right-0" style={{top:`${vp.y}%`,height:1,background:`${T.ink}33`}}/>
+        {Array.from({length:16}).map((_,i)=>{const a=(i/16)*Math.PI*2;return(<div key={i} className="absolute" style={{left:`${vp.x}%`,top:`${vp.y}%`,width:"180%",height:1,background:`${T.ink}1A`,transformOrigin:"0 0",transform:`rotate(${(a*180/Math.PI).toFixed(2)}deg)`}}/>);})}
+        {/* The vanishing point is a real handle: drag it and the horizon and
+            every ray re-derive from the new position. Grabbing it must not
+            start a stroke, hence the pointer capture + stopPropagation. */}
+        <button type="button" aria-label="Drag the vanishing point"
+          onPointerDown={e=>{e.stopPropagation();e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);vpDrag.current=true;}}
+          onPointerMove={e=>{if(!vpDrag.current)return;e.stopPropagation();const r=wrapRef.current?.getBoundingClientRect();if(!r)return;
+            setVp({x:Math.max(2,Math.min(98,((e.clientX-r.left)/r.width)*100)),y:Math.max(2,Math.min(98,((e.clientY-r.top)/r.height)*100))});}}
+          onPointerUp={e=>{e.stopPropagation();vpDrag.current=false;}}
+          onPointerCancel={()=>{vpDrag.current=false;}}
+          className="absolute rounded-full"
+          style={{left:`${vp.x}%`,top:`${vp.y}%`,width:24,height:24,marginLeft:-12,marginTop:-12,pointerEvents:"auto",touchAction:"none",cursor:"grab",background:"transparent",border:"none",padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <span style={{width:11,height:11,borderRadius:"50%",background:T.accent,border:`2px solid ${T.paper}`,boxShadow:`0 0 0 1.5px ${T.accent}`}}/>
+        </button>
       </div>}
       {/* Isometric: 30° lattice for boxes, tiles and pixel-ish constructions. */}
       {paper==="isometric"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{zIndex:5,backgroundImage:[`repeating-linear-gradient(30deg,${T.ink}18 0 1px,transparent 1px ${W/9}px)`,`repeating-linear-gradient(-30deg,${T.ink}18 0 1px,transparent 1px ${W/9}px)`,`repeating-linear-gradient(90deg,${T.ink}10 0 1px,transparent 1px ${W/9}px)`].join(",")}}/>}
