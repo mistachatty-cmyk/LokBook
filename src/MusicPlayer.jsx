@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { gsap } from "gsap";
 import { useT } from "./theme/theme.js";
 import { putTrack, getTrack, deleteTrack, putCover, getCover, deleteCover, ACCEPTED, IMAGE_TYPES, kindOfUrl, titleFromUrl } from "./engine/musicStore.js";
+import { uploadToCloud, coverKey } from "./engine/musicCloud.js";
 
 const LIST_KEY = "lok:music:list";
 const PREF_KEY = "lok:music:prefs";
@@ -24,9 +26,10 @@ const loadGains = () => { try { return JSON.parse(localStorage.getItem(GAINS_KEY
  * Blob in IndexedDB so albums keep playing offline. Streaming platforms that
  * forbid raw playback (Spotify/YouTube) are stored as links and open out.
  */
-export function useMusic() {
+export function useMusic({ userId } = {}) {
   const [list, setList] = useState(loadList);
   const [prefs, setPrefs] = useState(loadPrefs);
+  const [cloudBusy, setCloudBusy] = useState(false);
   const [playlists, setPlaylists] = useState(loadPlaylists);
   const [activePlaylistId, setActivePlaylistId] = useState(null);
   const [idx, setIdx] = useState(-1);
@@ -253,6 +256,35 @@ export function useMusic() {
     setList(l => l.map(t => t.id === id ? { ...t, global: !t.global } : t));
   }, []);
 
+  // LokCloud backup — a LokPass perk, and only ever runs when the user taps
+  // the button. Never triggered on add, on a timer, or on sign-in, so a free
+  // user or a LokPass holder who never taps it costs nothing. Uploads every
+  // not-yet-backed-up file track (and its cover, if any) and flags each one
+  // done so a repeat tap only pushes what's new.
+  const backupAllToCloud = useCallback(async () => {
+    if (!userId) return { ok: false, reason: "not signed in" };
+    const pending = list.filter(t => t.kind === "file" && !t.cloudBackedUp);
+    if (!pending.length) return { ok: true, count: 0 };
+    setCloudBusy(true);
+    let done = 0;
+    for (const t of pending) {
+      const blob = await getTrack(t.id);
+      if (!blob) continue;
+      const okTrack = await uploadToCloud(userId, t.id, blob);
+      let okCover = true;
+      if (t.hasCover) {
+        const coverBlob = await getCover(t.id);
+        if (coverBlob) okCover = await uploadToCloud(userId, coverKey(t.id), coverBlob);
+      }
+      if (okTrack && okCover) {
+        done++;
+        setList(l => l.map(x => x.id === t.id ? { ...x, cloudBackedUp: true } : x));
+      }
+    }
+    setCloudBusy(false);
+    return { ok: done === pending.length, count: done, attempted: pending.length };
+  }, [userId, list]);
+
   // Playlists are just named subsets of your own on-device library — no
   // separate storage for audio, just which track ids belong to which list.
   const createPlaylist = useCallback((name, trackIds = []) => {
@@ -276,7 +308,9 @@ export function useMusic() {
 
   const currentIsVideo = !!current && /^video\//.test(current.mime || "");
 
-  return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, toggleGlobal, playable, allPlayable, playlists, activePlaylist, createPlaylist, renamePlaylist, deletePlaylist, toggleInPlaylist, playPlaylist, clearActivePlaylist, mediaRef, analyserRef, ensureAnalyser, currentIsVideo, gains, setTrackGain, sleepAt, sleepRemainingMs, setSleepMinutes, cancelSleep };
+  const fileTracks = list.filter(t => t.kind === "file");
+  const cloudBackedCount = fileTracks.filter(t => t.cloudBackedUp).length;
+  return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, toggleGlobal, playable, allPlayable, playlists, activePlaylist, createPlaylist, renamePlaylist, deletePlaylist, toggleInPlaylist, playPlaylist, clearActivePlaylist, mediaRef, analyserRef, ensureAnalyser, currentIsVideo, gains, setTrackGain, sleepAt, sleepRemainingMs, setSleepMinutes, cancelSleep, backupAllToCloud, cloudBusy, cloudBackedCount, cloudTotalCount: fileTracks.length };
 }
 
 export const VISUALIZER_STYLES = [
@@ -419,6 +453,72 @@ function CoverStage({ music }) {
 }
 
 /**
+ * "Where does your music actually live" indicator. Three states: local-only
+ * (default — tap to learn why and get pointed at the fix), LokPass-eligible
+ * with something left to back up (tap triggers the one real upload, always
+ * a manual tap per backupAllToCloud's contract, never automatic), and fully
+ * backed up (steady state, with a one-time thank-you beat the first time it
+ * gets there).
+ */
+function CloudBackupBadge({ music, lokPass, signedIn, onGetLokPass, onSignIn, say }) {
+  const T = useT();
+  const [open, setOpen] = useState(false);
+  const panelRef = useRef(null);
+  const pillRef = useRef(null);
+  const wasFullyBacked = useRef(false);
+  const { cloudBackedCount, cloudTotalCount, cloudBusy, backupAllToCloud } = music;
+
+  useEffect(() => { if (open && panelRef.current) gsap.fromTo(panelRef.current, { opacity: 0, y: -6, height: 0 }, { opacity: 1, y: 0, height: "auto", duration: 0.25, ease: "power2.out" }); }, [open]);
+
+  const fullyBacked = lokPass && signedIn && cloudTotalCount > 0 && cloudBackedCount === cloudTotalCount;
+  useEffect(() => {
+    if (fullyBacked && !wasFullyBacked.current && pillRef.current) {
+      gsap.fromTo(pillRef.current, { scale: 1 }, { scale: 1.12, duration: 0.2, ease: "back.out(3)", yoyo: true, repeat: 1 });
+    }
+    wasFullyBacked.current = fullyBacked;
+  }, [fullyBacked]);
+
+  if (cloudTotalCount === 0) return null;
+
+  const doBackup = async () => {
+    const res = await backupAllToCloud();
+    if (res.ok && res.count > 0) say?.(`Thank you for being a LokPass member — ${res.count} track${res.count > 1 ? "s" : ""} now live in LokCloud`, "success");
+    else if (res.attempted && res.count < res.attempted) say?.("Some tracks couldn't back up — try again", "error");
+  };
+
+  let label, tone;
+  if (lokPass && signedIn) {
+    label = fullyBacked ? "🌐 In LokCloud — backed up" : cloudBusy ? "☁ Backing up…" : `☁ Back up ${cloudTotalCount - cloudBackedCount} track${cloudTotalCount - cloudBackedCount > 1 ? "s" : ""} to LokCloud`;
+    tone = fullyBacked ? T.accent : T.card;
+  } else {
+    label = "🔒 On this device only";
+    tone = T.card;
+  }
+
+  return (
+    <div className="mb-2">
+      <button ref={pillRef} onClick={() => (lokPass && signedIn) ? (fullyBacked || cloudBusy ? null : doBackup()) : setOpen(o => !o)}
+        aria-expanded={!(lokPass && signedIn) ? open : undefined}
+        className="lok-btn w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold"
+        style={{ border: `2px solid ${T.ink}`, background: tone, color: fullyBacked ? T.onAccent : T.ink }}>
+        {label}
+      </button>
+      {open && !(lokPass && signedIn) && (
+        <div ref={panelRef} className="overflow-hidden">
+          <div className="mt-1.5 p-2.5 rounded-xl text-[11px] leading-snug" style={{ border: `2px dashed ${T.shadow}`, background: T.paper }}>
+            Your music only lives in this browser's storage right now — clearing site data, switching phones, or a browser cleanup can lose it for good. LokPass unlocks LokCloud backup so it survives all of that.
+            <div className="mt-2 flex gap-1.5">
+              {!lokPass && <button onClick={onGetLokPass} className="lok-btn flex-1 py-1.5 rounded-lg font-extrabold text-[11px]" style={{ background: T.accent, color: T.onAccent, border: `2px solid ${T.ink}` }}>Get LokPass</button>}
+              {lokPass && !signedIn && <button onClick={onSignIn} className="lok-btn flex-1 py-1.5 rounded-lg font-extrabold text-[11px]" style={{ background: T.accent, color: T.onAccent, border: `2px solid ${T.ink}` }}>Sign in to back up</button>}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * Re-parents the persistent media element into the sheet so a video track is
  * actually visible, and puts it back on unmount so audio keeps playing after
  * the sheet closes.
@@ -455,7 +555,7 @@ export function MusicTicker({ music, onOpen }) {
 }
 
 /** Full player sheet: plug in files or links, queue, transport, preferences. */
-export function MusicSheet({ music, onClose, say, devMode = false }) {
+export function MusicSheet({ music, onClose, say, devMode = false, lokPass = false, signedIn = false, onGetLokPass, onSignIn }) {
   const T = useT();
   const [url, setUrl] = useState("");
   const fileRef = useRef(null);
@@ -491,6 +591,8 @@ export function MusicSheet({ music, onClose, say, devMode = false }) {
           <div className="lok-display text-lg font-extrabold">🎵 Music</div>
           <button onClick={onClose} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{ border: `2.5px solid ${T.ink}` }} aria-label="Close music player">✕</button>
         </div>
+
+        <CloudBackupBadge music={music} lokPass={lokPass} signedIn={signedIn} onGetLokPass={onGetLokPass} onSignIn={onSignIn} say={say} />
 
         <div className="p-3 rounded-2xl mb-2" style={{ border: `3px solid ${T.ink}`, background: T.paper }}>
           <div className="lok-display font-extrabold text-sm">Plug in your music</div>
