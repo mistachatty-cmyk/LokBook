@@ -62,6 +62,20 @@ export const THEMES = {
   // erased behind the whole app. Nothing else in the shop does this.
   livingink:   { name:"Living Ink",         desc:"The page draws itself behind you. Wave 5.",   price:260, wave:5, animated:true, backdrop:"livedraw", paper:"#F4EFE3", ink:"#232A3D", accent:"#C4487A", alt:"#2FA9A0", shadow:"#DFD8C8", card:"#FFFDF7", onAccent:"#fff" },
   voidhand:    { name:"The Void Hand",      desc:"Something is still drawing. Wave 5.",         price:280, wave:5, animated:true, backdrop:"livedraw", paper:"#0B0B10", ink:"#EDE9F5", accent:"#8B7BD8", alt:"#4FC3C0", shadow:"rgba(0,0,0,.65)", card:"#14141C", onAccent:"#fff" },
+
+  // ---- Second harvest — 10 more, ungated -------------------------------
+  // Same named-place voice as the ward batch above, priced like the
+  // original wave-1 wards rather than slotted behind a new wave gate.
+  cinderrow:      { name:"Cinder Row",          desc:"Coal smoke, a banked fire, iron light.",    price:50, paper:"#221A16", ink:"#EFE2D6", accent:"#E8622C", alt:"#B08A5E", shadow:"#16110D", card:"#2E2420", onAccent:"#000" },
+  papermoon:      { name:"The Paper Moon",      desc:"A pale disc on a cold clear page.",         price:50, paper:"#EAF0F6", ink:"#233045", accent:"#3B6EA5", alt:"#8FA6BF", shadow:"#D4DEE7", card:"#F7FAFC", onAccent:"#fff" },
+  verdigris:      { name:"Verdigris Hall",      desc:"Old copper roofing, gone green with age.",  price:55, paper:"#E3ECE6", ink:"#1E3A32", accent:"#2C7059", alt:"#8FAE9C", shadow:"#CBDACF", card:"#F2F7F4", onAccent:"#fff" },
+  saltline:       { name:"Salt Line",           desc:"Tide-flat grey, gull cry, cold brine.",     price:50, paper:"#E7EDF0", ink:"#2C3E48", accent:"#3F7C93", alt:"#9AB4C0", shadow:"#D2DCE1", card:"#F5F9FB", onAccent:"#fff" },
+  theloom:        { name:"The Loom",            desc:"Warp and weft, warm wool, slow hands.",     price:55, paper:"#EFE6D8", ink:"#4A3423", accent:"#8C4620", alt:"#8C6E4E", shadow:"#DDD0BC", card:"#FBF6EC", onAccent:"#fff" },
+  ambervault:     { name:"Amber Vault",         desc:"Everything kept, nothing spent. Wave 2.",   price:90, wave:2, paper:"#1D1508", ink:"#F3E3B8", accent:"#D9971F", alt:"#8C6A2E", shadow:"rgba(0,0,0,.5)", card:"#291F0F", onAccent:"#000" },
+  chalklinecourt: { name:"Chalkline Court",     desc:"Measured, swept, and drawn square.",        price:50, paper:"#F2F0EC", ink:"#3A3A38", accent:"#6E6E68", alt:"#A9A79E", shadow:"#DDDBD5", card:"#FAF9F6", onAccent:"#fff" },
+  hollowpress:    { name:"The Hollow Press",    desc:"A printworks nobody runs anymore. Wave 3.", price:120, wave:3, paper:"#150F1E", ink:"#E7DCF2", accent:"#8B4FD8", alt:"#5E4A7A", shadow:"rgba(0,0,0,.55)", card:"#1E1729", onAccent:"#fff" },
+  windward:       { name:"Windward Steps",      desc:"High stairs, clean air, a long view.",      price:55, paper:"#EAF4FA", ink:"#1D3E52", accent:"#2E9BD6", alt:"#8FCBE6", shadow:"#CFE3EE", card:"#F7FCFE", onAccent:"#000" },
+  ferrousyard:    { name:"Ferrous Yard",        desc:"Rust and rivets, the old iron works.",      price:55, paper:"#241C18", ink:"#EDDCC9", accent:"#D98456", alt:"#7A6152", shadow:"#170F0C", card:"#302620", onAccent:"#000" },
 };
 export const SKIN_WAVE_GATE = 2;
 export const SKIN_WAVE_3_GATE = 5;
