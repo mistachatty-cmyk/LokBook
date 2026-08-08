@@ -112,7 +112,7 @@ Status legend: ✅ done · 🔶 partial/needs polish · ⬜ not started · 🔄 
 | B1 | Nav overload: 7 bottom tabs at the practical ceiling | ⬜ | Consider folding Rush into Battle as a mode switch |
 | B2 | Shop has 15-19 sub-tabs | ⬜ | Group into 4-5 supercategories; keep "browse all" as escape hatch |
 | B3 | Four competing monetization pitches (LokPass, Studio UBER, Founder, Mythic/rotation shop) | ⬜ | Needs one coherent value ladder, not four parallel asks |
-| B4 | Progressive disclosure: reveal tabs/features as milestones are hit instead of showing everything on day one | ⬜ | Highest-leverage unused game-design lever in the app |
+| B4 | Progressive disclosure: reveal tabs/features as milestones are hit instead of showing everything on day one | 🔶 | Track exists: `src/engine/unlocks.js` + `src/pages/Roadmap.jsx` (Settings → 🗺️ The Roadmap). 8 milestones, 2 live (Ink Weather LV2, Night Shift LV4), 6 shown honestly as Planned. **Levels grant world-behaviour, never cosmetics** — the Shop stays the only place looks are sold, so the two never compete. Remaining B4 work is gating the 7 bottom tabs themselves |
 | B5 | Single "today's earn/spend" dashboard | ⬜ | Economy is sprawling enough now that a transaction log / daily summary would make it legible |
 | B6 | Quest pool (6 quests) hasn't grown to cover Rooms/journals/bleeps | ⬜ | Add quest tracks for the newer systems |
 | B7 | Badges (20 across 5 categories) — same gap, no Rooms/journal/social category yet | ⬜ | |
