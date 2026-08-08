@@ -55,7 +55,12 @@ export const roomsApi = {
   fetchMembers: roomId => get(`lok_room_members?room_id=eq.${q(roomId)}&select=*`),
   requestWrite: (roomId, userId) => patch(`lok_room_members?room_id=eq.${q(roomId)}&user_id=eq.${q(userId)}`, { requested_write: true }),
   grantWrite: (roomId, userId) => patch(`lok_room_members?room_id=eq.${q(roomId)}&user_id=eq.${q(userId)}`, { role: "writer", requested_write: false }),
-  insertStroke: row => post("lok_room_strokes", row, "resolution=ignore-duplicates,return=minimal").catch(() => false),
+  // NOTE: this used to end in `.catch(() => false)`. Every write failure was
+  // swallowed — the mark drew locally, broadcast to peers, then vanished on
+  // reload with no error anywhere, which is how `lok_room_strokes` stayed at 0
+  // rows while rooms and members accumulated. It must reject so the caller can
+  // tell the user and roll the optimistic mark back out.
+  insertStroke: row => post("lok_room_strokes", row, "resolution=ignore-duplicates,return=minimal"),
   async deleteStroke(id, authorId) {
     const r = await timedFetch(`${SUPA_URL}/rest/v1/lok_room_strokes?id=eq.${q(id)}&author_id=eq.${q(authorId)}`, { method: "DELETE", headers: headers() });
     return r.ok;
@@ -70,6 +75,7 @@ export const roomsApi = {
   saveJournal: j => post("lok_journals", j, "resolution=merge-duplicates,return=minimal"),
   fetchJournals: ownerName => get(`lok_journals?owner_name=eq.${q(ownerName)}&public=eq.true&order=created_at.desc&select=id,owner_name,title,style,pages,created_at`),
   fetchMyJournals: ownerId => get(`lok_journals?owner_id=eq.${q(ownerId)}&order=created_at.desc&select=*`),
+  // same fix as insertStroke — `lok_stamps` is also empty in production
   saveStamp: s => post("lok_stamps", s, "resolution=merge-duplicates,return=minimal"),
   fetchStamps: (limit = 100) => get(`lok_stamps?public=eq.true&order=created_at.desc&limit=${limit}&select=*`),
 };

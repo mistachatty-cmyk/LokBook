@@ -19,6 +19,11 @@ export const UNLOCK_TRACK = [
     detail: "After midnight local time the whole app cools and dims a few degrees, and warms back up toward morning. Drawing late looks different from drawing at noon.",
   },
   {
+    level: 5, id: "drift_rights", name: "Drift Rights", live: false,
+    blurb: "Leave a mark in any gallery you wander into.",
+    detail: "Today a drift gallery lets passers-by leave one bleep, and a private room lets a code-holder leave nothing at all. This opens it up: wander into any open gallery and leave a little blot behind, no code and no account needed — rate-limited, so a gallery stays a gallery and not a wall of noise.",
+  },
+  {
     level: 6, id: "echo_ink", name: "Echo Ink", live: false,
     blurb: "Your old strokes haunt the page.",
     detail: "The last thing you drew stays faintly on the paper behind the thing you're drawing now — a ghost of the previous page, fading over a few minutes.",
@@ -42,6 +47,16 @@ export const UNLOCK_TRACK = [
     level: 15, id: "misprint_day", name: "Misprint Day", live: false,
     blurb: "One day a week, the press is off.",
     detail: "The second colour drum lands out of register across the entire app for one day — everything is very slightly, deliberately misprinted. It goes away on its own.",
+  },
+  {
+    level: 14, id: "cartographer", name: "The Cartographer", live: false,
+    blurb: "A map of everywhere you've drawn.",
+    detail: "Room canvases are already carved into chunks behind the scenes. This surfaces them: a mini-map you can jump around by chunk — the ones you've drawn in filled, the ones you've only passed through faint, and the ones nobody has touched left blank. It's also what makes a genuinely endless canvas navigable instead of a place to get lost.",
+  },
+  {
+    level: 18, id: "patron", name: "Patron", live: false,
+    blurb: "Send Loks to an artist whose room you loved.",
+    detail: "Tip the owner of a canvas straight from the room. Comes out of your own balance, so it means something — capped per day, and both sides need an account so the Loks are real and not something anyone can mint by typing a different name.",
   },
   {
     level: 20, id: "long_page", name: "The Long Page", live: false,

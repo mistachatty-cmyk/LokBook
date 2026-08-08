@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useT, ART, THEMES } from "../theme/theme.js";
 import { roomsApi } from "../rooms/api.js";
+import { sendMark, onPending, flush as flushOutbox } from "../rooms/outbox.js";
 import { CHUNK, ChunkIndex, makeCamera, screenToWorld, encodePoints, decodePoints, chunkKey, newRoomCode, normalizeCode, newStrokeId } from "../rooms/world.js";
 import { useRoomChannel } from "../rooms/useRoomChannel.js";
 import { PROC_STAMPS, drawStampCard, stampBB, STAMP_W, STAMP_H } from "../rooms/stamps.js";
@@ -71,6 +72,7 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
   const [qrUrl, setQrUrl] = useState("");
   const [communityStamps, setCommunityStamps] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [pending, setPending] = useState(0); // marks queued by the outbox
   const miniRef = useRef(null); const [miniFrames, setMiniFrames] = useState([]);
   const canDraw = role === "owner" || role === "writer";
 
@@ -104,12 +106,17 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
         if (!on) return;
         setMembers(mem);
         const me = mem.find(m => m.user_id === userId);
-        if (me) setRole(me.role); else { await roomsApi.joinRoom(room.id, userId, userName, isOwner ? "owner" : "reader"); }
+        // The else branch used to join without ever calling setRole, leaving a
+        // fresh joiner stuck on the initial "reader" even when they own the room.
+        if (me) setRole(me.role);
+        else { const fallback = isOwner ? "owner" : "reader"; await roomsApi.joinRoom(room.id, userId, userName, fallback); setRole(fallback); }
         setLoaded(true);
       } catch (e) { console.warn("room load", e); setLoaded(true); }
     })();
     roomsApi.fetchStamps(60).then(r => on && setCommunityStamps(r.filter(s => s.kind === "mini"))).catch(() => {});
-    return () => { on = false; };
+    const unsub = onPending(n => on && setPending(n));
+    flushOutbox();
+    return () => { on = false; unsub(); };
   }, [room.id]);
 
   // ----- realtime -----
@@ -210,8 +217,9 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
     addRow(row);
     myStack.current.push(d.sid);
     channel.send("s.commit", row);
-    roomsApi.insertStroke(row);
-  }, [brush, color, size, room.id, userId, userName, addRow, channel]);
+    // A failed write used to disappear silently; now it queues and says so.
+    sendMark(row).then(sent => { if (!sent) say("Offline — that mark will land when you reconnect", "default"); });
+  }, [brush, color, size, room.id, userId, userName, addRow, channel, say]);
 
   const down = e => {
     e.preventDefault();
@@ -289,7 +297,7 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
     const row = { id: newStrokeId(userId), room_id: room.id, chunk: chunkKey(d.x, d.y), author_id: userId, author: userName, kind: "stamp", data: d };
     addRow(row); myStack.current.push(row.id);
     channel.send("s.commit", row);
-    roomsApi.insertStroke(row);
+    sendMark(row).then(sent => { if (!sent) say("Offline — that stamp will land when you reconnect", "default"); });
     setPendingStamp(null); setTool("pen");
     blip && blip("D5"); hap && hap([20]);
   };
@@ -311,7 +319,8 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
     if (localStorage.getItem(bleepKey)) { say("One bleep per gallery per day — come back tomorrow 🌙", "error"); setBleepDraft(null); return; }
     const d = { t: "bleep", x: bleepDraft.x, y: bleepDraft.y, icon, note: (note || "").slice(0, 40), color: color };
     const row = { id: newStrokeId(userId), room_id: room.id, chunk: chunkKey(d.x, d.y), author_id: userId, author: userName, kind: "bleep", data: d };
-    addRow(row); channel.send("s.commit", row); roomsApi.insertStroke(row);
+    addRow(row); channel.send("s.commit", row);
+    sendMark(row).then(sent => { if (!sent) say("Offline — that bleep will land when you reconnect", "default"); });
     localStorage.setItem(bleepKey, "1");
     setBleepDraft(null); say("Bleep left ✦ your mark lives here now", "success"); hap && hap([30, 20, 30]);
   };
@@ -361,7 +370,7 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
       <button onClick={onClose} aria-label="Leave room" className="lok-btn px-3 py-1 rounded-lg font-bold" style={{ border: `2.5px solid ${T.ink}`, background: T.card }}>‹</button>
       <div className="min-w-0 flex-1">
         <div className="lok-display font-extrabold text-sm leading-tight truncate">{room.title}{isGallery && <span className="ml-1.5 text-[9px] px-1.5 py-0.5 rounded align-middle" style={{ background: T.alt, color: "#fff" }}>GALLERY</span>}</div>
-        <div className="text-[10px] opacity-60">{room.code} · {online} here · {role}</div>
+        <div className="text-[10px] opacity-60">{room.code} · {online} here · {role}{pending > 0 && <span style={{ color: T.alt }}> · {pending} unsent ↻</span>}</div>
       </div>
       <button onClick={() => setShowMembers(true)} aria-label="Members" className="lok-btn px-2.5 py-1.5 rounded-full text-xs font-bold" style={btn(false)}>👥 {members.length || 1}</button>
       <button onClick={() => setShowShare(true)} aria-label="Invite" className="lok-btn px-2.5 py-1.5 rounded-full text-xs font-extrabold" style={{ background: T.accent, color: T.onAccent, border: `2.5px solid ${T.ink}` }}>Invite</button>
