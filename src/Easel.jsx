@@ -5,6 +5,7 @@ import { getStroke } from 'perfect-freehand';
 import { paperBase } from "./engine/draw.jsx";
 import { cursorFor } from "./engine/cursors.js";
 import { ROTATION_PAPERS } from "./engine/rotation.js";
+import { hitSticker, drawStickerItem, getSticker } from "./engine/stickers.js";
 import { useBodyScrollLock } from "./hooks/useBodyScrollLock.js";
 
 const PALLETS={
@@ -24,7 +25,7 @@ const DEMO_BRUSH_PRESETS=[
   {id:"basics",name:"Bold Basics",flow:0.6,scatter:0.1,dabs:2,angleJitter:0.1,roundness:1},
 ];
 
-const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper="plain",legacyMode=false,onLegacyToggle,maxLayers:maxLayersProp,ccTier=false,animFx="none",cursorPack="default"},ref){
+const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper="plain",legacyMode=false,onLegacyToggle,maxLayers:maxLayersProp,ccTier=false,animFx="none",cursorPack="default",stickers=[],onStickersChange,pendingSticker=null,onStickerPlaced},ref){
   const T=useT();
   // Layer cap: the Studio TIERS system passes maxLayers explicitly; otherwise
   // fall back to whatever the owned layer modules allow.
@@ -59,11 +60,43 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const[savedBrushes,setSavedBrushes]=useState(()=>{try{const r=localStorage.getItem("lok:customBrushes");return r?JSON.parse(r):[];}catch{return[];}});
   const lastMoveXY=useRef(null);const lastMoveT=useRef(0);const transformDrag=useRef(null);const labPreviewRef=useRef(null);
   const idRef=useRef(1);const canvases=useRef(new Map());const drawing=useRef(false);const undoStack=useRef([]);const redoStack=useRef([]);const wrapRef=useRef(null);const lastPts=useRef([]);const midPts=useRef([]);const activeLayer=layers.find(l=>l.id===active);
+  // Sticker placement/drag — kept orthogonal to the `tool` state machine so it
+  // can never interfere with brush/tool gating; down/move/up check this first
+  // and fall through to normal drawing untouched when nothing sticker-related
+  // is happening.
+  const stickerCvRef=useRef(null);const stickerDrag=useRef(null);const[selectedSticker,setSelectedSticker]=useState(null);
+  const stickerImages=useRef(new Map());const[stickerImgTick,setStickerImgTick]=useState(0);
+  useEffect(()=>{
+    let cancelled=false;
+    stickers.filter(s=>s.item.kind==="image"&&!stickerImages.current.has(s.item.value)).forEach(s=>{
+      const id=s.item.value;stickerImages.current.set(id,null); // placeholder so we don't fetch twice
+      getSticker(id).then(blob=>{
+        if(cancelled||!blob)return;
+        const img=new Image();const url=URL.createObjectURL(blob);
+        img.onload=()=>{if(!cancelled)setStickerImgTick(t=>t+1);};
+        img.src=url;stickerImages.current.set(id,img);
+      }).catch(()=>{});
+    });
+    return()=>{cancelled=true;};
+  },[stickers]);
+  useEffect(()=>{
+    const cv=stickerCvRef.current;if(!cv)return;const ctx=cv.getContext("2d");
+    ctx.clearRect(0,0,W,H);
+    stickers.forEach(s=>drawStickerItem(ctx,s,{selected:s.id===selectedSticker,accent:T.accent,imageCache:stickerImages.current}));
+  },[stickers,selectedSticker,stickerImgTick,T.accent]);
   const pointerRef=useRef({pressure:0.5,tiltX:0,tiltY:0,twist:0,pointerType:"mouse"});
   const toImg=cv=>cv.toDataURL("image/webp",0.72);
   const strokePoints=useRef([]);
   useImperativeHandle(ref,()=>({
-    composite(pageNum=null){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");paperBase(ctx,pageNum);layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv&&l.visible){ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=l.blend;ctx.drawImage(cv,0,0);}});ctx.globalAlpha=1;ctx.globalCompositeOperation="source-over";return toImg(tmp);},
+    composite(pageNum=null){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");paperBase(ctx,pageNum);layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv&&l.visible){ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=l.blend;ctx.drawImage(cv,0,0);}});ctx.globalAlpha=1;ctx.globalCompositeOperation="source-over";
+      // Stickers bake in here so every existing caller (capture, battle,
+      // duels, the live draft poll) gets them for free with no signature
+      // change. Stays synchronous: an image sticker not yet loaded into
+      // stickerImages is skipped rather than awaited, since composite() must
+      // not become async (see the note in engine/stickers.js) — in practice
+      // it's already loaded well before a capture happens.
+      stickers.forEach(s=>drawStickerItem(ctx,s,{imageCache:stickerImages.current}));
+      return toImg(tmp);},
     blankFrame(){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;paperBase(tmp.getContext("2d"),null);return toImg(tmp);},
     clearAll(){layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv)cv.getContext("2d").clearRect(0,0,W,H);});undoStack.current=[];redoStack.current=[];},
     async restoreFromImage(dataUrl){if(!dataUrl)return;const cv=canvases.current.get(layers[0].id);if(!cv)return;const img=new Image();await new Promise(res=>{img.onload=res;img.onerror=res;img.src=dataUrl;});cv.getContext("2d",{willReadFrequently:true}).drawImage(img,0,0,W,H);},
@@ -144,7 +177,12 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   };
   const fillLayer=ctx=>{ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;ctx.fillRect(0,0,W,H);};
   const eyedrop=(x,y)=>{for(let i=layers.length-1;i>=0;i--){const cv=canvases.current.get(layers[i].id);if(!cv||!layers[i].visible)continue;const d=cv.getContext("2d").getImageData(Math.floor(x),Math.floor(y),1,1).data;if(d[3]>10){setColorAndRecent(`rgb(${d[0]},${d[1]},${d[2]})`);setTool("pen");return;}}};
-  const down=e=>{e.preventDefault();const cv=canvases.current.get(active);if(!cv||!activeLayer?.visible)return;e.currentTarget.setPointerCapture(e.pointerId);const p0=pos(e);const mul=dynMul(e,p0[0],p0[1]);const pressure=e.pointerType==="pen"&&e.pressure>0?e.pressure:mul;pointerRef.current={pressure,tiltX:e.tiltX||0,tiltY:e.tiltY||0,twist:e.twist||0,pointerType:e.pointerType||"mouse"};strokePoints.current=[[...p0,pressure]];if(tool==="eyedrop"){eyedrop(...p0);return;}if(tool==="transform"){transformDrag.current={startClient:[e.clientX,e.clientY],startCanvas:p0};return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}if(tool==="clone"){if(!clonePt){setClonePt(p0);return;}const[ox,oy]=clonePt;const[cx,cy]=p0;const src=cv.getContext("2d").getImageData(Math.floor(ox),Math.floor(oy),48,60);cv.getContext("2d").putImageData(src,Math.floor(cx)-24,Math.floor(cy)-30);setClonePt(null);return;}if(tool==="shape"){setAnchorPt(p0);drawing.current=true;return;}if(tool==="gradient"){setAnchorPt(p0);drawing.current=true;return;}drawing.current=true;onStroke&&onStroke();stamp(cv.getContext("2d"),...p0,true);};
+  const down=e=>{e.preventDefault();const p0=pos(e);
+    if(pendingSticker){onStickersChange&&onStickersChange([...stickers,{id:`ps_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,item:pendingSticker,x:p0[0],y:p0[1],scale:1,rot:0}]);onStickerPlaced&&onStickerPlaced();return;}
+    const hit=hitSticker(stickers,p0);
+    if(hit){e.currentTarget.setPointerCapture(e.pointerId);stickerDrag.current={id:hit.sticker.id,mode:hit.handle,start:p0,orig:{...hit.sticker}};setSelectedSticker(hit.sticker.id);return;}
+    if(selectedSticker)setSelectedSticker(null);
+    const cv=canvases.current.get(active);if(!cv||!activeLayer?.visible)return;e.currentTarget.setPointerCapture(e.pointerId);const mul=dynMul(e,p0[0],p0[1]);const pressure=e.pointerType==="pen"&&e.pressure>0?e.pressure:mul;pointerRef.current={pressure,tiltX:e.tiltX||0,tiltY:e.tiltY||0,twist:e.twist||0,pointerType:e.pointerType||"mouse"};strokePoints.current=[[...p0,pressure]];if(tool==="eyedrop"){eyedrop(...p0);return;}if(tool==="transform"){transformDrag.current={startClient:[e.clientX,e.clientY],startCanvas:p0};return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}if(tool==="clone"){if(!clonePt){setClonePt(p0);return;}const[ox,oy]=clonePt;const[cx,cy]=p0;const src=cv.getContext("2d").getImageData(Math.floor(ox),Math.floor(oy),48,60);cv.getContext("2d").putImageData(src,Math.floor(cx)-24,Math.floor(cy)-30);setClonePt(null);return;}if(tool==="shape"){setAnchorPt(p0);drawing.current=true;return;}if(tool==="gradient"){setAnchorPt(p0);drawing.current=true;return;}drawing.current=true;onStroke&&onStroke();stamp(cv.getContext("2d"),...p0,true);};
   // Animation FX overlay — ported from the previous easel so ANIMATION_FX
   // purchases keep working after the component swap.
   const fxAt=(ctx,x,y)=>{if(!animFx||animFx==="none"||Math.random()>0.4)return;ctx.save();ctx.globalCompositeOperation="source-over";
@@ -156,10 +194,10 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
     else if(animFx==="water_ripple"){ctx.strokeStyle=color;ctx.globalAlpha=0.25;ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(x,y,size*(1+Math.random()),0,Math.PI*2);ctx.stroke();}
     else if(animFx==="galaxy_swirl"){const cs=["#7A4FBF","#2FA9A0","#FF5DA2","#E8B14B","#fff"];ctx.fillStyle=cs[Math.floor(Math.random()*cs.length)];ctx.globalAlpha=0.55;const a=Math.random()*Math.PI*2,r=Math.random()*size*1.3;ctx.beginPath();ctx.arc(x+Math.cos(a)*r,y+Math.sin(a)*r,0.8+Math.random()*1.6,0,Math.PI*2);ctx.fill();}
     ctx.globalAlpha=1;ctx.restore();};
-  const move=e=>{if(tool==="transform"){if(!transformDrag.current)return;const cv=canvases.current.get(active);if(cv)cv.style.transform=`translate(${e.clientX-transformDrag.current.startClient[0]}px,${e.clientY-transformDrag.current.startClient[1]}px)`;return;}if(!drawing.current&&tool!=="push"&&tool!=="smudge")return;const cv=canvases.current.get(active);if(!cv)return;const ctx=cv.getContext("2d");const evs=(e.getCoalescedEvents&&e.getCoalescedEvents().length)?e.getCoalescedEvents():[e];const p=pos(evs[evs.length-1]);if(drawing.current)fxAt(ctx,p[0],p[1]);const mul=dynMul(e,p[0],p[1]);pointerRef.current={pressure:e.pointerType==="pen"&&e.pressure>0?e.pressure:mul,tiltX:e.tiltX||0,tiltY:e.tiltY||0,twist:e.twist||0,pointerType:e.pointerType||"mouse"};if(tool==="push"){ctx.globalCompositeOperation="source-over";const[x,y]=p;const d=ctx.getImageData(Math.max(0,Math.floor(x)-size),Math.max(0,Math.floor(y)-size),size*2,size*2);ctx.putImageData(d,Math.max(0,Math.floor(x)-size+2),Math.max(0,Math.floor(y)-size+2));return;}if(tool==="smudge"){const[x,y]=p;const rx=Math.max(0,Math.floor(x)-8),ry=Math.max(0,Math.floor(y)-8);const d=ctx.getImageData(rx,ry,20,20);for(let i=0;i<d.data.length;i+=4){d.data[i]=(d.data[i]+d.data[i+4]+d.data[i-4]||d.data[i])/3;d.data[i+1]=(d.data[i+1]+d.data[i+5]+d.data[i-3]||d.data[i+1])/3;d.data[i+2]=(d.data[i+2]+d.data[i+6]+d.data[i-2]||d.data[i+2])/3;}ctx.putImageData(d,rx,ry);return;}if(tool==="shape"||tool==="gradient"){lastPts.current=[[p[0],p[1]]];return;}
+  const move=e=>{if(stickerDrag.current){const p=pos(e);const{id,mode,start,orig}=stickerDrag.current;onStickersChange&&onStickersChange(stickers.map(s=>{if(s.id!==id)return s;if(mode==="move")return{...s,x:orig.x+(p[0]-start[0]),y:orig.y+(p[1]-start[1])};const d0=Math.hypot(start[0]-orig.x,start[1]-orig.y)||1;const d1=Math.hypot(p[0]-orig.x,p[1]-orig.y);return{...s,scale:Math.max(0.25,Math.min(4,orig.scale*(d1/d0)))};}));return;}if(tool==="transform"){if(!transformDrag.current)return;const cv=canvases.current.get(active);if(cv)cv.style.transform=`translate(${e.clientX-transformDrag.current.startClient[0]}px,${e.clientY-transformDrag.current.startClient[1]}px)`;return;}if(!drawing.current&&tool!=="push"&&tool!=="smudge")return;const cv=canvases.current.get(active);if(!cv)return;const ctx=cv.getContext("2d");const evs=(e.getCoalescedEvents&&e.getCoalescedEvents().length)?e.getCoalescedEvents():[e];const p=pos(evs[evs.length-1]);if(drawing.current)fxAt(ctx,p[0],p[1]);const mul=dynMul(e,p[0],p[1]);pointerRef.current={pressure:e.pointerType==="pen"&&e.pressure>0?e.pressure:mul,tiltX:e.tiltX||0,tiltY:e.tiltY||0,twist:e.twist||0,pointerType:e.pointerType||"mouse"};if(tool==="push"){ctx.globalCompositeOperation="source-over";const[x,y]=p;const d=ctx.getImageData(Math.max(0,Math.floor(x)-size),Math.max(0,Math.floor(y)-size),size*2,size*2);ctx.putImageData(d,Math.max(0,Math.floor(x)-size+2),Math.max(0,Math.floor(y)-size+2));return;}if(tool==="smudge"){const[x,y]=p;const rx=Math.max(0,Math.floor(x)-8),ry=Math.max(0,Math.floor(y)-8);const d=ctx.getImageData(rx,ry,20,20);for(let i=0;i<d.data.length;i+=4){d.data[i]=(d.data[i]+d.data[i+4]+d.data[i-4]||d.data[i])/3;d.data[i+1]=(d.data[i+1]+d.data[i+5]+d.data[i-3]||d.data[i+1])/3;d.data[i+2]=(d.data[i+2]+d.data[i+6]+d.data[i-2]||d.data[i+2])/3;}ctx.putImageData(d,rx,ry);return;}if(tool==="shape"||tool==="gradient"){lastPts.current=[[p[0],p[1]]];return;}
     const freehand=brush==="ink"&&tool==="pen";
     evs.forEach(ev=>{const q=pos(ev);if(freehand)strokePoints.current.push([q[0],q[1],pointerRef.current.pressure]);stamp(ctx,q[0],q[1],false);});};
-  const up=e=>{if(tool==="transform"){const cv=canvases.current.get(active);if(cv)cv.style.transform="";if(transformDrag.current&&e){const p1=pos(e);const[sx,sy]=transformDrag.current.startCanvas;const dx=p1[0]-sx,dy=p1[1]-sy;if(Math.abs(dx)>0.5||Math.abs(dy)>0.5)commitTranslate(dx,dy);}transformDrag.current=null;return;}drawing.current=false;strokePoints.current=[];if(tool==="shape"&&anchorPt){const cv=canvases.current.get(active);if(cv){const ctx=cv.getContext("2d");const[ax,ay]=anchorPt;const[sx,sy]=lastPts.current[0]||[ax,ay];const x=Math.min(ax,sx),y=Math.min(ay,sy),w=Math.abs(sx-ax),h=Math.abs(sy-ay);ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;if(shapeMode==="ellipse")ctx.beginPath(),ctx.ellipse(x+w/2,y+h/2,w/2,h/2,0,0,Math.PI*2),ctx.fill();else ctx.fillRect(x,y,w,h);ctx.globalAlpha=1;}setAnchorPt(null);}if(tool==="gradient"&&anchorPt){const cv=canvases.current.get(active);if(cv){const ctx=cv.getContext("2d");const[ax,ay]=anchorPt;const[sx,sy]=lastPts.current[0]||[ax,ay];const g=ctx.createLinearGradient(ax,ay,sx,sy);g.addColorStop(0,color);g.addColorStop(0.5,color);g.addColorStop(1,T.paper);ctx.globalCompositeOperation="source-over";ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}setAnchorPt(null);}lastPts.current=[];midPts.current=[];try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
+  const up=e=>{if(stickerDrag.current){stickerDrag.current=null;try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}return;}if(tool==="transform"){const cv=canvases.current.get(active);if(cv)cv.style.transform="";if(transformDrag.current&&e){const p1=pos(e);const[sx,sy]=transformDrag.current.startCanvas;const dx=p1[0]-sx,dy=p1[1]-sy;if(Math.abs(dx)>0.5||Math.abs(dy)>0.5)commitTranslate(dx,dy);}transformDrag.current=null;return;}drawing.current=false;strokePoints.current=[];if(tool==="shape"&&anchorPt){const cv=canvases.current.get(active);if(cv){const ctx=cv.getContext("2d");const[ax,ay]=anchorPt;const[sx,sy]=lastPts.current[0]||[ax,ay];const x=Math.min(ax,sx),y=Math.min(ay,sy),w=Math.abs(sx-ax),h=Math.abs(sy-ay);ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;if(shapeMode==="ellipse")ctx.beginPath(),ctx.ellipse(x+w/2,y+h/2,w/2,h/2,0,0,Math.PI*2),ctx.fill();else ctx.fillRect(x,y,w,h);ctx.globalAlpha=1;}setAnchorPt(null);}if(tool==="gradient"&&anchorPt){const cv=canvases.current.get(active);if(cv){const ctx=cv.getContext("2d");const[ax,ay]=anchorPt;const[sx,sy]=lastPts.current[0]||[ax,ay];const g=ctx.createLinearGradient(ax,ay,sx,sy);g.addColorStop(0,color);g.addColorStop(0.5,color);g.addColorStop(1,T.paper);ctx.globalCompositeOperation="source-over";ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}setAnchorPt(null);}lastPts.current=[];midPts.current=[];try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
   const undo=()=>{const u=undoStack.current.pop();if(!u)return;const cv=canvases.current.get(u.id);if(cv){redoStack.current.push({id:u.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(u.snap,0,0);}};
   const redo=()=>{const r=redoStack.current.pop();if(!r)return;const cv=canvases.current.get(r.id);if(cv){undoStack.current.push({id:r.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(r.snap,0,0);}};
   const addLayer=()=>{if(layers.length>=maxLayers)return;const id=++idRef.current;setLayers(ls=>[...ls,{id,visible:true,opacity:1,blend:"source-over"}]);setActive(id);};
@@ -185,6 +223,7 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
       {onionFrames.map((of,i)=>(<img key={i} src={of.src} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" style={{opacity:of.opacity,mixBlendMode:"multiply"}}/>))}
       {refImg&&<img src={refImg} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" style={{opacity:refOpacity}}/>}
       {layers.map(l=>(<canvas key={l.id} width={W} height={H} ref={el=>{if(el){canvases.current.set(l.id,el);el.getContext("2d",{willReadFrequently:true});}}} aria-hidden="true" className="absolute inset-0 w-full h-full" style={{opacity:l.opacity,display:l.visible?"block":"none",mixBlendMode:l.blend==="source-over"?"normal":l.blend}}/>))}
+      <canvas ref={stickerCvRef} width={W} height={H} aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" style={{zIndex:8}}/>
       <div className="absolute inset-0" style={{touchAction:"none",cursor:cursorFor(cursorPack)}} role="img" aria-label="Drawing canvas" onPointerDown={down} onPointerMove={e=>{move(e);const r=wrapRef.current?.getBoundingClientRect();if(r)setCursorPos([(e.clientX-r.left)/r.width*100,(e.clientY-r.top)/r.height*100]);}} onPointerUp={e=>{up(e);setCursorPos(null);}} onPointerLeave={e=>{up(e);setCursorPos(null);}}/>
       {cursorPos&&(tool==="pen"||tool==="soft"||tool==="eraser")&&<div aria-hidden="true" className="absolute pointer-events-none" style={{left:`${cursorPos[0]}%`,top:`${cursorPos[1]}%`,width:tool==="eraser"?size*2.4:brush==="marker"?size*1.7:size,height:tool==="eraser"?size*2.4:brush==="marker"?size*1.7:size,borderRadius:"50%",border:`2px solid ${T.accent}`,background:"rgba(255,255,255,.25)",transform:"translate(-50%,-50%)",zIndex:10}}/>}
       {ROTATION_PAPERS[paper]&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{backgroundImage:ROTATION_PAPERS[paper].replace(/INK([0-9A-Fa-f]{2})/g,(_,a)=>`${T.ink}${a}`),zIndex:5}}/>}
@@ -311,6 +350,7 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
         <button onClick={()=>scaleLayer(0.9)} aria-label="Scale down" className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card,color:T.ink}}>Scale-</button>
       </>)}
       {owns("feat_ref")&&<label className="shrink-0 cursor-pointer"><input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>setRefImg(ev.target.result);r.readAsDataURL(f);e.target.value="";}} style={{display:"none"}}/><span className="lok-btn px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${refImg?T.accent:T.ink}`,background:refImg?T.ink:T.card,color:refImg?T.paper:T.ink}}>{refImg?"Ref ✓":"Ref"}</span></label>}
+      {selectedSticker&&<button onClick={()=>{onStickersChange&&onStickersChange(stickers.filter(s=>s.id!==selectedSticker));setSelectedSticker(null);}} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${T.ink}`,background:T.card}}>🗑 Remove sticker</button>}
     </div>)}
     {owns("canvas_sizes")&&(<div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1" style={{color:T.ink}}>
       <span className="text-[10px] font-bold opacity-60 shrink-0">Size</span>

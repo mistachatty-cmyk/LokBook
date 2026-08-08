@@ -95,7 +95,10 @@ export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kid
   const ALL_CATS=[["featured","Featured"],["themes","Skins"],["mythic","💎 Mythic"],["effects","Effects"],["fx","FX"],["skies","Skies"],["cosmetic","Cosmetics"],["studio","Studio"],["blot","Blot Shop"],["lillok","LilLok+"],["paper","Paper"],["cursors","Cursors"],["fonts","Fonts"],["stickers","Stickers"],["export","Export"],["music","Music"]];
   // Simple view hides the categories whose effects aren't wired up yet;
   // Legacy view shows the original full shop with those marked "not active".
-  const DEAD_TABS=new Set(["stickers","export","music"]);
+  // "stickers" used to be dead — buying a pack changed nothing (see
+  // docs/AUDIT.md). It's real now: Studio's sticker sheet reads whichever
+  // pack is equipped and places its stickers on the canvas.
+  const DEAD_TABS=new Set(["export","music"]);
   const cats=legacy?ALL_CATS:ALL_CATS.filter(([id])=>!DEAD_TABS.has(id));
   // Layers has no shop tab: it's a duplicate of the TIERS system Studio already
   // sells directly (10/25/50/100 · Sketch/Studio/Pro/Marathon) and which the live

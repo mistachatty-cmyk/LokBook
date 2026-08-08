@@ -34,6 +34,11 @@ export const UNLOCK_TRACK = [
     detail: "Small unbidden doodles start appearing in the empty edges of the feed, drawn with the same curve maths the resident artists use. They accumulate. They are not yours.",
   },
   {
+    level: 9, id: "sticker_bench", name: "The Sticker Bench", live: false,
+    blurb: "Recolor, resize, and rotate any sticker before you place it.",
+    detail: "A small workbench for the stickers you place in Studio — pick one from a pack or your own uploads, then recolor it, resize it, and rotate it before it goes on the page. Built on the same tiny snapshot-canvas the Rooms mini-stamp drawer already uses, plus a recolor pass. Sharing your own uploaded stickers with other artists is a natural next step once the community stamp library has real moderation — it doesn't yet, so uploads stay yours alone for now.",
+  },
+  {
     level: 10, id: "understudy", name: "The Understudy", live: false,
     blurb: "LilLok covers one of your pieces.",
     detail: "Once in a while LilLok redraws one of your own posts in its own style and files it beside the original. You can keep it, or paint over it.",
