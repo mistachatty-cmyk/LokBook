@@ -13,7 +13,20 @@ const out = join(dirname(fileURLToPath(import.meta.url)), "..", ".smoke-bundle.c
 
 try {
   await build({
-    entryPoints: ["src/App.jsx"],
+    // Mirror how main.jsx actually mounts the app: App requires AuthProvider
+    // context (useAuth throws without it), so rendering App bare is not a
+    // faithful smoke test — it fails on the provider, masking real crashes.
+    stdin: {
+      contents: `
+        import App from "./src/App.jsx";
+        import { AuthProvider } from "./src/auth/AuthContext.jsx";
+        import { createElement } from "react";
+        export default () => createElement(AuthProvider, null, createElement(App));
+      `,
+      resolveDir: join(dirname(fileURLToPath(import.meta.url)), ".."),
+      sourcefile: "smoke-entry.jsx",
+      loader: "jsx",
+    },
     bundle: true,
     format: "cjs",
     outfile: out,
