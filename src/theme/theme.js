@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import { ROTATION_BORDERS } from "../engine/rotation.js";
 
 export const THEMES = {
   riso:    { name:"Print Shop",       desc:"Two-ink risograph. The original.",          price:0,  paper:"#F2EDE2", ink:"#23306B", accent:"#FF5DA2", alt:"#2FA9A0", shadow:"#D9D2C0", card:"#FFFDF7", onAccent:"#000" },
@@ -123,6 +124,7 @@ export function onColor(bg, T) {
 // are unaffected. New components can style via var(--lok-*) without prop drilling.
 // Border style presets for LilLok blot containers (Shop + LilLok FAB)
 export const blotBorderStyle = (id, T) => ({
+  ...ROTATION_BORDERS(T.ink, T.accent),
   none:  { border: `3px solid ${T.ink}` },
   gilded:{ border: "3px solid #E8B14B", boxShadow: `0 0 0 2px ${T.ink}, 3px 3px 0 ${T.shadow}` },
   washi: { border: `3px dashed ${T.accent}` },

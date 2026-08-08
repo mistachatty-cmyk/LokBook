@@ -11,6 +11,7 @@
     "tauri:build": "tauri build",
     "gen-icons": "node scripts/steam-icons.mjs",
     "smoke": "node scripts/smoke.mjs",
+    "verify:rotation": "node scripts/verify-rotation.mjs",
     "db:migrate": "supabase db push",
     "build:steam": "vite build --config vite.config.steam.js"
   },

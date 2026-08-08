@@ -4,6 +4,7 @@ import { W, H, BLENDS, hasModule, getModuleLayers } from "./constants.jsx";
 import { getStroke } from 'perfect-freehand';
 import { paperBase } from "./engine/draw.jsx";
 import { cursorFor } from "./engine/cursors.js";
+import { ROTATION_PAPERS } from "./engine/rotation.js";
 import { useBodyScrollLock } from "./hooks/useBodyScrollLock.js";
 
 const PALLETS={
@@ -186,6 +187,7 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
       {layers.map(l=>(<canvas key={l.id} width={W} height={H} ref={el=>{if(el){canvases.current.set(l.id,el);el.getContext("2d",{willReadFrequently:true});}}} aria-hidden="true" className="absolute inset-0 w-full h-full" style={{opacity:l.opacity,display:l.visible?"block":"none",mixBlendMode:l.blend==="source-over"?"normal":l.blend}}/>))}
       <div className="absolute inset-0" style={{touchAction:"none",cursor:cursorFor(cursorPack)}} role="img" aria-label="Drawing canvas" onPointerDown={down} onPointerMove={e=>{move(e);const r=wrapRef.current?.getBoundingClientRect();if(r)setCursorPos([(e.clientX-r.left)/r.width*100,(e.clientY-r.top)/r.height*100]);}} onPointerUp={e=>{up(e);setCursorPos(null);}} onPointerLeave={e=>{up(e);setCursorPos(null);}}/>
       {cursorPos&&(tool==="pen"||tool==="soft"||tool==="eraser")&&<div aria-hidden="true" className="absolute pointer-events-none" style={{left:`${cursorPos[0]}%`,top:`${cursorPos[1]}%`,width:tool==="eraser"?size*2.4:brush==="marker"?size*1.7:size,height:tool==="eraser"?size*2.4:brush==="marker"?size*1.7:size,borderRadius:"50%",border:`2px solid ${T.accent}`,background:"rgba(255,255,255,.25)",transform:"translate(-50%,-50%)",zIndex:10}}/>}
+      {ROTATION_PAPERS[paper]&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{backgroundImage:ROTATION_PAPERS[paper].replace(/INK([0-9A-Fa-f]{2})/g,(_,a)=>`${T.ink}${a}`),zIndex:5}}/>}
       {paper==="grid"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{backgroundImage:`repeating-linear-gradient(${T.ink}15 0 1px,transparent 1px ${H/10}px),repeating-linear-gradient(90deg,${T.ink}15 0 1px,transparent 1px ${W/10}px)`,zIndex:5}}/>}
       {paper==="dots"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{backgroundImage:`radial-gradient(circle,${T.ink}25 1px,transparent 1px)`,backgroundSize:`${W/10}px ${H/10}px`,zIndex:5}}/>}
       {paper==="storyboard"&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{backgroundImage:[`linear-gradient(${T.ink}20 0 1px,transparent 1px)`,`linear-gradient(90deg,${T.ink}20 0 1px,transparent 1px)`].join(","),backgroundSize:[`100% ${H/3}px`,`${W/2}px 100%`].join(","),zIndex:5}}><div className="absolute left-1/2 top-0 bottom-0" style={{width:1,background:T.ink+"30"}}/><div className="absolute top-[33.33%] left-0 right-0" style={{height:1,background:T.ink+"30"}}/><div className="absolute top-[66.66%] left-0 right-0" style={{height:1,background:T.ink+"30"}}/></div>}

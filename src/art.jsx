@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { ART, SMILE_VARIANTS, useT, themeVars } from "./theme/theme.js";
 import { NAME_COLOR_MAP, PACE_PRESETS } from "./constants.jsx";
+import { ROTATION_FRAMES, ROTATION_EFFECTS, ROTATION_SKIES } from "./engine/rotation.js";
 
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -19,6 +20,8 @@ export function FramedAvatar({ src, size = 64, frame = "none", accent = "none", 
     torn: { border: `3px solid ${ink}`, clipPath: "polygon(4% 0, 30% 4%, 55% 0, 78% 5%, 100% 2%, 97% 28%, 100% 52%, 95% 76%, 100% 100%, 72% 96%, 48% 100%, 24% 95%, 0 99%, 4% 72%, 0 48%, 5% 24%)", borderRadius: 0 },
     // Misprinted two-drum riso: the second colour lands a hair off-register.
     riso: { border: `3px solid ${ink}`, boxShadow: `-3px 3px 0 ${acc}, 3px -3px 0 ${ink}44` },
+    // rotation frames resolve the same way built-ins do
+    ...ROTATION_FRAMES(ink, acc, size),
   }[frame] || { border: `3px solid ${ink}` };
   return (<div className="relative" style={{ width: size, height: size }}>
     {accent === "ring" && <div className="absolute rounded-full" style={{ inset: -5, border: `3px solid ${acc}` }} />}
@@ -67,6 +70,7 @@ export function ReactionIcon({ type, size = 24 }) {
 
 export function SkyEffect({ sky, paper }) {
   if (sky === "clear"||!sky) return null;
+  if (ROTATION_SKIES[sky]) return (<div className="pointer-events-none fixed inset-0" style={{ zIndex: 1, background: ROTATION_SKIES[sky], opacity: 0.22, animation: reduceMotion ? "none" : "lokaurora 14s ease-in-out infinite alternate" }} />);
   if (sky === "clouds") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{zIndex:1}}>{Array.from({length:12}).map((_,i)=>(<div key={i} className="absolute" style={{left:`${(i*31)%90+5}%`,top:`${20+i*6}%`,width:60+(i%3)*30,height:20+(i%2)*10,borderRadius:"50%",background:"rgba(200,200,200,.12)",animation:reduceMotion?"none":`lokdrift ${18+i*3}s linear infinite`,animationDelay:`-${i*4}s`}}/>))}</div>);
   if (sky === "stars") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{zIndex:1}}>{Array.from({length:50}).map((_,i)=>(<div key={i} className="absolute rounded-full" style={{left:`${(i*19)%100}%`,top:`${(i*7)%100}%`,width:2+(i%3),height:2+(i%3),background:"rgba(255,255,255,.6)",animation:reduceMotion?"none":`loktwinkle ${1.5+(i%5)*0.8}s ease-in-out infinite alternate`,animationDelay:`-${i*0.3}s`}}/>))}</div>);
   if (sky === "sunset") return (<div className="pointer-events-none fixed inset-0" style={{zIndex:1,background:`linear-gradient(180deg, #FF6B35 0%, #FF8C42 20%, #FFD700 40%, ${paper} 65%)`,opacity:0.2}}/>);
@@ -74,7 +78,27 @@ export function SkyEffect({ sky, paper }) {
   return null;
 }
 
+// Rotation effects are declared as data in engine/rotation.js and rendered by
+// this one generic pass, so adding an effect is a table entry, not a branch.
+function RotationEffect({ spec }) {
+  const { count, size, color, anim, dur: [base, jit], round, glow, hollow, blur, alpha = 0.75 } = spec;
+  return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }}>
+    {Array.from({ length: count }).map((_, i) => {
+      const isRainbow = color === "rainbow";
+      return (<div key={i} className={round ? "absolute rounded-full" : "absolute"} style={{
+        left: `${(i * 37) % 100}%`, top: `${(i * 53) % 100}%`, width: size, height: size, opacity: alpha,
+        background: hollow ? "transparent" : isRainbow ? "linear-gradient(90deg,#FF5DA2,#E8B14B,#2FA9A0,#7A4FBF)" : color,
+        border: hollow ? `1.5px solid ${color}` : undefined,
+        filter: blur ? `blur(${blur}px)` : glow ? `drop-shadow(0 0 ${size}px ${isRainbow ? "#FF5DA2" : color})` : undefined,
+        animation: reduceMotion ? "none" : `${anim} ${base + (i % 5) * jit}s linear infinite`,
+        animationDelay: `${(i % 7) * 0.24}s`,
+      }} />);
+    })}
+  </div>);
+}
+
 export function PageEffect({ effect }) {
+  if (ROTATION_EFFECTS[effect]) return <RotationEffect spec={ROTATION_EFFECTS[effect]} />;
   if (effect === "rain") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }}>{Array.from({ length: 30 }).map((_, i) => (<div key={i} className="absolute" style={{ left: `${(i * 37) % 100}%`, top: -20, width: 2, height: 60, background: "rgba(47,169,160,.4)", animation: reduceMotion ? "none" : `lokrain ${0.7 + (i % 5) * 0.12}s linear infinite`, animationDelay: `${(i % 7) * 0.1}s` }} />))}</div>);
   if (effect === "confetti") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }}>{Array.from({ length: 40 }).map((_, i) => { const cs = ["#FF5DA2", "#2FA9A0", "#E8B14B", "#7A4FBF", "#5E8BFF"]; return (<div key={i} className="absolute" style={{ left: `${(i * 27) % 100}%`, top: -12, width: 7, height: 11, background: cs[i % 5], animation: reduceMotion ? "none" : `lokconf ${3.5 + (i % 5) * 0.6}s linear infinite`, animationDelay: `${(i % 8) * 0.35}s`, borderRadius: 2 }} />); })}</div>);
   if (effect === "aurora") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }}><div className="absolute inset-x-0 top-0" style={{ height: "55%", background: "linear-gradient(180deg, rgba(47,169,160,.28), rgba(122,79,191,.18) 50%, transparent)", filter: "blur(28px)", animation: reduceMotion ? "none" : "lokaurora 9s ease-in-out infinite alternate", mixBlendMode: "screen" }} /></div>);
@@ -146,7 +170,7 @@ export function GlobalStyle({ T, pace = "sweep", speed = 1 }) {
   const m = ((P.mult || 1) / Math.max(0.25, speed)).toFixed(3);
   const vars = Object.entries(themeVars(T)).map(([k, v]) => `${k}:${v}`).join(";");
   return (<style>{`
-  @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Schibsted+Grotesk:wght@400;500;700&family=Nunito:wght@400;700&family=Patrick+Hand&family=Press+Start+2P&family=Bebas+Neue&family=Playfair+Display:wght@700&family=Permanent+Marker&family=Fira+Code:wght@500&family=Abril+Fatface&family=Caveat:wght@600&family=Space+Mono:wght@700&family=Comfortaa:wght@700&family=Shrikhand&family=Space+Grotesk:wght@700&family=Kalam:wght@700&family=VT323&family=Cormorant:wght@700&family=Amatic+SC:wght@700&family=Righteous&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Schibsted+Grotesk:wght@400;500;700&family=Nunito:wght@400;700&family=Patrick+Hand&family=Press+Start+2P&family=Bebas+Neue&family=Playfair+Display:wght@700&family=Permanent+Marker&family=Fira+Code:wght@500&family=Abril+Fatface&family=Caveat:wght@600&family=Space+Mono:wght@700&family=Comfortaa:wght@700&family=Shrikhand&family=Space+Grotesk:wght@700&family=Kalam:wght@700&family=VT323&family=Cormorant:wght@700&family=Amatic+SC:wght@700&family=Righteous&family=Great+Vibes&family=UnifrakturMaguntia&family=Orbitron:wght@700&family=Cinzel:wght@700&family=Major+Mono+Display&display=swap');
   :root{${vars}}
   ::selection{background:${T.accent};color:${T.onAccent}}
   @keyframes lokdrift{from{transform:translateX(0)}to{transform:translateX(200vw)}}

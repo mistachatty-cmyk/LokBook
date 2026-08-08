@@ -1,3 +1,4 @@
+import { ROTATION_CURSORS } from "./rotation.js";
 // Purchasable drawing cursors, as inline SVG data-URIs so no assets ship.
 // Each entry returns a CSS `cursor` value with an explicit hotspot; every one
 // falls back to `crosshair` so a missing/blocked cursor never leaves the canvas
@@ -24,4 +25,6 @@ export const CURSOR_CSS = {
   laser_dot: svg(`<circle cx='14' cy='14' r='3' fill='#D94040'/><circle cx='14' cy='14' r='7' fill='none' stroke='#D94040' stroke-width='1.4' opacity='0.55'/>`),
 };
 
-export const cursorFor = id => CURSOR_CSS[id] || CURSOR_CSS.default;
+// Rotation cursor packs resolve here too, so a daily/weekly cursor behaves
+// exactly like a built-in one (docs/AUDIT.md Finding 2).
+export const cursorFor = id => CURSOR_CSS[id] || ROTATION_CURSORS[id] || CURSOR_CSS.default;
