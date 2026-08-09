@@ -105,7 +105,24 @@ export const BLOT_BORDERS = [
 export const FOD_WINDOW_DAYS = 7;
 export const ANIMATED_AVATAR_SPEND = 5000;
 
-export const ADS = [{ text: "Your art could live here", cta: "Advertise", slot: "lok-feed-1" }, { text: "Draw more. Earn more Loks.", cta: "Studio →", slot: "lok-feed-2" }, { text: "LokPass — no ads, every theme", cta: "Get it", slot: "lok-feed-3" }];
+// Ad inventory, typed by the surface each entry can fill. `format` must match
+// what src/ads.js routes for a given viewport tier — a "rail" entry is tall and
+// never appears on phone, a "banner" entry is one line and never appears in a
+// desktop rail. `slot` is the id handed to the ad network.
+export const ADS = [
+  { format: "banner", text: "Your art could live here", cta: "Advertise", slot: "lok-banner-1" },
+  { format: "banner", text: "Draw more. Earn more Loks.", cta: "Studio →", slot: "lok-banner-2" },
+  { format: "banner", text: "LokPass — no ads, every theme", cta: "Get it", slot: "lok-banner-3" },
+  { format: "rail", title: "Your art could live here", text: "Reach artists who actually draw.", cta: "Advertise", slot: "lok-rail-1" },
+  { format: "rail", title: "LokPass", text: "No ads, every theme, PASS badge. One-time $2.99.", cta: "Get LokPass", slot: "lok-rail-2" },
+  { format: "rail", title: "Studio Pro", text: "More frames, finer brushes, faster export.", cta: "See it", slot: "lok-rail-3" },
+  { format: "feed", title: "Your art could live here", text: "Sponsored placements in the Lok feed.", cta: "Advertise", slot: "lok-feed-1" },
+  { format: "feed", title: "Draw more. Earn more.", text: "Every flip you publish earns Loks.", cta: "Open Studio", slot: "lok-feed-2" },
+  { format: "interstitial", title: "LokPass", text: "Remove ads forever. Keep every theme.", cta: "Get LokPass", slot: "lok-full-1" },
+];
+
+/** Ads matching a surface format, in rotation order. */
+export const adsFor = format => ADS.filter(a => a.format === format);
 
 export const QUEST_POOL = [
   { id: "vote3", label: "Vote on 3 pieces", goal: 3, reward: 15, track: "vote" },
