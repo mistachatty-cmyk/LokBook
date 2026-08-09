@@ -3,9 +3,10 @@ import { useT } from "../theme/theme.js";
 import { ReactionIcon } from "../art.jsx";
 import NameTag from "../NameTag.jsx";
 import EmptyState, { Empty } from "../EmptyState.jsx";
+import { LocationBadge } from "../components/LocationBadge.jsx";
 import { REACTION_SETS, lokApi, fromDbPost } from "../constants.jsx";
 
-export default function Feed({posts,bookmarks,following,feedMode,setFeedMode,cosmetics={},daily,streak,dailyClaimed,flipOfDay,onLine,onClaimDaily,onOpen,onVote,onLok,onBookmark,onArtist,onReact,onEcho,tides,onVoteTide,activeEvent,eventClaimed,onClaimEvent,say,loadingMore,onLoadMore}){
+export default function Feed({posts,bookmarks,following,feedMode,setFeedMode,cosmetics={},daily,streak,dailyClaimed,flipOfDay,onLine,onClaimDaily,onOpen,onVote,onLok,onBookmark,onArtist,onReact,onEcho,tides,onVoteTide,activeEvent,eventClaimed,onClaimEvent,say,loadingMore,onLoadMore,onLocationClick}){
   const T=useT();const[active,setActive]=useState(0);const wrapRef=useRef(null);
   const[searchQ,setSearchQ]=useState("");const[searchResults,setSearchResults]=useState(null);const[searching,setSearching]=useState(false);
   const list=(feedMode==="following"?posts.filter(p=>following.includes(p.author)):posts).sort((a,b)=>(b.boostedAt||0)-(a.boostedAt||0));
@@ -28,7 +29,7 @@ export default function Feed({posts,bookmarks,following,feedMode,setFeedMode,cos
     <div className="mt-3 flex gap-2">{[["discover","Discover"],["following","Following"]].map(([id,l])=>(<button key={id} onClick={()=>setFeedMode(id)} className="lok-btn flex-1 py-2 rounded-full text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:feedMode===id?T.ink:T.card,color:feedMode===id?T.paper:T.ink}}>{l}</button>))}</div>
     <div className="mt-2 relative" role="search"><svg aria-hidden="true" className="absolute left-2.5 top-1/2 -translate-y-1/2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.shadow} strokeWidth="2.5" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="7.5"/><line x1="16" y1="16" x2="21" y2="21"/></svg><input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search flips & artists…" aria-label="Search all flips" className="w-full pl-8 pr-8 py-2 rounded-xl text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink,outline:"none"}}/>{searchQ&&<button onClick={()=>setSearchQ("")} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold" style={{color:T.shadow}}>✕</button>}</div>
     {searchQ.trim()&&<div className="mt-2" style={{maxHeight:"calc(100dvh - 300px)",minHeight:200,overflowY:"auto"}}>
-      {searching?<div className="text-center py-8 text-sm opacity-60">Searching…</div>:searchResults!==null&&searchResults.length===0?<EmptyState icon="search" title="No results" subtitle={`Nothing for "${searchQ}"`}/>:searchResults?.map(p=>(<FeedCard key={p.id} p={p} live={false} marked={bookmarks.includes(p.id)} following={following} cosmetics={cosmetics} onOpen={onOpen} onVote={onVote} onLok={onLok} onBookmark={onBookmark} onArtist={onArtist} onReact={onReact} onEcho={onEcho}/>))}
+      {searching?<div className="text-center py-8 text-sm opacity-60">Searching…</div>:searchResults!==null&&searchResults.length===0?<EmptyState icon="search" title="No results" subtitle={`Nothing for "${searchQ}"`}/>:searchResults?.map(p=>(<FeedCard key={p.id} p={p} live={false} marked={bookmarks.includes(p.id)} following={following} cosmetics={cosmetics} onOpen={onOpen} onVote={onVote} onLok={onLok} onBookmark={onBookmark} onArtist={onArtist} onReact={onReact} onEcho={onEcho} onLocationClick={onArtist}/>))}
     </div>}
     {!searchQ.trim()&&(list.length===0?(
       feedMode==="following"
@@ -36,14 +37,14 @@ export default function Feed({posts,bookmarks,following,feedMode,setFeedMode,cos
         :<EmptyState icon="feed" title="No art yet" subtitle="Be the first to publish a flip!"/>
     ):(
       <div ref={wrapRef} onScroll={onScroll} className="mt-3 -mx-4" style={{height:"calc(100dvh - 300px)",minHeight:360,overflowY:"scroll",scrollSnapType:"y mandatory"}}>
-        {list.map((p,i)=>(<FeedCard key={p.id} p={p} live={i===active} marked={bookmarks.includes(p.id)} following={following} cosmetics={cosmetics} onOpen={onOpen} onVote={onVote} onLok={onLok} onBookmark={onBookmark} onArtist={onArtist} onReact={onReact} onEcho={onEcho}/>))}
+        {list.map((p,i)=>(<FeedCard key={p.id} p={p} live={i===active} marked={bookmarks.includes(p.id)} following={following} cosmetics={cosmetics} onOpen={onOpen} onVote={onVote} onLok={onLok} onBookmark={onBookmark} onArtist={onArtist} onReact={onReact} onEcho={onEcho} onLocationClick={onLocationClick}/>))}
         {onLoadMore&&feedMode==="discover"&&<div className="flex justify-center py-4" style={{scrollSnapAlign:"start"}}><button onClick={onLoadMore} disabled={loadingMore} className="lok-btn px-6 py-3 rounded-xl text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink,opacity:loadingMore?0.5:1}}>{loadingMore?"Loading…":"Load more"}</button></div>}
       </div>
     ))}
   </div>);
 }
 
-export function FeedCard({p,live,marked,following=[],cosmetics={},onOpen,onVote,onLok,onBookmark,onArtist,onReact,onEcho}){
+export function FeedCard({p,live,marked,following=[],cosmetics={},onOpen,onVote,onLok,onBookmark,onArtist,onReact,onEcho,onLocationClick}){
   const T=useT();const[fi,setFi]=useState(0);const[pop,setPop]=useState(false);
   const author=p.author||"moss.ink";const loked=following.includes(author);
   useEffect(()=>{if(!live||p.frames.length<2){setFi(0);return;}const t=setInterval(()=>setFi(f=>(f+1)%p.frames.length),p.paceMs||160);return()=>clearInterval(t);},[live,p.id,p.paceMs,p.frames.length]);
@@ -54,7 +55,7 @@ export function FeedCard({p,live,marked,following=[],cosmetics={},onOpen,onVote,
       <button onClick={()=>onOpen(p.id)} className="block w-full" aria-label={`Open ${p.title}`}><img src={p.frames[fi]} alt={p.title} className="block w-full" style={{aspectRatio:"4/5",objectFit:"cover"}}/></button>
       {p.frames.length>1&&<div className="absolute top-0 left-0 right-0 h-1" style={{background:"rgba(0,0,0,.15)"}}><div style={{width:`${((fi+1)/p.frames.length)*100}%`,height:"100%",background:T.accent,transition:"width .12s linear"}}/></div>}
       <div className="absolute left-0 right-0 bottom-0 p-3 flex items-end gap-2" style={{background:"linear-gradient(transparent, rgba(0,0,0,.6))"}}>
-        <div className="flex-1 text-white min-w-0"><div className="lok-display font-extrabold leading-tight truncate">{p.title}</div><div className="text-xs opacity-90"><button onClick={()=>onArtist&&onArtist(author)} aria-label={`View ${author}'s page`} style={{background:"transparent",border:"none",padding:0,textDecoration:"underline",cursor:"pointer"}}><NameTag name={author} color={cosmetics.nameColor} style={{color:"#fff"}}/></button> · {p.from==="revival"?"revival loop":p.from==="battle"?"battle piece":p.mode==="B"?"page-flip":"flipbook"}</div></div>
+        <div className="flex-1 text-white min-w-0"><div className="lok-display font-extrabold leading-tight truncate">{p.title}</div><div className="text-xs opacity-90"><button onClick={()=>onArtist&&onArtist(author)} aria-label={`View ${author}'s page`} style={{background:"transparent",border:"none",padding:0,textDecoration:"underline",cursor:"pointer"}}><NameTag name={author} color={cosmetics.nameColor} style={{color:"#fff"}}/></button> · {p.from==="revival"?"revival loop":p.from==="battle"?"battle piece":p.mode==="B"?"page-flip":"flipbook"}</div>{(p.latitude&&p.longitude&&p.location_privacy==="everyone")&&<div style={{marginTop:6}}><LocationBadge locationName={p.location_name} latitude={p.latitude} longitude={p.longitude} onLocationClick={()=>onLocationClick&&onLocationClick(p)}/></div>}</div>
         <button onClick={()=>onReact(p.id,"humhah")} aria-label="HumHah" className="lok-btn shrink-0 px-2 py-1 rounded-full text-xs font-extrabold" style={{border:`2px solid ${T.ink}`,color:"#fff",background:"rgba(255,255,255,.15)",backdropFilter:"blur(4px)"}}>😄 {p.reactions.humhah||0}</button>
         <button onClick={()=>onReact(p.id,"bomhogwah")} aria-label="BomHogWah" className="lok-btn shrink-0 px-2 py-1 rounded-full text-xs font-extrabold" style={{border:`2px solid ${T.ink}`,color:"#fff",background:"rgba(255,255,255,.15)",backdropFilter:"blur(4px)"}}>😮 {p.reactions.bomhogwah||0}</button>
         <button onClick={()=>onLok(author)} aria-label={loked?"Already Lok'd":"Lok this artist"} className="lok-btn shrink-0 px-2.5 py-1 rounded-full text-xs font-extrabold" style={{background:loked?"rgba(255,255,255,.92)":T.accent,color:loked?T.ink:T.onAccent,border:"2px solid #fff"}}>{loked?"Lok'd ✓":"Lok"}</button>

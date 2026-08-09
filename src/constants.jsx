@@ -727,7 +727,7 @@ export async function hashPin(pin) {
 }
 
 
-export const fromDbPost = r => ({ id: r.id, title: r.title, author: r.author, frames: r.frames || [], frameDurations: r.frame_durations || undefined, paceMs: r.pace_ms || 160, mode: r.mode || "A", style: r.style || "bold", loop: !!r.loop, votes: r.votes || 0, views: r.views || 0, reactions: { humhah: 0, bomhogwah: 0, splat: 0, heart: 0, drip: 0, ...(r.reactions||{}) }, echoedAt: null, echoCount: 0, echoParent: null, echoExpiresAt: null, from: r.origin || "studio", createdAt: r.created_at, musicId: r.music_id || undefined, remote: true, voted: false, viewed: false });
+export const fromDbPost = r => ({ id: r.id, title: r.title, author: r.author, frames: r.frames || [], frameDurations: r.frame_durations || undefined, paceMs: r.pace_ms || 160, mode: r.mode || "A", style: r.style || "bold", loop: !!r.loop, votes: r.votes || 0, views: r.views || 0, reactions: { humhah: 0, bomhogwah: 0, splat: 0, heart: 0, drip: 0, ...(r.reactions||{}) }, echoedAt: null, echoCount: 0, echoParent: null, echoExpiresAt: null, from: r.origin || "studio", createdAt: r.created_at, musicId: r.music_id || undefined, latitude: r.latitude || undefined, longitude: r.longitude || undefined, location_name: r.location_name || undefined, location_privacy: r.location_privacy || "everyone", remote: true, voted: false, viewed: false });
 
 export const GAME_MANUAL_PAGES = [
   { title:"Welcome", icon:"📖", content:"LokBook is a living flipbook sketchbook. Draw frames, play them as animation, publish to the feed. This manual covers everything you need to get started and thrive." },

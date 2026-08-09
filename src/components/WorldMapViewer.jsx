@@ -46,9 +46,9 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'defa
           .pointAltitude(0.01);
       }
 
-      // Add post location markers
+      // Add post location markers (only show public locations)
       const postMarkers = posts
-        .filter(post => post.latitude && post.longitude)
+        .filter(post => post.latitude && post.longitude && post.location_privacy === 'everyone')
         .map((post, idx) => ({
           id: post.id,
           lat: post.latitude,
