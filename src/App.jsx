@@ -22,7 +22,7 @@ import {
   MODES, FRONT_NAMES, EFFECTS, NAME_COLORS, FRAMES, REACTION_PACKS, AVATAR_ACCENTS, PAPERS, LILLOK_GEAR,
   SKIES, ANIMATION_FX, CURSORS, FONT_PACKS, MUSIC_PACKS, STICKER_PACKS, POST_EXPORTS, LILLOK_SKINS, LILLOK_AURAS, LILLOK_PETS, VOICE_PACKS, STUDIO_MODULES, BLENDS,
   RARITY, MYTHIC_ITEMS, CELEBRATIONS, getDailyRotation, getWeeklyRotation, fromDbPost, hasModule,
-  OFFLINE_BONUS_HOURS, OFFLINE_BONUS_LOKS, BLOT_GIFTS, BLOT_IDLE_ANIMATIONS, BLOT_EXPRESSIONS, BLOT_BOUNCES,
+  OFFLINE_BONUS_HOURS, OFFLINE_BONUS_LOKS, BLOT_IDLE_ANIMATIONS, BLOT_EXPRESSIONS, BLOT_BOUNCES,
 } from "./constants.jsx";
 import { paperBase, drawBounce, drawBloom, drawNight, renderSequence, renderDoodle, renderAvatar, traceShape } from "./engine/draw.jsx";
 import { TUTORIAL_PROJECTS, getTutorialGhostFrames } from "./engine/tutorials.js";
@@ -191,7 +191,7 @@ function Onboard({onDone,onName,defaultName="",canInstall=false,onInstallClick})
 
 const GUEST_REMINDER_OPTIONS=[3,7,14,30];
 const ALL_MOODS=["","calm","wild","moody","playful","dreamy","chaos","cozy","spooky"];
-function Feed({posts,bookmarks,following,feedMode,setFeedMode,myHandle="",onFeatureOpen,cosmetics={},daily,streak,dailyClaimed,flipOfDay,onLine,onClaimDaily,onOpen,onVote,onLok,onBookmark,say,moodFilter,setMoodFilter,moodTags,reportedPosts,onReport,onEcho,onArtist,flair="",onPullRefresh,music,feedAds=false,onAdCta}){
+function Feed({posts,bookmarks,following,feedMode,setFeedMode,myHandle="",onFeatureOpen,cosmetics={},daily,streak,dailyClaimed,flipOfDay,onLine,onClaimDaily,onOpen,onVote,onLok,onBookmark,say,moodFilter,setMoodFilter,moodTags,reportedPosts,onReport,onEcho,onArtist,flair="",onPullRefresh,music,feedAds=false,onAdCta,onLocationClick}){
   const T=useT();const[active,setActive]=useState(0);const cardRefs=useRef([]);
   const[pullY,setPullY]=useState(0);const[refreshing,setRefreshing]=useState(false);const pullStart=useRef(null);
   const PULL_THRESHOLD=70;
@@ -286,7 +286,7 @@ function Feed({posts,bookmarks,following,feedMode,setFeedMode,myHandle="",onFeat
           const feedAdPool=showAd?adsFor("feed"):null;
           return(<Fragment key={p.id}>
             {showAd&&feedAdPool.length>0&&<AdFeedCard ad={feedAdPool[(i/FEED_AD_EVERY-1)%feedAdPool.length]} onCta={onAdCta}/>}
-            <div ref={el=>cardRefs.current[i]=el} data-idx={i}><FeedCard p={p} live={i===active} marked={bookmarks.includes(p.id)} loked={following.includes(p.author||"moss.ink")} cosmetics={cosmetics} onOpen={onOpen} onVote={onVote} onLok={onLok} onBookmark={onBookmark} moodTags={moodTags} onReport={onReport} onEcho={onEcho} onArtist={onArtist} flair={flair} music={music}/></div>
+            <div ref={el=>cardRefs.current[i]=el} data-idx={i}><FeedCard p={p} live={i===active} marked={bookmarks.includes(p.id)} loked={following.includes(p.author||"moss.ink")} cosmetics={cosmetics} onOpen={onOpen} onVote={onVote} onLok={onLok} onBookmark={onBookmark} moodTags={moodTags} onReport={onReport} onEcho={onEcho} onArtist={onArtist} flair={flair} music={music} onLocationClick={onLocationClick}/></div>
           </Fragment>);
         })}
         {feedMode==="discover"&&<FeaturedArtist onArtist={onArtist} onOpen={onFeatureOpen}/>}
@@ -317,7 +317,7 @@ function MusicBar({musicId,music,T}){
   </div>);
 }
 
-function FeedCard({p,live,marked,loked,cosmetics={},onOpen,onVote,onLok,onBookmark,moodTags,onReport,onEcho,onArtist,flair="",music}){
+function FeedCard({p,live,marked,loked,cosmetics={},onOpen,onVote,onLok,onBookmark,moodTags,onReport,onEcho,onArtist,flair="",music,onLocationClick}){
   const T=useT();const[fi,setFi]=useState(0);const[pop,setPop]=useState(false);const[echoed,setEchoed]=useState(false);
   const mood=moodTags?.[p.id];const moodEmojis={calm:"🌊",wild:"🔥",moody:"🌙",playful:"🎈",dreamy:"✨",chaos:"🌀",cozy:"☕",spooky:"👻"};
   useEffect(()=>{if(!live||p.frames.length<2){setFi(0);return;}const t=setInterval(()=>setFi(f=>(f+1)%p.frames.length),p.paceMs||160);return()=>clearInterval(t);},[live,p.id,p.paceMs,p.frames.length]);
@@ -330,7 +330,7 @@ function FeedCard({p,live,marked,loked,cosmetics={},onOpen,onVote,onLok,onBookma
       {p.eventLine&&<div className="absolute top-2 left-2 right-2 text-[10px] font-bold text-white px-2 py-1 rounded-lg z-10" style={{background:"rgba(0,0,0,.55)",backdropFilter:"blur(2px)"}}>{p.author} {p.eventLine}</div>}
       {p.frames.length>1&&<div className="absolute top-0 left-0 right-0 h-1" style={{background:"rgba(0,0,0,.15)"}}><div style={{width:`${((fi+1)/p.frames.length)*100}%`,height:"100%",background:T.accent,transition:"width .12s linear"}}/></div>}
       <div className="absolute left-0 right-0 bottom-0 p-3 flex items-end gap-2" style={{background:"linear-gradient(transparent, rgba(0,0,0,.6))"}}>
-        <div className="flex-1 text-white min-w-0"><div className="lok-display font-extrabold leading-tight truncate">{p.title}</div><div className="text-xs opacity-90"><button onClick={()=>onArtist&&onArtist(p.author||"moss.ink")} style={{background:"transparent",border:"none",padding:0,textDecoration:"underline",cursor:"pointer",color:"inherit",font:"inherit"}}><NameTag name={p.author||"moss.ink"} color={cosmetics.nameColor} style={{color:"#fff"}}/></button>{flair?<span className="ml-1.5 text-[10px] font-bold tracking-wide" style={{color:"#F0DB4F"}}>{flair}</span>:null} · {p.from==="revival"?"revival loop":p.from==="battle"?"battle piece":p.mode==="B"?"page-flip":"flipbook"}</div></div>
+        <div className="flex-1 text-white min-w-0"><div className="lok-display font-extrabold leading-tight truncate">{p.title}</div><div className="text-xs opacity-90"><button onClick={()=>onArtist&&onArtist(p.author||"moss.ink")} style={{background:"transparent",border:"none",padding:0,textDecoration:"underline",cursor:"pointer",color:"inherit",font:"inherit"}}><NameTag name={p.author||"moss.ink"} color={cosmetics.nameColor} style={{color:"#fff"}}/></button>{flair?<span className="ml-1.5 text-[10px] font-bold tracking-wide" style={{color:"#F0DB4F"}}>{flair}</span>:null} · {p.from==="revival"?"revival loop":p.from==="battle"?"battle piece":p.mode==="B"?"page-flip":"flipbook"}</div>{p.latitude&&p.longitude&&<div className="mt-1"><LocationBadge locationName={p.location_name} latitude={p.latitude} longitude={p.longitude} onLocationClick={()=>onLocationClick&&onLocationClick(p)}/></div>}</div>
         <button onClick={()=>onLok(p.author||"moss.ink")} aria-label={loked?"Un-Lok this artist":"Lok this artist"} className="lok-btn shrink-0 px-2.5 py-1 rounded-full text-xs font-extrabold" style={{background:loked?"rgba(255,255,255,.92)":T.accent,color:loked?T.ink:T.onAccent,border:"2px solid #fff"}}>{loked?"Lok'd ✓":"Lok"}</button>
       </div>
       <div className="absolute right-2 bottom-16 flex flex-col gap-1 items-center">
