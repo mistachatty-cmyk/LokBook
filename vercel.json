@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/flip/:id", "destination": "/api/flip/:id" }
+  ]
+}

@@ -26,10 +26,33 @@ export default defineConfig({
           theme_color: '#23306B',
           background_color: '#F2EDE2',
           display: 'standalone',
-          orientation: 'portrait',
+          // Was 'portrait', which locked an installed iPad or desktop PWA to a
+          // phone orientation the responsive shell now handles properly.
+          orientation: 'any',
           start_url: '/',
           icons: [
             { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' },
+            { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
+          ],
+        },
+        workbox: {
+          // The app shell is precached by default; these rules cover what the
+          // shell then reaches for, so a cold offline launch renders rather than
+          // showing the browser's error page.
+          globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+          navigateFallback: '/index.html',
+          // /flip/:id is server-rendered for crawlers — never answer it from the
+          // SPA shell cache, or a shared link loses its OpenGraph tags.
+          navigateFallbackDenylist: [/^\/api\//, /^\/flip\//],
+          runtimeCaching: [
+            {
+              urlPattern: ({ request }) => request.destination === 'image',
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'lok-images',
+                expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              },
+            },
           ],
         },
     }),

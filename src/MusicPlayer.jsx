@@ -1,3 +1,4 @@
+import { pacedLoop } from "./engine/framerate.js";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { gsap } from "gsap";
 import { useT } from "./theme/theme.js";
@@ -335,7 +336,7 @@ function MusicVisualizer({ music, height = 56, style = "bars" }) {
     const cv = ref.current;
     if (!cv) return;
     const ctx = cv.getContext("2d");
-    let raf, run = true, t = 0;
+    let run = true, t = 0;
     const fit = () => { const r = cv.getBoundingClientRect(); cv.width = r.width; cv.height = height; };
     fit();
     window.addEventListener("resize", fit);
@@ -397,7 +398,9 @@ function MusicVisualizer({ music, height = 56, style = "bars" }) {
       ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
     };
-    const draw = () => {
+    // Paced rather than bare rAF: on a 120Hz display this loop would otherwise
+    // do twice the canvas work for an effect most people cannot distinguish.
+    const stop = pacedLoop(() => {
       if (!run) return;
       ctx.clearRect(0, 0, cv.width, cv.height);
       t += 0.05;
@@ -405,10 +408,8 @@ function MusicVisualizer({ music, height = 56, style = "bars" }) {
       else if (style === "circle") drawCircle(sample());
       else if (style === "pulse") drawPulse(sample());
       else drawBars(sample());
-      raf = requestAnimationFrame(draw);
-    };
-    raf = requestAnimationFrame(draw);
-    return () => { run = false; cancelAnimationFrame(raf); window.removeEventListener("resize", fit); };
+    });
+    return () => { run = false; stop(); window.removeEventListener("resize", fit); };
   }, [analyserRef, playing, height, style, T.accent, T.alt]);
   return <canvas ref={ref} aria-hidden="true" style={{ width: "100%", height, display: "block", borderRadius: 10 }} />;
 }

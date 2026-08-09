@@ -1,13 +1,13 @@
 import {
   useState, useEffect, useRef, useCallback, useMemo,
-  forwardRef, useImperativeHandle, Fragment,
+  forwardRef, useImperativeHandle, Fragment, lazy, Suspense,
 } from "react";
 import { getStroke } from "perfect-freehand";
 import { gsap } from "gsap";
 import Easel from "./Easel.jsx";
 
 import { THEMES, SKIN_WAVE_GATE, SKIN_WAVE_3_GATE, SKIN_WAVE_4_GATE, ThemeCtx, useT, ART, blotBorderStyle, onColor } from "./theme/theme.js";
-import Shop from "./pages/Shop.jsx";
+const Shop=lazy(()=>import("./pages/Shop.jsx"));
 import { encodeLok } from "./engine/lokFormat.js";
 import { encodeGIF } from "./engine/gif.js";
 import { AD_PROVIDER } from "./ads.js";
@@ -31,7 +31,7 @@ import InterventionFX from "./InterventionFX.jsx";
 import EmptyState from "./EmptyState.jsx";
 import GuestSavePrompt from "./GuestSavePrompt.jsx";
 import SharePreview from "./SharePreview.jsx";
-import Rooms from "./pages/Rooms.jsx";
+const Rooms=lazy(()=>import("./pages/Rooms.jsx"));
 import { resolveCheat } from "./engine/bleepbox.js";
 import MythicPreview from "./MythicPreview.jsx";
 import "./steam/steamStore.jsx";
@@ -51,8 +51,10 @@ import { supabase } from "./supabaseClient.js";
 import { useAuth } from "./auth/AuthContext.jsx";
 import { rotationTarget, isArchivedRotation, ROTATION_FONTS, ROTATION_STICKERS, ROTATION_REACTIONS } from "./engine/rotation.js";
 import { normalizePack, newStickerId, putSticker, getSticker, listStickerIds, deleteSticker, resizeStickerImage, IMAGE_TYPES as STICKER_IMAGE_TYPES } from "./engine/stickers.js";
-import Roadmap from "./pages/Roadmap.jsx";
+const Roadmap=lazy(()=>import("./pages/Roadmap.jsx"));
 import { useViewport, RAIL_W } from "./engine/viewport.js";
+import { pacedLoop, setHighRefresh } from "./engine/framerate.js";
+import { pushSave, pullSave, syncIntent, progressOf } from "./engine/saveCloud.js";
 import { adPlan, canShowInterstitial, FEED_AD_EVERY } from "./ads.js";
 import AdRail from "./ads/AdRail.jsx";
 import AdInterstitial from "./ads/AdInterstitial.jsx";
@@ -1218,6 +1220,8 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
           <div className="grid grid-cols-3 gap-1.5">{[["small","Compact"],["normal","Normal"],["large","Large"]].map(([id,label])=>(
             <button key={id} onClick={()=>onSetFlag&&onSetFlag("uiScale",id)} aria-pressed={(featureFlags.uiScale||"normal")===id} className="lok-btn py-1.5 rounded-xl text-xs font-extrabold" style={{border:`2.5px solid ${(featureFlags.uiScale||"normal")===id?T.accent:T.ink}`,background:(featureFlags.uiScale||"normal")===id?T.ink:T.card,color:(featureFlags.uiScale||"normal")===id?T.paper:T.ink}}>{label}</button>))}</div>
           <label className="mt-2 flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={!!featureFlags.compactUi} onChange={e=>onSetFlag&&onSetFlag("compactUi",e.target.checked)} style={{accentColor:T.accent}}/> Tighter spacing (compact layout)</label>
+          <label className="mt-2 flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={!!featureFlags.highRefresh} onChange={e=>onSetFlag&&onSetFlag("highRefresh",e.target.checked)} style={{accentColor:T.accent}}/> High refresh rate (120fps where supported)</label>
+          <div className="text-[10px] opacity-55 leading-snug ml-6">Uncaps animation on 120Hz displays. Costs battery, and Reduce Motion still overrides it.</div>
           <div className="mt-3 font-bold text-sm">Default page</div>
           <div className="text-xs opacity-70 mt-0.5 mb-1.5 leading-snug">Which tab Lok opens to.</div>
           <div className="grid grid-cols-3 gap-1.5">{[["feed","Feed"],["gallery","You"],["studio","Studio"],["battle","Battle"],["front","Rush"],["rooms","Rooms"]].map(([id,label])=>(
@@ -1340,6 +1344,29 @@ export default function LokApp(){
   const[bookmarks,setBookmarks]=useState([]);const[following,setFollowing]=useState([]);const[lillok,setLillok]=useState({ink:80,bond:30,stasis:false,name:"Blot",lastSeen:Date.now()});const[customLilLok,setCustomLilLok]=useState(null);const[cosmetics,setCosmetics]=useState({nameColor:"default",frame:"none",reactionPack:"base",avatarAccent:"none",blotBorder:"none"});const[owned,setOwned]=useState({nameColor:["default"],frame:["none"],reactionPack:["base"],avatarAccent:["none"],blotBorder:["none"]});const[kids,setKids]=useState(false);const[showLilLok,setShowLilLok]=useState(false);const[onboarded,setOnboarded]=useState(false);const[showOnboard,setShowOnboard]=useState(false);const[showHint,setShowHint]=useState(false);const[sound,setSound]=useState(false);const[feedMode,setFeedMode]=useState("discover");const[daily,setDaily]=useState({day:null,streak:0,claimed:false,prompt:""});const[xp,setXp]=useState(0);const[quests,setQuests]=useState(null);const[flair,setFlair]=useState("");const[adVisible,setAdVisible]=useState(true);const[notifications,setNotifications]=useState([]);const[notifUnread,setNotifUnread]=useState(0);
   const[sessionPin,setSessionPin]=useState(null);const[pinInput,setPinInput]=useState("");const[pinError,setPinError]=useState("");const[pinUnlocked,setPinUnlocked]=useState(true);
   const vp=useViewport();
+  // The frame-pacing module is plain state, not React state, because the rAF
+  // loops that read it live outside the component tree. Push the flag to it
+  // whenever the setting changes.
+  useEffect(()=>{setHighRefresh(!!featureFlags.highRefresh);},[featureFlags.highRefresh]);
+  // Cross-device restore. On sign-in, compare the cloud save against this
+  // device's. Restoring writes the remote blob into the local store and reloads
+  // rather than re-applying field by field — the load path in this file is one
+  // large inline block, and duplicating it is exactly how the two copies drift.
+  const[syncPrompt,setSyncPrompt]=useState(null);
+  const restoreSave=useCallback(blob=>{store.set(SAVE_KEY,blob);store.set(SAVE_KEY+":at",Date.now());location.reload();},[]);
+  useEffect(()=>{
+    if(!ready)return;const uid=auth.getUserId();if(!uid)return;
+    let live=true;
+    (async()=>{
+      const remote=await pullSave(uid);if(!live)return;
+      const local=getSaveBlob();
+      const intent=syncIntent({localSavedAt:Number(store.get(SAVE_KEY+":at"))||0,localProgress:progressOf(local),remote});
+      if(intent==="push")pushSave(uid,local).catch(()=>{});
+      else if(intent==="pull")restoreSave(remote.blob);
+      else if(intent==="ask")setSyncPrompt(remote);
+    })();
+    return()=>{live=false;};
+  },[ready,auth.getUserId()]);
   // One gating decision for every involuntary ad surface. Rewarded video is not
   // routed here — it is opt-in and stays available to LokPass holders.
   const ads=adPlan({tier:vp.tier,orientation:vp.orientation,lokPass,kids});
@@ -1480,7 +1507,12 @@ export default function LokApp(){
     if(ownList)ownList(o=>[...new Set([...o,item.id])]);else setOwned(o=>add(o,t.key));
     equip?.(item.id);return true;},[]);
   const getSaveBlob=useCallback(()=>({botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok:{...lillok,lastSeen:Date.now()},modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,comebackStyle:celebrationStyle,lastComebackAward,lastOfflineBonus,legacyStudio,legacyBrushes,tutorialProgress,rewardClaims,doubleLoksUntil}),[botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok,modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,celebrationStyle,lastComebackAward,lastOfflineBonus,tutorialProgress,rewardClaims,doubleLoksUntil]);
-  const doSave=useCallback(()=>{store.set(SAVE_KEY,getSaveBlob());},[getSaveBlob]);
+  const doSave=useCallback(()=>{const b=getSaveBlob();store.set(SAVE_KEY,b);store.set(SAVE_KEY+":at",Date.now());
+    // Mirror to the cloud so progress follows the user between phone, iPad, and
+    // desktop. Fire-and-forget: a failed sync must never block the local save,
+    // which remains the source of truth.
+    const uid=auth.getUserId();if(uid)pushSave(uid,b).catch(()=>{});
+  },[getSaveBlob,auth]);
   const mintGuestPassCode=useCallback(async email=>{
     const code=await mintGuestPass(getSaveBlob(),email);
     if(code)store.set("lok:guestPassMinted",true);
@@ -1608,6 +1640,11 @@ export default function LokApp(){
         {vp.tier==="desktop"&&<aside className="lok-rail lok-rail-left" style={{position:"sticky",top:88}}>{ads.rails==="both"&&<AdRail side="left" onGetLokPass={()=>setTab("shop")}/>}</aside>}
       <main className="mx-auto w-full px-4 pb-40" style={{maxWidth:560}}>
         <div key={tab} className="lok-tabin">
+        {/* Shop, Rooms, and Roadmap are lazy — they are the heaviest pages and
+            most sessions never open them, so they no longer sit in the initial
+            bundle. The fallback is deliberately quiet: these load in a frame or
+            two on any real connection and a spinner would only flash. */}
+        <Suspense fallback={<div className="py-10 text-center text-sm opacity-50">Loading…</div>}>
           {tab==="feed"&&<Feed posts={posts} bookmarks={bookmarks} following={following} feedMode={feedMode} setFeedMode={setFeedMode} cosmetics={cosmetics} daily={daily} streak={daily.streak} dailyClaimed={daily.claimed} flipOfDay={flipOfDay} onLine={showLine} onClaimDaily={()=>{if(daily.claimed)return;const wk=daily.streak%7===0&&daily.streak>0?20:0;const mo=daily.streak%30===0&&daily.streak>0?100:0;const bonus=10+Math.min(daily.streak,7)*5+wk+mo;setDaily(d=>({...d,claimed:true}));addLoks(bonus);gainXp(20);feedLilLok(15,"creation");blip("E5");hap([30,20,60]);say(`Day ${daily.streak} claimed · +${bonus} Loks`,"success");}} onOpen={id=>setOpenIdx(posts.findIndex(p=>p.id===id))} onVote={id=>{const p=posts.find(x=>x.id===id);if(p.voted)return;patchPost(id,{voted:true,votes:p.votes+1});addLoks(5);gainXp(5);questTick("vote");blip("C5");hap([30]);say("Vote stamped · +5 Loks","success");if(id.startsWith("seed")){addLoks(5);pushNotif("Your flip got a vote · +5 Loks (creator)","success");}else{pushNotif("You voted · creator notified","success");}}} onLok={name=>{setFollowing(f=>{const has=f.includes(name);blip("G5");hap([20,10,20]);if(has){say(`Un-Lok'd ${name}`);return f.filter(x=>x!==name);}questTick("lok");say(`Lok'd ${name}`);return[...f,name];});}} onBookmark={id=>{setBookmarks(b=>b.includes(id)?b.filter(x=>x!==id):[...b,id]);blip("A4");hap([20]);say(bookmarks.includes(id)?"Bookmark removed":"Lok'd in to bookmarks");}} say={say} moodFilter={moodFilter} setMoodFilter={setMoodFilter} moodTags={moodTags} reportedPosts={reportedPosts} onReport={id=>{setReportedPosts(r=>[...r,id]);patchPost(id,{hidden:true});say("Post hidden")}} onEcho={post=>{setPosts(ps=>[{id:"echo-"+Date.now(),title:"↻ "+post.title,frames:post.frames,paceMs:post.paceMs||160,mode:post.mode||"A",style:post.style||"bold",loop:post.loop,from:"studio",author:profile.name,votes:0,voted:false,viewed:false,views:0,reactions:{splat:0,heart:0,drip:0}},...ps]);addLoks(2);say("Echoed! +2 Loks");}} onArtist={setArtistView} myHandle={profile.name} onFeatureOpen={pc=>{setPosts(ps=>{if(ps.some(x=>x.id===pc.id))return ps;return [...ps,pc];});setTimeout(()=>setOpenIdx(i=>{const idx=posts.findIndex(x=>x.id===pc.id);return idx>=0?idx:posts.length;}),0);}} flair={flair} onPullRefresh={()=>{const now=Date.now();if(now-lastPullRef.current<15000){say("Still fresh — try again in a bit");return;}lastPullRef.current=now;dropBotPosts(2,true);say("New pieces from the wards ✨","success");}} music={music} feedAds={ads.feedNative} onAdCta={()=>setTab("shop")}/>}
           {tab==="gallery"&&<Profile posts={posts} profile={profile} setProfile={setProfile} wins={wins} lokPass={lokPass} kids={kids} cosmetics={cosmetics} owned={owned} onBuyCosmetic={(cat,item)=>{if(owned[cat]?.some(o=>o.id===item.id)){setCosmetics(c=>({...c,[cat]:item.id}));say(`Equipped ${item.name}`);}else spend(item.price,()=>{setOwned(o=>({...o,[cat]:[...(o[cat]||[]),{id:item.id,ts:Date.now()}]}));setCosmetics(c=>({...c,[cat]:item.id}));},`${item.name} unlocked`);}} level={level} xp={xp} quests={quests} following={following} lokdInCount={bookmarks.length} bookmarks={bookmarks} notifications={notifications} notifUnread={notifUnread} loks={loks} totalEarned={totalEarned} questsCompleted={questsCompleted} canInstall={!!installEvt} onInstall={async()=>{if(installEvt){installEvt.prompt();try{const r=await installEvt.userChoice;if(r.outcome==="accepted")say("Lok added to your home screen!","success");}catch{}setInstallEvt(null);}else{say("Open your browser menu → Install app / Add to Home Screen");}}} onClearNotifs={()=>setNotifUnread(0)} onOpen={id=>setOpenIdx(posts.findIndex(p=>p.id===id))} onDelete={id=>setPosts(ps=>ps.filter(p=>p.id!==id))} onRename={(id,title)=>patchPost(id,{title})} say={say} onCheat={onCheat} pace={pace} setPace={setPace} speed={speed} setSpeed={setSpeed} soundLab={soundLab} onUnlockSoundLab={()=>setSoundLab(true)} soundQueue={soundQueue} setSoundQueue={setSoundQueue} founder={founder} onFounderJoin={async(handle,email)=>{await founderSignup(handle,email,{loks,wins,xp,profile,questsCompleted,totalEarned,gallerySize:posts.filter(p=>!p.id?.startsWith("seed")).length,lillok:{ink:lillok.ink,bond:lillok.bond,name:lillok.name}});setFounder(true);pushNotif("Founder status secured on LokServices 🏆","success");}} animatedToken={animatedToken} focusMode={focusMode} setFocusMode={setFocusMode} showSettings={showSettings} setShowSettings={setShowSettings} featureFlags={featureFlags} onSetFlag={(k,v)=>{setFeatureFlags(f=>({...f,[k]:v}));store.set("lok:flags",{...featureFlags,[k]:v});}} hapticGrammar={hapticGrammar} setHapticGrammar={setHapticGrammar} fourthWall={fourthWall} setFourthWall={setFourthWall} garden={garden} setGarden={setGarden} wordTwister={wordTwister} setWordTwister={setWordTwister} flair={flair} timeMachineIdx={timeMachineIdx} setTimeMachineIdx={setTimeMachineIdx} heatmapData={heatmapData} sessionPin={sessionPin} setSessionPin={setSessionPin} pinInput={pinInput} setPinInput={setPinInput} verified={verified} setVerified={setVerified} devTap={devTap} devTimer={devTimer} devMode={devMode} setDevMode={setDevMode} appLogo={appLogo} setAppLogo={setAppLogo} setPinUnlocked={setPinUnlocked} setLoks={setLoks} setTotalEarned={setTotalEarned} legacyStudio={legacyStudio} setLegacyStudio={setLegacyStudio} viewingArtist={viewingArtist} onBackToMyGallery={()=>setViewingArtist(null)} onOpenMusic={()=>setShowMusic(true)} onOpenRoadmap={()=>setShowRoadmap(true)} tutorialProgress={tutorialProgress} onStartTutorial={id=>{setActiveTutorialId(id);const saved=tutorialProgress[id];setStudioFrames(saved?.frames||[]);setStudioFrameDurations(saved?.frameDurations||[]);setStudioTitle(saved?.title||TUTORIAL_PROJECTS.find(t=>t.id===id)?.title||"");setTab("studio");}} onMintGuestPass={mintGuestPassCode} onRedeemGuestPass={redeemGuestPassCode}/>}
           {tab==="studio"&&<>{activeTutorialId&&(()=>{const t=TUTORIAL_PROJECTS.find(x=>x.id===activeTutorialId);return t?(<div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold mb-1.5" style={{border:`2px solid ${T.accent}`,background:T.card,color:T.ink}}><span>{t.icon} Tutorial: {t.title}</span><button onClick={()=>setActiveTutorialId(null)} className="ml-auto lok-btn text-[10px] font-bold underline opacity-70">exit tutorial</button></div>):null;})()}<div className="mb-1">
@@ -1632,6 +1669,7 @@ export default function LokApp(){
           {tab==="rooms"&&<Rooms profile={profile} userId={profile.name} myRooms={myRooms} setMyRooms={setMyRooms} pendingCode={pendingRoomCode} onPendingCodeUsed={()=>setPendingRoomCode(null)} onArtist={name=>setArtistView&&setArtistView(name)} say={say} blip={blip} hap={hap}/>}
           {tab==="roadmap"&&<Roadmap level={level} xp={xp} onClose={()=>setTab("feed")}/>}
           {tab==="shop"&&<Shop ccTier={ccTier} say={say} modules={modules} onBuyModule={m=>{if(modules.includes(m.id)){say("Already owned");return;}spend(m.price,()=>{setModules(o=>[...o,m.id]);blip("C6");},`${m.name} unlocked`);}} loks={loks} lokPass={lokPass} kids={kids} uiTheme={uiTheme} ownedThemes={ownedThemes} effect={effect} ownedEffects={ownedEffects} sky={sky} ownedSkies={ownedSkies} onSky={(id,s)=>{if(ownedSkies.includes(id)){setSky(id);say(`Equipped ${s.name}`);}else spend(s.price,()=>{setOwnedSkies(o=>[...o,id]);setSky(id);},`${s.name} unlocked`);}} animFx={animFx} ownedAnimFx={ownedAnimFx} onAnimFx={(id,f)=>{if(ownedAnimFx.includes(id)){setAnimFx(id);say(id==="none"?"FX off":`${f.name} equipped`);}else spend(f.price,()=>{setOwnedAnimFx(o=>[...o,id]);setAnimFx(id);},`${f.name} unlocked`);}} fontPack={fontPack} onFontPack={(id,f)=>spend(f.price,()=>{setOwned(o=>({...o,fontPack:[...(o.fontPack||[]),id]}));setFontPack(id);},`${f.name} set`)} cursorPack={cursorPack} onCursorPack={(id,c)=>spend(c.price,()=>{setOwned(o=>({...o,cursorPack:[...(o.cursorPack||[]),id]}));setCursorPack(id);},`${c.name} set`)} musicPack={musicPack} onMusicPack={(id,m)=>spend(m.price,()=>{setOwned(o=>({...o,musicPack:[...(o.musicPack||[]),id]}));setMusicPack(id);},`${m.name} set`)} stickerPack={stickerPack} onStickerPack={(id,s)=>spend(s.price,()=>{setOwned(o=>({...o,stickerPack:[...(o.stickerPack||[]),id]}));setStickerPack(id);},`${s.name} set`)} postExport={postExport} onPostExport={(id,e)=>spend(e.price,()=>{setOwned(o=>({...o,postExport:[...(o.postExport||[]),id]}));setPostExport(id);},`${e.name} set`)} mythicOwned={mythicOwned} mythicEquipped={mythicEquipped} dailyOwned={dailyOwned} weeklyOwned={weeklyOwned} onBuyMythic={(item,rotation)=>{if(rotation==="daily"||rotation==="weekly"){if(isArchivedRotation(item)){say(`${item.name} isn't active yet — it needs a real encoder, not just wiring`);return;}const ownedIds=rotation==="daily"?dailyOwned:weeklyOwned;if(ownedIds.includes(item.id)){applyRotation(item);say(`Equipped ${item.name}`);return;}spend(item.price,()=>{rotation==="daily"?setDailyOwned(o=>[...o,item.id]):setWeeklyOwned(o=>[...o,item.id]);applyRotation(item);blip("C6");},`${item.name} unlocked`);}else{if(mythicOwned.includes(item.id)){setMythicEquipped(item.id);say(`Equipped ${item.name}`);}else spend(item.price,()=>{setMythicOwned(o=>[...o,item.id]);setMythicEquipped(item.id);setTimeout(()=>setCelebration(item.name),100);setTimeout(()=>setCelebration(null),3000);},`${item.name} unlocked`);}}} cosmetics={cosmetics} owned={owned} setKids={setKids} onBuyCosmetic={(cat,item)=>{if((owned[cat]||[]).includes(item.id)){setCosmetics(c=>({...c,[cat]:item.id}));blip("D5");say(`Equipped ${item.name}`);}else spend(item.price,()=>{setOwned(o=>({...o,[cat]:[...(o[cat]||[]),item.id]}));setCosmetics(c=>({...c,[cat]:item.id}));blip("C6");},`${item.name} unlocked`);}} onBuyPass={()=>{setLokPass(true);setOwnedThemes(Object.keys(THEMES));blip("C6");say("LokPass active!");}} onTheme={id=>{if(ownedThemes.includes(id)){setUiTheme(id);say(`Equipped ${THEMES[id].name}`);}else spend(THEMES[id].price,()=>{setOwnedThemes(o=>[...o,id]);setUiTheme(id);},`${THEMES[id].name} unlocked`);}} onEffect={(id,e)=>{if(ownedEffects.includes(id)){setEffect(id);say(id==="none"?"Effects off":`${e.name} equipped`);}else spend(e.price,()=>{setOwnedEffects(o=>[...o,id]);setEffect(id);},`${e.name} unlocked`);}} onCc={()=>spend(120,()=>setCcTier(true),"Studio Pro unlocked")} celebrationStyle={celebrationStyle} onCelebrationStyle={id=>setCelebrationStyle(id)}/>}
+        </Suspense>
         </div>
       </main>
         {vp.tier!=="phone"&&<aside className="lok-rail lok-rail-right" style={{position:"sticky",top:88}}>{!!ads.rails&&<AdRail side="right" onGetLokPass={()=>setTab("shop")}/>}</aside>}
@@ -1639,7 +1677,7 @@ export default function LokApp(){
       {!focusMode && music.current && (<div className="fixed inset-x-0 z-40" style={{bottom:`calc(60px + env(safe-area-inset-bottom)${(!lokPass&&!kids)?" + 28px":""})`}}>
         <MusicTicker music={music} onOpen={()=>setShowMusic(true)}/>
       </div>)}
-      {showRoadmap&&<div className="fixed inset-0 z-[70] overflow-y-auto" style={{background:T.paper}}><Roadmap level={level} xp={xp} onClose={()=>setShowRoadmap(false)}/></div>}
+      {showRoadmap&&<div className="fixed inset-0 z-[70] overflow-y-auto" style={{background:T.paper}}><Suspense fallback={<div className="py-10 text-center text-sm opacity-50">Loading…</div>}><Roadmap level={level} xp={xp} onClose={()=>setShowRoadmap(false)}/></Suspense></div>}
       {showMusic&&<MusicSheet music={music} say={say} devMode={devMode} lokPass={lokPass} signedIn={auth.isAuthenticated()} onGetLokPass={()=>{setShowMusic(false);setTab("shop");}} onSignIn={()=>{setShowMusic(false);setShowSettings(true);}} onClose={()=>setShowMusic(false)}/>}
       {!focusMode && ads.bottomBanner&&(()=>{const bannerAds=adsFor("banner");const b=bannerAds[adIdx%bannerAds.length];return(<div className="fixed inset-x-0 z-40 flex items-center justify-between gap-2 px-4 py-1.5 text-xs font-bold" {...(AD_PROVIDER!=="placeholder"?{"data-ad-slot":b.slot,"data-ad-format":"banner"}:{})} style={{bottom:62,background:T.card,borderTop:`2px dashed ${T.ink}`,color:T.ink,opacity:adVisible?1:0,transition:"opacity .3s ease",pointerEvents:adVisible?"auto":"none"}}>
         {/* AdSense: replace inner span with <ins class="adsbygoogle"> at deploy; slot id in data-ad-slot. data-ad-* attrs only emitted once a real provider is wired — placeholder mode ships no ad-network markup */}
@@ -1648,6 +1686,18 @@ export default function LokApp(){
       </div>);})()}
       {interstitial&&<AdInterstitial ad={interstitial} onClose={()=>setInterstitial(null)} onCta={()=>{setInterstitial(null);setTab("shop");}}/>}
       {showRewards&&<RewardedSheet claims={rewardClaims} lokPass={lokPass} onClose={()=>setShowRewards(false)} onClaim={grantReward}/>}
+      {syncPrompt&&(<div className="fixed inset-0 z-[85] flex items-center justify-center p-5" style={{background:"rgba(0,0,0,.6)"}}>
+        <div className="w-full rounded-3xl p-5 flex flex-col gap-3" style={{maxWidth:400,background:T.card,color:T.ink,border:`3px solid ${T.ink}`,boxShadow:`6px 6px 0 ${T.accent}`}}>
+          <div className="lok-display font-extrabold text-xl leading-tight">Two saves found</div>
+          <p className="text-sm opacity-80 leading-snug">There's newer progress saved from another device. Keeping one means losing the other — pick carefully.</p>
+          <div className="text-xs opacity-70 leading-snug rounded-xl p-2.5" style={{border:`2px dashed ${T.ink}`}}>
+            <div><strong>Cloud save</strong> · {new Date(syncPrompt.savedAt).toLocaleString()}</div>
+            <div className="mt-1"><strong>This device</strong> · {loks} Loks · level {level}</div>
+          </div>
+          <button onClick={()=>restoreSave(syncPrompt.blob)} className="lok-btn w-full py-2.5 rounded-xl text-sm font-extrabold" style={{background:T.accent,color:T.onAccent,border:`2.5px solid ${T.ink}`}}>Use the cloud save</button>
+          <button onClick={()=>{const uid=auth.getUserId();if(uid)pushSave(uid,getSaveBlob()).catch(()=>{});setSyncPrompt(null);say("Keeping this device's save","success");}} className="lok-btn w-full py-2.5 rounded-xl text-sm font-extrabold" style={{background:T.paper,color:T.ink,border:`2.5px solid ${T.ink}`}}>Keep this device</button>
+        </div>
+      </div>)}
       {!focusMode && <nav className="fixed bottom-0 inset-x-0 z-40 flex" style={{background:T.paper,borderTop:`3px solid ${T.ink}`,paddingBottom:"env(safe-area-inset-bottom)"}} role="navigation" aria-label="Main navigation">
         {[["feed",kids?"Home":"Feed",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>],["gallery",kids?"You":"You",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>],["studio","Studio",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><circle cx="11" cy="11" r="2"/></svg>],["battle",kids?"Draw":"Battle",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M2 2l20 20"/></svg>],["front","Rush",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>],["rooms","Rooms",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>],["roadmap","Map",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="3 7 3 17 21 17 21 7"/><line x1="3" y1="7" x2="21" y2="7"/><path d="M7 17v4M17 17v4M3 12h18"/></svg>],["shop","Shop",<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>]].map(([id,label,icon])=>{const on=tab===id;return(<button key={id} onClick={()=>setTab(id)} aria-label={`Go to ${label}`} aria-current={on?"page":undefined} className="lok-btn lok-display relative flex-1 py-2.5 text-xs font-bold flex flex-col items-center gap-0.5" style={{color:on?T.accent:T.ink,transition:"color .2s ease"}}>
           {on&&<span className="absolute left-1/2 rounded-full" style={{top:4,width:22,height:3,transform:"translateX(-50%)",background:T.accent}} aria-hidden="true"/>}
@@ -1690,17 +1740,15 @@ function Loader(){
     const onDown=()=>{pos.current.down=true;};const onUp=()=>{pos.current.down=false;};
     const onMotion=e=>{if(!e.gamma||!e.beta)return;const gx=Math.max(-90,Math.min(90,e.gamma))*2;const gy=Math.max(-45,Math.min(45,e.beta))*4;pos.current.x=window.innerWidth/2+gx;pos.current.y=window.innerHeight/2+gy;};
     window.addEventListener("pointermove",onMove);window.addEventListener("pointerdown",onDown);window.addEventListener("pointerup",onUp);window.addEventListener("devicemotion",onMotion);
-    let frame;const tick=()=>{
+    const stop=pacedLoop(()=>{
       const {x,y,px,py,vx,vy,down}=pos.current;const rect=el.getBoundingClientRect();
       const targetX=x-rect.left-rect.width/2;const targetY=y-rect.top-rect.height/2;
       const ax=(targetX-px)*0.15;const ay=(targetY-py)*0.15;
       pos.current.vx=(vx+ax)*0.86;pos.current.vy=(vy+ay)*0.86;
       pos.current.px+=pos.current.vx;pos.current.py+=pos.current.vy;
       el.style.transform=`perspective(500px) rotateY(${pos.current.px/24}deg) rotateX(${-pos.current.py/24}deg) scale(${down?0.9:1})`;
-      frame=requestAnimationFrame(tick);
-    };
-    tick();
-    return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerdown",onDown);window.removeEventListener("pointerup",onUp);window.removeEventListener("devicemotion",onMotion);cancelAnimationFrame(frame);};
+    });
+    return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerdown",onDown);window.removeEventListener("pointerup",onUp);window.removeEventListener("devicemotion",onMotion);stop();};
   },[]);
 
   return(<div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:ART.paper,color:ART.ink,fontFamily:"'Bricolage Grotesque',system-ui,sans-serif"}}>
