@@ -109,8 +109,17 @@ export const getCommentReward = (text) => {
 // and nobody can farm it. Reuses page-effect ids the renderer already knows.
 // 4 new weathers: rain, fog, aurora, dust — notable but not distracting
 const WEATHER = ["rain", "fog", "aurora", "dust"];
-export const inkWeatherToday = (d = new Date()) =>
-  WEATHER[Math.floor(d.getTime() / 86400000) % WEATHER.length];
+export const getWeatherOverride = () => {
+  try { return localStorage.getItem("lok:weatherOverride"); } catch { return null; }
+};
+export const setWeatherOverride = (weather) => {
+  try { localStorage.setItem("lok:weatherOverride", weather || ""); } catch {}
+};
+export const inkWeatherToday = (d = new Date()) => {
+  const override = getWeatherOverride();
+  if (override && WEATHER.includes(override)) return override;
+  return WEATHER[Math.floor(d.getTime() / 86400000) % WEATHER.length];
+};
 
 // Night Shift: 0 at midday, 1 in the small hours. Drives a cheap CSS filter.
 export const nightShiftAmount = (d = new Date()) => {
