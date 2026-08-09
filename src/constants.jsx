@@ -111,29 +111,29 @@ export const BLOT_PERSONALITIES = [
 ];
 
 export const BLOT_IDLE_ANIMATIONS = [
-  { id: "float", name: "Gentle Float", price: 0, desc: "Soft up-and-down floating" },
-  { id: "sway", name: "Sway", price: 25, desc: "Side-to-side gentle swaying" },
-  { id: "pulse", name: "Pulse", price: 35, desc: "Rhythmic breathing-like pulse" },
-  { id: "wiggle", name: "Wiggle", price: 30, desc: "Playful wiggling motion" },
-  { id: "bounce_idle", name: "Bouncy Rest", price: 40, desc: "Subtle bouncing while idle" },
-  { id: "spin_slow", name: "Slow Spin", price: 45, desc: "Gentle rotating motion" },
+  { id: "float", name: "Gentle Float", price: 0, desc: "Soft up-and-down floating", giftReward: "heart" },
+  { id: "sway", name: "Sway", price: 25, desc: "Side-to-side gentle swaying", giftReward: "flower" },
+  { id: "pulse", name: "Pulse", price: 35, desc: "Rhythmic breathing-like pulse", giftReward: "sparkle" },
+  { id: "wiggle", name: "Wiggle", price: 30, desc: "Playful wiggling motion", giftReward: "star" },
+  { id: "bounce_idle", name: "Bouncy Rest", price: 40, desc: "Subtle bouncing while idle", giftReward: "treasure" },
+  { id: "spin_slow", name: "Slow Spin", price: 45, desc: "Gentle rotating motion", giftReward: "crown" },
 ];
 
 export const BLOT_EXPRESSIONS = [
-  { id: "neutral", name: "Neutral", price: 0, desc: "Calm and centered" },
-  { id: "happy", name: "Happy", price: 20, desc: "Cheerful and bright" },
-  { id: "excited", name: "Excited", price: 25, desc: "Eyes wide and energetic" },
-  { id: "sleepy", name: "Sleepy", price: 20, desc: "Relaxed and drowsy" },
-  { id: "thinking", name: "Thinking", price: 30, desc: "Pondering and thoughtful" },
-  { id: "playful", name: "Playful", price: 25, desc: "Mischievous and fun" },
+  { id: "neutral", name: "Neutral", price: 0, desc: "Calm and centered", giftReward: "heart" },
+  { id: "happy", name: "Happy", price: 20, desc: "Cheerful and bright", giftReward: "star" },
+  { id: "excited", name: "Excited", price: 25, desc: "Eyes wide and energetic", giftReward: "sparkle" },
+  { id: "sleepy", name: "Sleepy", price: 20, desc: "Relaxed and drowsy", giftReward: "flower" },
+  { id: "thinking", name: "Thinking", price: 30, desc: "Pondering and thoughtful", giftReward: "treasure" },
+  { id: "playful", name: "Playful", price: 25, desc: "Mischievous and fun", giftReward: "rainbow" },
 ];
 
 export const BLOT_BOUNCES = [
-  { id: "gentle", name: "Gentle Bounce", price: 0, desc: "Soft and subtle bounce" },
-  { id: "energetic", name: "Energetic Bounce", price: 30, desc: "Punchy and enthusiastic" },
-  { id: "bouncy", name: "Super Bouncy", price: 40, desc: "High-energy bouncing" },
-  { id: "elastic", name: "Elastic Bounce", price: 35, desc: "Stretchy springy motion" },
-  { id: "wobbly", name: "Wobbly Bounce", price: 25, desc: "Unbalanced and jiggly" },
+  { id: "gentle", name: "Gentle Bounce", price: 0, desc: "Soft and subtle bounce", giftReward: "heart" },
+  { id: "energetic", name: "Energetic Bounce", price: 30, desc: "Punchy and enthusiastic", giftReward: "sparkle" },
+  { id: "bouncy", name: "Super Bouncy", price: 40, desc: "High-energy bouncing", giftReward: "crown" },
+  { id: "elastic", name: "Elastic Bounce", price: 35, desc: "Stretchy springy motion", giftReward: "treasure" },
+  { id: "wobbly", name: "Wobbly Bounce", price: 25, desc: "Unbalanced and jiggly", giftReward: "flower" },
 ];
 
 export const BLOT_GIFTS = [
@@ -478,7 +478,7 @@ export const NAME_COLOR_MAP = Object.fromEntries(
     .map(c => [c.id, c.color ?? null])
 );
 export const FRAMES = [{ id: "none", name: "None", price: 0 }, { id: "double", name: "Double rule", price: 25 }, { id: "dashed", name: "Dashed ink", price: 25 }, { id: "tape", name: "Washi corners", price: 40 }, { id: "glow", name: "Neon glow", price: 60 }, { id: "photo", name: "Photo Corners", price: 30 }, { id: "stamp", name: "Stamp Edge", price: 35 }, { id:"polaroid", name:"Polaroid border", price:35 }, { id:"filmstrip", name:"Film strip sprockets", price:45 }, { id:"torn", name:"Torn edge", price:30 }, { id:"riso", name:"Riso offset", price:50 }];
-export const REACTION_PACKS = [{ id: "base", name: "Ink set (splat · heart · drip)", price: 0 }, { id: "stars", name: "Stardust pack", price: 30 }, { id: "fire", name: "Hot streak pack", price: 30 }, { id: "zen", name: "Zen pack", price: 45 }, { id: "spooky", name: "Spooky Pack", price: 30 }, { id: "sweet", name: "Sweet Pack", price: 30 }];
+export const REACTION_PACKS = [{ id: "base", name: "Ink set (splat · heart · drip)", price: 0, giftReward: "heart" }, { id: "stars", name: "Stardust pack", price: 30, giftReward: "star" }, { id: "fire", name: "Hot streak pack", price: 30, giftReward: "sparkle" }, { id: "zen", name: "Zen pack", price: 45, giftReward: "flower" }, { id: "spooky", name: "Spooky Pack", price: 30, giftReward: "treasure" }, { id: "sweet", name: "Sweet Pack", price: 30, giftReward: "heart" }];
 export const PAPERS = [{ id:"plain", name:"Plain paper", price:0 }, { id:"grid", name:"Grid guide", price:25 }, { id:"dots", name:"Dot grid", price:25 }, { id:"storyboard", name:"Storyboard · 3 panels", price:40 }, { id:"graphite", name:"Graphite texture", price:50 }, { id:"perspective", name:"Perspective guide", price:60 }, { id:"isometric", name:"Isometric grid", price:55 }];
 export const LILLOK_GEAR = [{ id:"none", name:"None", price:0 }, { id:"hat", name:"Tiny hat", price:25 }, { id:"glasses", name:"Round glasses", price:25 }, { id:"bowtie", name:"Bow tie", price:20 },
   { id:"crown", name:"Tiny Crown", price:60, rarity:"epic" }, { id:"scarf", name:"Cozy Scarf", price:35, rarity:"rare" },
@@ -489,24 +489,24 @@ export const LILLOK_GEAR = [{ id:"none", name:"None", price:0 }, { id:"hat", nam
   { id:"bandana", name:"Pirate Bandana", price:35, rarity:"rare" }, { id:"collar", name:"Spiked Collar", price:40, rarity:"rare" },
   { id:"antenna", name:"Alien Antenna", price:55, rarity:"epic" }, { id:"cape", name:"Hero Cape", price:90, rarity:"legendary" },
 ];
-export const LILLOK_SKINS = [{ id:"none", name:"Default", price:0 }, { id:"galaxy", name:"Galaxy skin", price:300, rarity:"epic" }, { id:"gold", name:"Gold leaf", price:250, rarity:"epic" },
-  { id:"phantom", name:"Phantom", price:350, rarity:"legendary" }, { id:"prism", name:"Prism Scale", price:400, rarity:"legendary" },
-  { id:"void", name:"Void Skin", price:500, rarity:"legendary" }, { id:"embers", name:"Ember Core", price:450, rarity:"legendary" },
-  { id:"frost", name:"Frost Heart", price:420, rarity:"legendary" }, { id:"storm", name:"Storm Shell", price:480, rarity:"legendary" },
+export const LILLOK_SKINS = [{ id:"none", name:"Default", price:0, giftReward: "heart" }, { id:"galaxy", name:"Galaxy skin", price:300, rarity:"epic", giftReward: "star" }, { id:"gold", name:"Gold leaf", price:250, rarity:"epic", giftReward: "crown" },
+  { id:"phantom", name:"Phantom", price:350, rarity:"legendary", giftReward: "treasure" }, { id:"prism", name:"Prism Scale", price:400, rarity:"legendary", giftReward: "rainbow" },
+  { id:"void", name:"Void Skin", price:500, rarity:"legendary", giftReward: "meteor" }, { id:"embers", name:"Ember Core", price:450, rarity:"legendary", giftReward: "sparkle" },
+  { id:"frost", name:"Frost Heart", price:420, rarity:"legendary", giftReward: "flower" }, { id:"storm", name:"Storm Shell", price:480, rarity:"legendary", giftReward: "crown" },
 ];
-export const LILLOK_AURAS = [{ id:"none", name:"No aura", price:0 }, { id:"glow", name:"Aura glow", price:200, rarity:"epic" },
-  { id:"embers", name:"Ember Aura", price:280, rarity:"legendary" }, { id:"frost", name:"Frost Aura", price:280, rarity:"legendary" },
-  { id:"storm", name:"Storm Aura", price:320, rarity:"legendary" }, { id:"cosmic", name:"Cosmic Aura", price:400, rarity:"legendary" },
-  { id:"rainbow", name:"Rainbow Aura", price:350, rarity:"legendary" }, { id:"void", name:"Void Aura", price:450, rarity:"legendary" },
+export const LILLOK_AURAS = [{ id:"none", name:"No aura", price:0, giftReward: "heart" }, { id:"glow", name:"Aura glow", price:200, rarity:"epic", giftReward: "sparkle" },
+  { id:"embers", name:"Ember Aura", price:280, rarity:"legendary", giftReward: "sparkle" }, { id:"frost", name:"Frost Aura", price:280, rarity:"legendary", giftReward: "flower" },
+  { id:"storm", name:"Storm Aura", price:320, rarity:"legendary", giftReward: "crown" }, { id:"cosmic", name:"Cosmic Aura", price:400, rarity:"legendary", giftReward: "meteor" },
+  { id:"rainbow", name:"Rainbow Aura", price:350, rarity:"legendary", giftReward: "rainbow" }, { id:"void", name:"Void Aura", price:450, rarity:"legendary", giftReward: "treasure" },
 ];
-export const LILLOK_PETS = [{ id:"none", name:"No pet", price:0 }, { id:"mini", name:"Mini LilLok", price:400, rarity:"epic" },
-  { id:"inkling", name:"Inkling", price:350, rarity:"epic" }, { id:"blotlet", name:"Blotlet", price:300, rarity:"rare" },
-  { id:"spark", name:"Spark Blob", price:380, rarity:"epic" }, { id:"wisp", name:"Wisp", price:500, rarity:"legendary" },
-  { id:"gloworm", name:"Gloworm", price:280, rarity:"rare" }, { id:"shadow", name:"Shadow Pup", price:450, rarity:"legendary" },
-  { id:"starling", name:"Starling", price:320, rarity:"epic" }, { id:"moonkit", name:"Moonkit", price:550, rarity:"legendary" },
+export const LILLOK_PETS = [{ id:"none", name:"No pet", price:0, giftReward: "heart" }, { id:"mini", name:"Mini LilLok", price:400, rarity:"epic", giftReward: "star" },
+  { id:"inkling", name:"Inkling", price:350, rarity:"epic", giftReward: "sparkle" }, { id:"blotlet", name:"Blotlet", price:300, rarity:"rare", giftReward: "flower" },
+  { id:"spark", name:"Spark Blob", price:380, rarity:"epic", giftReward: "sparkle" }, { id:"wisp", name:"Wisp", price:500, rarity:"legendary", giftReward: "rainbow" },
+  { id:"gloworm", name:"Gloworm", price:280, rarity:"rare", giftReward: "star" }, { id:"shadow", name:"Shadow Pup", price:450, rarity:"legendary", giftReward: "meteor" },
+  { id:"starling", name:"Starling", price:320, rarity:"epic", giftReward: "star" }, { id:"moonkit", name:"Moonkit", price:550, rarity:"legendary", giftReward: "treasure" },
 ];
-export const VOICE_PACKS = [{ id:"default", name:"Default voice", price:0 }, { id:"whisper", name:"Whisper pack", price:150 }, { id:"echo", name:"Echo pack", price:200 }, { id:"robot", name:"Robot pack", price:250 }];
-export const AVATAR_ACCENTS = [{ id: "none", name: "Plain", price: 0 }, { id: "ring", name: "Accent ring", price: 20 }, { id: "halo", name: "Sketch halo", price: 35 }, { id: "crown", name: "Ink crown", price: 50 }, { id: "horns", name: "Horns", price: 40 }, { id: "antenna", name: "Antenna", price: 40 }, { id: "drip", name: "Ink drip", price: 45 }];
+export const VOICE_PACKS = [{ id:"default", name:"Default voice", price:0, giftReward: "heart" }, { id:"whisper", name:"Whisper pack", price:150, giftReward: "flower" }, { id:"echo", name:"Echo pack", price:200, giftReward: "sparkle" }, { id:"robot", name:"Robot pack", price:250, giftReward: "treasure" }];
+export const AVATAR_ACCENTS = [{ id: "none", name: "Plain", price: 0, giftReward: "heart" }, { id: "ring", name: "Accent ring", price: 20, giftReward: "star" }, { id: "halo", name: "Sketch halo", price: 35, giftReward: "sparkle" }, { id: "crown", name: "Ink crown", price: 50, giftReward: "crown" }, { id: "horns", name: "Horns", price: 40, giftReward: "flower" }, { id: "antenna", name: "Antenna", price: 40, giftReward: "star" }, { id: "drip", name: "Ink drip", price: 45, giftReward: "treasure" }];
 
 export const ANIMATION_FX = [{ id:"none", name:"No FX", price:0 }, { id:"sparkle_trail", name:"Sparkle Trail", desc:"Lines leave glittering sparkles", price:200 }, { id:"neon_pulse", name:"Neon Pulse", desc:"Every stroke pulses with neon", price:250 }, { id:"ink_splatter", name:"Ink Splatter", desc:"Brush tips splatter occasionally", price:180 }, { id:"smoke_rise", name:"Smoke Rise", desc:"Drawn lines emit rising smoke", price:220 }, { id:"fire_embers", name:"Fire Embers", desc:"Strokes glow with floating embers", price:300 }, { id:"water_ripple", name:"Water Ripple", desc:"Strokes ripple outward", price:280 }, { id:"galaxy_swirl", name:"Galaxy Swirl", desc:"Lines reveal star field", price:400 },
   { id:"fx_pixel", name:"Pixel Storm", desc:"Frame breaks into pixels", price:150, rarity:"rare" },
@@ -533,8 +533,8 @@ export const FONT_PACKS = [{ id:"default", name:"System font", price:0, font:"in
   { id:"amaticsc", name:"Amatic Condensed", desc:"Tall hand-drawn condensed", price:35, font:"'Amatic SC',cursive" },
   { id:"righteous", name:"Righteous", desc:"Bold rounded display face", price:40, font:"'Righteous',cursive" },
 ];
-export const MUSIC_PACKS = [{ id:"none", name:"No music", price:0 }, { id:"lo-fi", name:"Lo-Fi Study", price:100 }, { id:"synth", name:"Synth Wave", price:120 }, { id:"rain", name:"Rain Ambience", price:80 }, { id:"jazz", name:"Coffee Jazz", price:110 }, { id:"nature", name:"Forest Nature", price:90 }, { id:"retro", name:"Retro Arcade", price:130 }, { id:"piano", name:"Piano Moods", price:95 }];
-export const STICKER_PACKS = [{ id:"emoji", name:"Emoji Pack", price:0, stickers:["😎","🔥","🎨","💀","👾","✨","🌈","🍕"] }, { id:"nature", name:"Nature Pack", price:30, stickers:["🌸","🌿","🦋","🍀","🌻","🐚","🍄","🌙"] }, { id:"food", name:"Snack Pack", price:25, stickers:["🍕","🍔","🌮","🍩","🍦","🥨","🧋","🍪"] }, { id:"animals", name:"Animal Pack", price:35, stickers:["🐱","🐶","🦊","🐸","🐼","🐧","🦉","🐝"] }, { id:"space", name:"Space Pack", price:40, stickers:["🚀","🛸","🌍","⭐","🌑","☄️","👽","🪐"] }, { id:"retro", name:"Retro Pack", price:30, stickers:["📟","📼","🕹️","💾","📺","📻","🎮","📸"] }, { id:"magic", name:"Magic Pack", price:45, stickers:["🔮","🪄","🧙","🐉","🦄","🧚","⚡","🌟"] }, { id:"music", name:"Music Pack", price:25, stickers:["🎵","🎸","🥁","🎹","🎤","🎧","🎼","🎷"] }];
+export const MUSIC_PACKS = [{ id:"none", name:"No music", price:0, giftReward: "heart" }, { id:"lo-fi", name:"Lo-Fi Study", price:100, giftReward: "sparkle" }, { id:"synth", name:"Synth Wave", price:120, giftReward: "star" }, { id:"rain", name:"Rain Ambience", price:80, giftReward: "flower" }, { id:"jazz", name:"Coffee Jazz", price:110, giftReward: "treasure" }, { id:"nature", name:"Forest Nature", price:90, giftReward: "flower" }, { id:"retro", name:"Retro Arcade", price:130, giftReward: "star" }, { id:"piano", name:"Piano Moods", price:95, giftReward: "sparkle" }];
+export const STICKER_PACKS = [{ id:"emoji", name:"Emoji Pack", price:0, stickers:["😎","🔥","🎨","💀","👾","✨","🌈","🍕"], giftReward:"star" }, { id:"nature", name:"Nature Pack", price:30, stickers:["🌸","🌿","🦋","🍀","🌻","🐚","🍄","🌙"], giftReward:"flower" }, { id:"food", name:"Snack Pack", price:25, stickers:["🍕","🍔","🌮","🍩","🍦","🥨","🧋","🍪"], giftReward:"heart" }, { id:"animals", name:"Animal Pack", price:35, stickers:["🐱","🐶","🦊","🐸","🐼","🐧","🦉","🐝"], giftReward:"sparkle" }, { id:"space", name:"Space Pack", price:40, stickers:["🚀","🛸","🌍","⭐","🌑","☄️","👽","🪐"], giftReward:"meteor" }, { id:"retro", name:"Retro Pack", price:30, stickers:["📟","📼","🕹️","💾","📺","📻","🎮","📸"], giftReward:"star" }, { id:"magic", name:"Magic Pack", price:45, stickers:["🔮","🪄","🧙","🐉","🦄","🧚","⚡","🌟"], giftReward:"rainbow" }, { id:"music", name:"Music Pack", price:25, stickers:["🎵","🎸","🥁","🎹","🎤","🎧","🎼","🎷"], giftReward:"sparkle" }];
 export const POST_EXPORTS = [{ id:"png", name:"PNG frames", desc:"Export frames as transparent PNGs", price:0 }, { id:"gif", name:"Animated GIF", desc:"Export as looping GIF", price:80 }, { id:"webp", name:"WebP anim", desc:"Export as animated WebP", price:50 }, { id:"spritesheet", name:"Spritesheet", desc:"All frames in one grid", price:60 }, { id:"apng", name:"APNG", desc:"Animated PNG format", price:100 }, { id:"pdf", name:"PDF flip", desc:"Export as PDF flipbook", price:120 }, { id:"mp4", name:"MP4 video", desc:"Export as MP4 (soon)", price:150, soon:true }];
 
 

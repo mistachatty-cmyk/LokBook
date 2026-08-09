@@ -20,7 +20,7 @@ import {
   MODES, FRONT_NAMES, EFFECTS, NAME_COLORS, FRAMES, REACTION_PACKS, AVATAR_ACCENTS, PAPERS, LILLOK_GEAR,
   SKIES, ANIMATION_FX, CURSORS, FONT_PACKS, MUSIC_PACKS, STICKER_PACKS, POST_EXPORTS, LILLOK_SKINS, LILLOK_AURAS, LILLOK_PETS, VOICE_PACKS, STUDIO_MODULES, BLENDS,
   RARITY, MYTHIC_ITEMS, CELEBRATIONS, getDailyRotation, getWeeklyRotation, fromDbPost, hasModule,
-  OFFLINE_BONUS_HOURS, OFFLINE_BONUS_LOKS,
+  OFFLINE_BONUS_HOURS, OFFLINE_BONUS_LOKS, BLOT_GIFTS, BLOT_IDLE_ANIMATIONS, BLOT_EXPRESSIONS, BLOT_BOUNCES,
 } from "./constants.jsx";
 import { paperBase, drawBounce, drawBloom, drawNight, renderSequence, renderDoodle, renderAvatar, traceShape } from "./engine/draw.jsx";
 import { TUTORIAL_PROJECTS, getTutorialGhostFrames } from "./engine/tutorials.js";
@@ -64,7 +64,6 @@ import AdFeedCard from "./ads/AdFeedCard.jsx";
 import RewardedSheet from "./ads/rewarded.jsx";
 import { DOUBLE_LOKS_MS, isActive } from "./engine/rewards.js";
 import { isUnlocked, inkWeatherToday, nightShiftAmount, levelFor } from "./engine/unlocks.js";
-import { BLOT_GIFTS } from "./constants.jsx";
 
 // Font packs were fully inert: the root style read `cosmetics.fontPack`, but
 // buying one writes the top-level `fontPack` state, which nothing ever read.
@@ -1461,7 +1460,19 @@ export default function LokApp(){
   },[say,pushNotif]);
   const showLine=useCallback((ctx="")=>{const s={name:lillok.name,wins,loks,ink:lillok.ink,bond:lillok.bond};setFabBubble(getLilLokLine(lilLokPhase(lillok),ctx,s,fourthWall));setTimeout(()=>setFabBubble(""),3500);},[lillok,wins,loks,fourthWall]);
   const gainXp=useCallback(n=>setXp(x=>{const before=Math.floor(x/100);const nx=x+n;if(Math.floor(nx/100)>before){setTimeout(()=>{say(`Level ${Math.floor(nx/100)+1}! New flair unlocked`);setShowRoadmap(true);setBlotSpeech(getBlotResponse(cosmetics.blotPersonality,"level_up",lillok.name));},300);}return nx;}),[say,cosmetics.blotPersonality,lillok.name]);
-  const tapBlot=useCallback(()=>{const currentLevel=levelFor(xp);const newStreak=blotTapStreak+1;setBlotTapStreak(newStreak);clearTimeout(blotTapTimerRef.current);blotTapTimerRef.current=setTimeout(()=>setBlotTapStreak(0),3000);const rewards=[0.5,1,1.5,2,2.5,3];const rewardIdx=Math.min(newStreak-1,rewards.length-1);const reward=rewards[rewardIdx];const finalReward=Math.floor(reward*10)/10;setLoks(l=>l+finalReward);setTotalEarned(t=>t+finalReward);const tokenId=Date.now()+Math.random();setFloatingTokens(t=>[...t,{id:tokenId,text:`+${finalReward} Loks`,x:0,y:0}]);setTimeout(()=>setFloatingTokens(t=>t.filter(tk=>tk.id!==tokenId)),1000);if(isUnlocked("gift_drops",currentLevel)&&Math.random()<0.15){const gift=BLOT_GIFTS[Math.floor(Math.random()*BLOT_GIFTS.length)];setGiftPop(gift.emoji);setTimeout(()=>setGiftPop(null),1200);}hap([30]);blip("A4");},[blotTapStreak,xp]);
+  const getPackGiftReward=useCallback(()=>{const allPacks=[
+    ...STICKER_PACKS.filter(p=>p.id===stickerPack),
+    ...LILLOK_SKINS.filter(p=>p.id===cosmetics.lillokSkin),
+    ...LILLOK_AURAS.filter(p=>p.id===cosmetics.lillokAura),
+    ...LILLOK_PETS.filter(p=>p.id===cosmetics.lillokPet),
+    ...REACTION_PACKS.filter(p=>p.id===cosmetics.reactionPack),
+    ...VOICE_PACKS.filter(p=>p.id===cosmetics.voicePack),
+    ...MUSIC_PACKS.filter(p=>p.id===musicPack),
+    ...BLOT_IDLE_ANIMATIONS.filter(p=>p.id===cosmetics.blotIdleAnimation),
+    ...BLOT_EXPRESSIONS.filter(p=>p.id===cosmetics.blotExpression),
+    ...BLOT_BOUNCES.filter(p=>p.id===cosmetics.blotBounce),
+  ];return allPacks.length>0?allPacks[Math.floor(Math.random()*allPacks.length)].giftReward:null;},[stickerPack,cosmetics.lillokSkin,cosmetics.lillokAura,cosmetics.lillokPet,cosmetics.reactionPack,cosmetics.voicePack,musicPack,cosmetics.blotIdleAnimation,cosmetics.blotExpression,cosmetics.blotBounce]);
+  const tapBlot=useCallback(()=>{const currentLevel=levelFor(xp);const newStreak=blotTapStreak+1;setBlotTapStreak(newStreak);clearTimeout(blotTapTimerRef.current);blotTapTimerRef.current=setTimeout(()=>setBlotTapStreak(0),3000);const rewards=[0.5,1,1.5,2,2.5,3];const rewardIdx=Math.min(newStreak-1,rewards.length-1);const reward=rewards[rewardIdx];const finalReward=Math.floor(reward*10)/10;setLoks(l=>l+finalReward);setTotalEarned(t=>t+finalReward);const tokenId=Date.now()+Math.random();setFloatingTokens(t=>[...t,{id:tokenId,text:`+${finalReward} Loks`,x:0,y:0}]);setTimeout(()=>setFloatingTokens(t=>t.filter(tk=>tk.id!==tokenId)),1000);if(isUnlocked("gift_drops",currentLevel)){const packGift=getPackGiftReward();const usePackGift=packGift&&Math.random()<0.4;const giftId=usePackGift?packGift:Math.random()<0.15?BLOT_GIFTS[Math.floor(Math.random()*BLOT_GIFTS.length)].id:null;if(giftId){const gift=BLOT_GIFTS.find(g=>g.id===giftId);if(gift)setGiftPop(gift.emoji);setTimeout(()=>setGiftPop(null),1200);}}hap([30]);blip("A4");},[blotTapStreak,xp,getPackGiftReward]);
   const questTick=useCallback((track,amt=1)=>{setQuests(q=>{if(!q)return q;let paid=0,msg=null,doneCount=0;const items=q.items.map(it=>{if(it.track!==track||it.done)return it;const progress=Math.min(it.goal,it.progress+amt);const done=progress>=it.goal;if(done){paid+=it.reward;doneCount++;msg=`Quest done: ${it.label} · +${it.reward}`;}return{...it,progress,done};});if(paid){setLoks(l=>l+paid);setTotalEarned(t=>t+paid);gainXp(paid);setTimeout(()=>say(msg,"success"),250);setQuestsCompleted(c=>{const nc=c+doneCount;const m=[10,25,50,100].find(x=>c<x&&nc>=x);if(m){const bonus=m*2;setLoks(l=>l+bonus);setTotalEarned(t=>t+bonus);setTimeout(()=>{say(`🎖 ${m} quests done · +${bonus} bonus Loks`,"success");hap([200,100,200,100,200]);},700);}return nc;});}return{...q,items};});},[gainXp,say,hap]);
   useEffect(()=>{(async()=>{
     const dayOfYear=d=>Math.floor((d-new Date(d.getFullYear(),0,0))/86400000);const todayPromptIdx=(new Date().getFullYear()*366+dayOfYear(new Date()))%PROMPTS.length;
