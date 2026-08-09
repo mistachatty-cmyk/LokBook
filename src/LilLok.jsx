@@ -61,7 +61,7 @@ export function LilLokSprite({ phase, ink, size = 88, custom, gear, skin, aura, 
   </svg>);
 }
 
-export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onFeed, onFlask, onClose, say, setLillok, onPublish, onSaveCustom, gear, skin="none", aura="none", pet="none", chests=[], owned=[], modules=[], cosmetics={}, goggles={}, setLoks, setModules, setCosmetics, setGoggles, setChests, setTotalEarned }) {
+export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onFeed, onFlask, onClose, say, setLillok, onPublish, onSaveCustom, gear, skin="none", aura="none", pet="none", chests=[], owned=[], modules=[], cosmetics={}, goggles={}, setLoks, setModules, setCosmetics, setGoggles, setChests, setTotalEarned, gyroMotion={gamma:0,beta:0,alpha:0} }) {
   const T = useT();
   const [mode, setMode] = useState("care");
   const [feeding, setFeeding] = useState(false);
@@ -83,7 +83,7 @@ export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onF
   return (<div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,.35)" }} onClick={onClose}>
     <div className="w-full rounded-t-3xl p-5 overflow-y-auto" style={{ maxWidth: 560, maxHeight: "92vh", background: T.card, border: `3px solid ${(phase === "decaying" || phase === "critical") ? "#8E93A8" : T.ink}`, animation: (phase === "decaying" || phase === "critical") && !reduceMotion ? "lokwobble 9s ease-in-out infinite" : "lokrise .25s ease" }} onClick={e => e.stopPropagation()}>
       <div className="flex items-center gap-3">
-        <div className="rounded-2xl p-2 relative" style={{ background: T.paper, border: `3px solid ${T.ink}`, transform: feeding ? "scale(1.08)" : "scale(1)", transition: "transform .15s cubic-bezier(.34,1.56,.64,1)" }}>
+        <div className="rounded-2xl p-2 relative" style={{ background: T.paper, border: `3px solid ${T.ink}`, transform: feeding ? `scale(1.08) translate(${Math.max(-3,Math.min(3,gyroMotion.gamma*0.03))}px, ${Math.max(-3,Math.min(3,gyroMotion.beta*0.03))}px)` : `scale(1) translate(${Math.max(-3,Math.min(3,gyroMotion.gamma*0.03))}px, ${Math.max(-3,Math.min(3,gyroMotion.beta*0.03))}px)`, transition: "transform .15s cubic-bezier(.34,1.56,.64,1)" }}>
           <LilLokSprite phase={phase} ink={lillok.ink} size={64} custom={custom?.art} gear={gear} skin={skin} aura={aura} pet={pet}/>
           {feeding && [0, 1, 2].map(i => (<div key={i} className="absolute pointer-events-none" style={{ left: `${22 + i * 24}%`, bottom: "85%", fontSize: 15, animation: `lokfloat .65s ease-out ${i * 0.1}s forwards` }}>💧</div>))}
         </div>

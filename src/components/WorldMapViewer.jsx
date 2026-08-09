@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { GLOBE_CONFIG, THEME_GLOBE_SETTINGS } from '../constants.jsx';
 
-export default function WorldMapViewer({ posts = [], userLocation, theme = 'default', onPostClick, onClose }) {
+export default function WorldMapViewer({ posts = [], userLocation, theme = 'default', gyroMotion = { gamma: 0, beta: 0, alpha: 0 }, onPostClick, onClose }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
   const [selectedPost, setSelectedPost] = useState(null);
   const [globeReady, setGlobeReady] = useState(false);
+  const cameraRotationRef = useRef({ longitude: 0, latitude: 0 });
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -100,6 +101,23 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'defa
       };
     }).catch(err => console.warn('Failed to load globe.gl', err));
   }, [posts, userLocation, theme, onPostClick]);
+
+  useEffect(() => {
+    if (!globeRef.current || !globeReady) return;
+    const baseLongitude = 0;
+    const baseLatitude = 20;
+    const rotationLongitude = (gyroMotion.gamma || 0) * 0.3;
+    const rotationLatitude = (gyroMotion.beta || 0) * 0.2;
+    cameraRotationRef.current = {
+      longitude: baseLongitude + rotationLongitude,
+      latitude: baseLatitude - rotationLatitude
+    };
+    globeRef.current.pointOfView({
+      lat: cameraRotationRef.current.latitude,
+      lng: cameraRotationRef.current.longitude,
+      altitude: 2.5
+    });
+  }, [gyroMotion, globeReady]);
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50 }}>

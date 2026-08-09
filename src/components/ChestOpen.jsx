@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { CHEST_TYPES, generateChestReward } from "../constants.jsx";
 
-export function ChestOpen({ chestType, reward, onComplete }) {
+export function ChestOpen({ chestType, reward, onComplete, gyroMotion = { gamma: 0, beta: 0, alpha: 0 } }) {
   const containerRef = useRef(null);
   const chest = CHEST_TYPES.find(c => c.id === chestType);
 
@@ -168,6 +168,8 @@ export function ChestOpen({ chestType, reward, onComplete }) {
       <div style={{
         fontSize: 80,
         animation: "blotBounce 0.6s ease-out",
+        transform: `rotateX(${Math.max(-15,Math.min(15,gyroMotion.beta*0.15))}deg) rotateY(${Math.max(-15,Math.min(15,gyroMotion.gamma*0.15))}deg)`,
+        transformStyle: "preserve-3d",
       }}>
         {chest?.emoji}
       </div>
