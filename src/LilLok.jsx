@@ -61,7 +61,7 @@ export function LilLokSprite({ phase, ink, size = 88, custom, gear, skin, aura, 
   </svg>);
 }
 
-export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onFeed, onFlask, onClose, say, setLillok, onPublish, onSaveCustom, gear, skin="none", aura="none", pet="none", chests=[], owned=[], modules=[], setLoks, setModules, setCosmetics, setGoggles, setChests, setTotalEarned }) {
+export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onFeed, onFlask, onClose, say, setLillok, onPublish, onSaveCustom, gear, skin="none", aura="none", pet="none", chests=[], owned=[], modules=[], cosmetics={}, goggles={}, setLoks, setModules, setCosmetics, setGoggles, setChests, setTotalEarned }) {
   const T = useT();
   const [mode, setMode] = useState("care");
   const [feeding, setFeeding] = useState(false);
@@ -139,7 +139,7 @@ export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onF
       </>)}
       {mode === "chests" && (<>
         <div className="mt-3 text-sm font-bold">Your Lok Chests · Tap to open</div>
-        <ChestInventory chests={chests} owned={modules} T={T} onOpen={(idx, reward) => {
+        <ChestInventory chests={chests} owned={modules} cosmetics={cosmetics} goggles={goggles} T={T} onOpen={(idx, reward) => {
           if (reward.type === "loks") {
             setLoks(l => l + reward.amount);
             if (setTotalEarned) setTotalEarned(t => t + reward.amount);

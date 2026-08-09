@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { CHEST_TYPES, generateChestReward } from "../constants.jsx";
 
-export function ChestInventory({ chests = [], onOpen, T, owned = [] }) {
+export function ChestInventory({ chests = [], onOpen, T, owned = [], cosmetics = {}, goggles = {} }) {
   const [openingId, setOpeningId] = useState(null);
   const [reward, setReward] = useState(null);
 
@@ -10,7 +10,7 @@ export function ChestInventory({ chests = [], onOpen, T, owned = [] }) {
 
     setOpeningId(chestId);
     const chest = chests[index];
-    const chestReward = generateChestReward(chest.type, owned);
+    const chestReward = generateChestReward(chest.type, owned, cosmetics, goggles);
 
     // Delay reward reveal for animation
     setTimeout(() => {
