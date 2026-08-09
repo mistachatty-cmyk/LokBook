@@ -463,17 +463,6 @@ export const STICKER_PACKS = [{ id:"emoji", name:"Emoji Pack", price:0, stickers
 export const POST_EXPORTS = [{ id:"png", name:"PNG frames", desc:"Export frames as transparent PNGs", price:0 }, { id:"gif", name:"Animated GIF", desc:"Export as looping GIF", price:80 }, { id:"webp", name:"WebP anim", desc:"Export as animated WebP", price:50 }, { id:"spritesheet", name:"Spritesheet", desc:"All frames in one grid", price:60 }, { id:"apng", name:"APNG", desc:"Animated PNG format", price:100 }, { id:"pdf", name:"PDF flip", desc:"Export as PDF flipbook", price:120 }, { id:"mp4", name:"MP4 video", desc:"Export as MP4 (soon)", price:150, soon:true }];
 
 
-export function blotBorderStyle(id, T) {
-  return ({
-    none: { border: `3px solid ${T.ink}` },
-    gilded: { border: "3px solid #E8B14B", boxShadow: `0 0 0 2px ${T.ink}, 3px 3px 0 ${T.shadow}` },
-    washi: { border: `3px dashed ${T.accent}` },
-    orbit: { border: `3px dotted ${T.alt}`, outline: `2px dashed ${T.ink}`, outlineOffset: 3 },
-    liquid: { border: `3px solid ${T.accent}`, boxShadow: `0 0 0 2px ${T.ink}, 0 0 16px 3px ${T.accent}` },
-    stitch: { border: `3px double ${T.ink}` },
-    marble: { border: `3px solid ${T.alt}`, boxShadow: `inset 0 0 0 2px ${T.paper}, 0 0 0 3px ${T.ink}` },
-  }[id] || { border: `3px solid ${T.ink}` });
-}
 
 export function makeQuests() { return [...QUEST_POOL].sort(() => Math.random() - .5).slice(0, 3).map(q => ({ ...q, progress: 0, done: false })); }
 

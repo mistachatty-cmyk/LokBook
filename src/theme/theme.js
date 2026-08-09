@@ -130,6 +130,8 @@ export const blotBorderStyle = (id, T) => ({
   washi: { border: `3px dashed ${T.accent}` },
   orbit: { border: `3px dotted ${T.alt}`, outline: `2px dashed ${T.ink}`, outlineOffset: 3 },
   liquid:{ border: `3px solid ${T.accent}`, boxShadow: `0 0 0 2px ${T.ink}, 0 0 16px 3px ${T.accent}` },
+  stitch:{ border: `3px double ${T.ink}` },
+  marble:{ border: `3px solid ${T.alt}`, boxShadow: `inset 0 0 0 2px ${T.paper}, 0 0 0 3px ${T.ink}` },
 }[id] || { border: `3px solid ${T.ink}` });
 
 export function themeVars(T) {

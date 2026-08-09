@@ -49,6 +49,7 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
   const pinch = useRef(null);
   const peerLive = useRef(new Map()); // author -> {brush,color,size,points}
   const miniCache = useRef(new Map()); // stampId -> [Image]
+  const stampsPending = useRef(new Set()); // stampIds currently being fetched
   const myStack = useRef([]);
   const progBuf = useRef([]); const progTimer = useRef(0);
   const lastCreatedAt = useRef(null);
@@ -84,11 +85,17 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
     const el = { id: row.id, kind: row.kind, author: row.author, data: row.data, bb: row.kind === "stroke" ? row.data.bb : row.kind === "stamp" ? stampBB(row.data) : [row.data.x - 40, row.data.y - 40, row.data.x + 40, row.data.y + 40] };
     index.current.add(el);
     if (row.kind === "stamp" && row.data.kind === "mini" && row.data.stampId && !miniCache.current.has(row.data.stampId)) {
-      miniCache.current.set(row.data.stampId, []);
-      roomsApi.fetchStamps(200).then(rows => {
-        const st = rows.find(s => s.id === row.data.stampId);
-        if (st?.frames) miniCache.current.set(row.data.stampId, st.frames.map(f => { const im = new Image(); im.src = f; return im; }));
-      }).catch(() => {});
+      const stampId = row.data.stampId;
+      // Deduplicate: only fetch each stampId once
+      if (!stampsPending.current.has(stampId)) {
+        stampsPending.current.add(stampId);
+        miniCache.current.set(stampId, []);
+        roomsApi.fetchStamps(200).then(rows => {
+          const st = rows.find(s => s.id === stampId);
+          if (st?.frames) miniCache.current.set(stampId, st.frames.map(f => { const im = new Image(); im.src = f; return im; }));
+          stampsPending.current.delete(stampId);
+        }).catch(() => { stampsPending.current.delete(stampId); });
+      }
     }
   }, []);
   useEffect(() => {
