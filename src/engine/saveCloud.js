@@ -1,13 +1,18 @@
 // Cross-device save sync.
 //
-// The save blob (getSaveBlob() in App.jsx) has always lived in the local store
-// ladder — Tauri storage, then localStorage, then memory. That means a user's
-// Loks, gallery, cosmetics, and level exist only on the device that earned them:
-// open LokBook on an iPad after playing on a phone and you are a new user.
+// This targets the existing `auth_saves` table (user_id PK -> auth.users,
+// save_blob jsonb, updated_at) — the same table the manual "Back up now" /
+// "Restore" buttons in Profile already use (App.jsx cloudSyncNow/
+// cloudRestoreNow). An earlier version of this file created a second,
+// parallel `lok_saves` table; that was a duplicate of a feature that already
+// existed and has been dropped in favour of reusing this one.
 //
-// This mirrors the blob to a Supabase row keyed by auth user, so signing in on a
-// second device restores progress. It follows the shape of musicCloud.js rather
-// than inventing a second pattern.
+// The manual buttons remain as an explicit, user-triggered action. This module
+// adds an automatic layer on top of the same storage: push on every local save,
+// and check on sign-in whether the remote copy is newer.
+//
+// `save_blob` embeds the gallery under `_gallery`, matching the existing manual
+// shape exactly — so a manual restore and an automatic one read identical data.
 //
 // Conflict handling is deliberately simple and deliberately not silent. Two
 // devices editing the same save is a real possibility, and quietly picking one
@@ -17,29 +22,31 @@
 
 import { supabase } from "../supabaseClient.js";
 
-const TABLE = "lok_saves";
+const TABLE = "auth_saves";
 
-/** Push the local blob up. Returns true on success. */
-export async function pushSave(userId, blob) {
+/** Push the local blob (plus gallery) up. Returns true on success. */
+export async function pushSave(userId, blob, gallery) {
   if (!supabase || !userId || !blob) return false;
   const { error } = await supabase.from(TABLE).upsert({
     user_id: userId,
-    blob,
-    device_saved_at: new Date().toISOString(),
-  }, { onConflict: "user_id" });
+    save_blob: { ...blob, _gallery: gallery },
+    updated_at: new Date().toISOString(),
+  });
   return !error;
 }
 
 /**
- * Fetch the remote save. Returns { blob, savedAt } or null when there is none
- * (a first sign-in on a fresh account is the common case, not an error).
+ * Fetch the remote save. Returns { blob, gallery, savedAt } or null when there
+ * is none (a first sign-in on a fresh account is the common case, not an
+ * error).
  */
 export async function pullSave(userId) {
   if (!supabase || !userId) return null;
   const { data, error } = await supabase
-    .from(TABLE).select("blob,device_saved_at").eq("user_id", userId).maybeSingle();
-  if (error || !data) return null;
-  return { blob: data.blob, savedAt: Date.parse(data.device_saved_at) || 0 };
+    .from(TABLE).select("save_blob,updated_at").eq("user_id", userId).maybeSingle();
+  if (error || !data?.save_blob) return null;
+  const { _gallery, ...blob } = data.save_blob;
+  return { blob, gallery: _gallery, savedAt: Date.parse(data.updated_at) || 0 };
 }
 
 /**

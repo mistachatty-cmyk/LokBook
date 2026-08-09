@@ -1353,16 +1353,17 @@ export default function LokApp(){
   // rather than re-applying field by field — the load path in this file is one
   // large inline block, and duplicating it is exactly how the two copies drift.
   const[syncPrompt,setSyncPrompt]=useState(null);
-  const restoreSave=useCallback(blob=>{store.set(SAVE_KEY,blob);store.set(SAVE_KEY+":at",Date.now());location.reload();},[]);
+  const restoreSave=useCallback((blob,gallery)=>{store.set(SAVE_KEY,blob);store.set(SAVE_KEY+":at",Date.now());if(gallery)store.set(GALLERY_KEY,gallery);location.reload();},[]);
   useEffect(()=>{
     if(!ready)return;const uid=auth.getUserId();if(!uid)return;
     let live=true;
     (async()=>{
       const remote=await pullSave(uid);if(!live)return;
       const local=getSaveBlob();
-      const intent=syncIntent({localSavedAt:Number(store.get(SAVE_KEY+":at"))||0,localProgress:progressOf(local),remote});
-      if(intent==="push")pushSave(uid,local).catch(()=>{});
-      else if(intent==="pull")restoreSave(remote.blob);
+      const localSavedAt=Number(await store.get(SAVE_KEY+":at"))||0;if(!live)return;
+      const intent=syncIntent({localSavedAt,localProgress:progressOf(local),remote});
+      if(intent==="push")pushSave(uid,local,galleryRef.current).catch(()=>{});
+      else if(intent==="pull")restoreSave(remote.blob,remote.gallery);
       else if(intent==="ask")setSyncPrompt(remote);
     })();
     return()=>{live=false;};
@@ -1371,6 +1372,7 @@ export default function LokApp(){
   // routed here — it is opt-in and stays available to LokPass holders.
   const ads=adPlan({tier:vp.tier,orientation:vp.orientation,lokPass,kids});
   const[interstitial,setInterstitial]=useState(null);const lastInterstitialRef=useRef(0);
+  const galleryRef=useRef([]); // kept current by the gallery-persist effect; read by cloud push so pushes need not depend on `posts`
   // Rewarded video is opt-in and survives LokPass, so it is not part of `ads`.
   const[showRewards,setShowRewards]=useState(false);const[rewardClaims,setRewardClaims]=useState({});const[doubleLoksUntil,setDoubleLoksUntil]=useState(0);
   const[moodTags,setMoodTags]=useState({});const[moodFilter,setMoodFilter]=useState("all");const[viewingArtist,setViewingArtist]=useState(null);
@@ -1510,8 +1512,9 @@ export default function LokApp(){
   const doSave=useCallback(()=>{const b=getSaveBlob();store.set(SAVE_KEY,b);store.set(SAVE_KEY+":at",Date.now());
     // Mirror to the cloud so progress follows the user between phone, iPad, and
     // desktop. Fire-and-forget: a failed sync must never block the local save,
-    // which remains the source of truth.
-    const uid=auth.getUserId();if(uid)pushSave(uid,b).catch(()=>{});
+    // which remains the source of truth. Same auth_saves table + shape as the
+    // manual "Back up now" button, so either path reads the other's data.
+    const uid=auth.getUserId();if(uid)pushSave(uid,b,galleryRef.current).catch(()=>{});
   },[getSaveBlob,auth]);
   const mintGuestPassCode=useCallback(async email=>{
     const code=await mintGuestPass(getSaveBlob(),email);
@@ -1556,7 +1559,7 @@ export default function LokApp(){
   useEffect(()=>{if(!activeTutorialId)return;setTutorialProgress(tp=>({...tp,[activeTutorialId]:{frames:studioFrames,frameDurations:studioFrameDurations,title:studioTitle}}));},[activeTutorialId,studioFrames,studioFrameDurations,studioTitle]);
   useEffect(()=>{if(tab!=="studio")setActiveTutorialId(null);},[tab]);
   useEffect(()=>{if(!ready)return;const t=setTimeout(doSave,400);return()=>clearTimeout(t);},[ready,doSave]);
-  useEffect(()=>{if(!ready)return;const userPosts=posts.filter(p=>!p.id?.startsWith("seed"));const t=setTimeout(()=>{store.set(GALLERY_KEY,userPosts).then(ok=>{if(!ok)say("Gallery too big");});},500);return()=>clearTimeout(t);},[ready,posts]);
+  useEffect(()=>{if(!ready)return;const userPosts=posts.filter(p=>!p.id?.startsWith("seed"));galleryRef.current=userPosts;const t=setTimeout(()=>{store.set(GALLERY_KEY,userPosts).then(ok=>{if(!ok)say("Gallery too big");});},500);return()=>clearTimeout(t);},[ready,posts]);
   useEffect(()=>{if(!ready||kids)return;let interval=null;const startDecay=()=>{interval=setInterval(()=>setLillok(s=>{if(s.stasis)return s;if(s.ink===0){if(!s.inkZeroAt)return{...s,inkZeroAt:Date.now()};if(Date.now()-s.inkZeroAt>120000)return{...s,stasis:true,inkZeroAt:null};return s;}const buffer=1-(s.bond/100)*0.5;return{...s,ink:Math.max(0,s.ink-1.4*buffer)};}),12000);};const stopDecay=()=>{clearInterval(interval);interval=null;};const onVisible=()=>{if(document.visibilityState==="hidden")stopDecay();else startDecay();};startDecay();document.addEventListener("visibilitychange",onVisible);return()=>{stopDecay();document.removeEventListener("visibilitychange",onVisible);};},[ready,kids]);
   useEffect(()=>{const h=e=>{e.preventDefault();setInstallEvt(e);};window.addEventListener("beforeinstallprompt",h);return()=>window.removeEventListener("beforeinstallprompt",h);},[]);
   useEffect(()=>{const save=()=>doSave();window.addEventListener("beforeunload",save);return()=>window.removeEventListener("beforeunload",save);},[doSave]);
@@ -1694,8 +1697,8 @@ export default function LokApp(){
             <div><strong>Cloud save</strong> · {new Date(syncPrompt.savedAt).toLocaleString()}</div>
             <div className="mt-1"><strong>This device</strong> · {loks} Loks · level {level}</div>
           </div>
-          <button onClick={()=>restoreSave(syncPrompt.blob)} className="lok-btn w-full py-2.5 rounded-xl text-sm font-extrabold" style={{background:T.accent,color:T.onAccent,border:`2.5px solid ${T.ink}`}}>Use the cloud save</button>
-          <button onClick={()=>{const uid=auth.getUserId();if(uid)pushSave(uid,getSaveBlob()).catch(()=>{});setSyncPrompt(null);say("Keeping this device's save","success");}} className="lok-btn w-full py-2.5 rounded-xl text-sm font-extrabold" style={{background:T.paper,color:T.ink,border:`2.5px solid ${T.ink}`}}>Keep this device</button>
+          <button onClick={()=>restoreSave(syncPrompt.blob,syncPrompt.gallery)} className="lok-btn w-full py-2.5 rounded-xl text-sm font-extrabold" style={{background:T.accent,color:T.onAccent,border:`2.5px solid ${T.ink}`}}>Use the cloud save</button>
+          <button onClick={()=>{const uid=auth.getUserId();if(uid)pushSave(uid,getSaveBlob(),galleryRef.current).catch(()=>{});setSyncPrompt(null);say("Keeping this device's save","success");}} className="lok-btn w-full py-2.5 rounded-xl text-sm font-extrabold" style={{background:T.paper,color:T.ink,border:`2.5px solid ${T.ink}`}}>Keep this device</button>
         </div>
       </div>)}
       {!focusMode && <nav className="fixed bottom-0 inset-x-0 z-40 flex" style={{background:T.paper,borderTop:`3px solid ${T.ink}`,paddingBottom:"env(safe-area-inset-bottom)"}} role="navigation" aria-label="Main navigation">
