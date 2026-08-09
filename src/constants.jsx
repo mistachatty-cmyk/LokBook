@@ -878,3 +878,36 @@ export const lokApi = {
     try { const r = await fetch(`${SUPA_URL}/rest/v1/lok_reactions?post_id=eq.${encodeURIComponent(postId)}&select=handle,type`, { headers: getHeaders() }); if (!r.ok) return []; return r.json(); } catch { return []; }
   },
 };
+
+// Globe.gl configuration for world map visualization
+export const GLOBE_CONFIG = {
+  tileLayer: 'USGS',
+  tileLayerOptions: [
+    { id: 'USGS', name: 'USGS Imagery', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
+    { id: 'OSM', name: 'OpenStreetMap', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+    { id: 'satellite', name: 'Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
+    { id: 'terrain', name: 'Terrain', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}' },
+  ],
+  defaultGlobeRadius: 100,
+  autoRotate: true,
+  autoRotateSpeed: 0.5,
+};
+
+// Theme-specific globe appearance settings
+export const THEME_GLOBE_SETTINGS = {
+  default: {
+    atmosphereColor: '#87CEEB',
+    glowColor: '#4a9eff',
+    backgroundColor: '#000011',
+  },
+  light: {
+    atmosphereColor: '#e0f0ff',
+    glowColor: '#2563eb',
+    backgroundColor: '#f0f5ff',
+  },
+  dark: {
+    atmosphereColor: '#1a1a3e',
+    glowColor: '#60a5fa',
+    backgroundColor: '#0a0a1a',
+  },
+};
