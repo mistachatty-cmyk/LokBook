@@ -102,6 +102,14 @@ export const BLOT_BORDERS = [
   { id: "marble", name: "Marble Inlay", price: 75 },
 ];
 
+export const BLOT_PERSONALITIES = [
+  { id: "vibes", name: "Good Vibes", price: 0, emoji: "✨", desc: "Chill and positive — the default cool friend" },
+  { id: "hype", name: "Hype Master", price: 60, emoji: "🔥", desc: "High-energy, always hyped, celebrates everything" },
+  { id: "wisdom", name: "Wise Ink", price: 45, emoji: "🧠", desc: "Thoughtful and encouraging, gives solid advice" },
+  { id: "goofy", name: "Goofy Blot", price: 35, emoji: "🤪", desc: "Silly and playful, makes jokes and puns" },
+  { id: "chill", name: "Zen Master", price: 50, emoji: "🧘", desc: "Relaxed vibes, encouraging self-care and balance" },
+];
+
 export const FOD_WINDOW_DAYS = 7;
 export const ANIMATED_AVATAR_SPEND = 5000;
 
