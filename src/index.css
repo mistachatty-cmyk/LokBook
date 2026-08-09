@@ -32,6 +32,20 @@
   50% { transform: translateY(-8px); opacity: 0.8; }
   100% { transform: translateY(0px); opacity: 1; }
 }
+@keyframes blotBounce {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+@keyframes blotFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes blotSpeechFade {
+  0% { opacity: 1; transform: translateY(-8px); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-16px); }
+}
 .rarity-common { border-color: #9CA3AF !important; }
 .rarity-uncommon { border-color: #22C55E !important; box-shadow: 0 0 6px rgba(34,197,94,0.3); }
 .rarity-rare { border-color: #3B82F6 !important; box-shadow: 0 0 8px rgba(59,130,246,0.35); }
