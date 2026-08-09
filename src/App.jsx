@@ -13,6 +13,7 @@ import { encodeGIF } from "./engine/gif.js";
 import { AD_PROVIDER } from "./ads.js";
 import { useFeedback } from "./hooks/useFeedback.js";
 import { useBodyScrollLock } from "./hooks/useBodyScrollLock.js";
+import { useGyroscope } from "./hooks/useGyroscope.js";
 import {
   W, H, PROMPTS, PROMPT_META, CATEGORIES, MOTION_TYPES, CATEGORY_ICONS, WEEKLY_PROMPT, SUPA_URL, SUPA_KEY, PACE_PRESETS,
   BLOT_BORDERS, BLOT_PERSONALITIES, FOD_WINDOW_DAYS, ANIMATED_AVATAR_SPEND, ADS, adsFor, QUEST_POOL, REACTION_SETS, LILLOK_SPEECH,
@@ -1230,6 +1231,8 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
           <label className="mt-2 flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={!!featureFlags.invertColors} onChange={e=>onSetFlag&&onSetFlag("invertColors",e.target.checked)} style={{accentColor:T.accent}}/> Invert colors (dark invert of current theme)</label>
           <label className="mt-2 flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={!!featureFlags.highRefresh} onChange={e=>onSetFlag&&onSetFlag("highRefresh",e.target.checked)} style={{accentColor:T.accent}}/> Refresh rate: {featureFlags.highRefresh ? "High (120fps)" : "Standard (60fps)"}</label>
           <div className="text-[10px] opacity-55 leading-snug ml-6">Uncaps animation on 120Hz displays. Costs battery, and Reduce Motion still overrides it.</div>
+          <label className="mt-2 flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={!!featureFlags.enableGyroscope} onChange={e=>onSetFlag&&onSetFlag("enableGyroscope",e.target.checked)} style={{accentColor:T.accent}}/> Gyroscope (tilt interaction)</label>
+          <div className="text-[10px] opacity-55 leading-snug ml-6">Enable device motion detection for interactive tilt effects.</div>
           <div className="mt-3 font-bold text-sm">Default page</div>
           <div className="text-xs opacity-70 mt-0.5 mb-1.5 leading-snug">Which tab Lok opens to.</div>
           <div className="grid grid-cols-3 gap-1.5">{[["feed","Feed"],["gallery","You"],["studio","Studio"],["battle","Battle"],["front","Rush"],["rooms","Rooms"]].map(([id,label])=>(
@@ -1350,7 +1353,7 @@ export default function LokApp(){
   const[questsCompleted,setQuestsCompleted]=useState(0);const[totalEarned,setTotalEarned]=useState(0);const[traceHinted,setTraceHinted]=useState(false);const[fabBubble,setFabBubble]=useState("");const[adIdx,setAdIdx]=useState(0);const[installEvt,setInstallEvt]=useState(null);const[showSettings,setShowSettings]=useState(false);const auth=useAuth();const music=useMusic({userId:auth.getUserId()});const[showMusic,setShowMusic]=useState(false);const[showRoadmap,setShowRoadmap]=useState(false);const[showChestViewer,setShowChestViewer]=useState(false);
   const[loks,setLoks]=useState(260);const[myRooms,setMyRooms]=useState([]);const[pendingRoomCode,setPendingRoomCode]=useState(()=>{try{return new URLSearchParams(location.search).get("room")||null;}catch{return null;}});const[pace,setPace]=useState("sweep");const[speed,setSpeed]=useState(1);const[soundLab,setSoundLab]=useState(false);const[soundQueue,setSoundQueue]=useState([]);const[founder,setFounder]=useState(false);const[totalSpent,setTotalSpent]=useState(0);const[fodHistory,setFodHistory]=useState([]);const[lokPass,setLokPass]=useState(false);const[uiTheme,setUiTheme]=useState("riso");const[ownedThemes,setOwnedThemes]=useState(["riso"]);const[effect,setEffect]=useState("none");const[ownedEffects,setOwnedEffects]=useState(["none"]);const[ownedTiers,setOwnedTiers]=useState([10]);const[ccTier,setCcTier]=useState(false);const[bigBattleOwned,setBigBattleOwned]=useState(false);const[wins,setWins]=useState(0);
   const[profile,setProfile]=useState(()=>{const seed=Math.floor(Math.random()*9999);return{name:starterHandle(seed),bio:"",avatarSeed:seed,links:[{label:"Lok page",url:"coming soon"}]};});
-  const[focusMode,setFocusMode]=useState(false);  const[featureFlags,setFeatureFlags]=useState({compactUi:false,vibe:"default",uiScale:"normal",lokMotion:"subtle",combatUIMode:"unified"});const[weatherOverride,setWeatherOverrideLocal]=useState(getWeatherOverride());
+  const[focusMode,setFocusMode]=useState(false);  const[featureFlags,setFeatureFlags]=useState({compactUi:false,vibe:"default",uiScale:"normal",lokMotion:"subtle",combatUIMode:"unified",enableGyroscope:true});const[gyroMotion,setGyroMotion]=useState({gamma:0,beta:0,alpha:0});const[weatherOverride,setWeatherOverrideLocal]=useState(getWeatherOverride());
   const[comebackActive,setComebackActive]=useState(false);const[legacyStudio,setLegacyStudio]=useState(false);const[legacyBrushes,setLegacyBrushes]=useState(false);
   const[studioFrames,setStudioFrames]=useState([]);const[studioFrameDurations,setStudioFrameDurations]=useState([]);const[studioTitle,setStudioTitle]=useState("");const[studioDraftImg,setStudioDraftImg]=useState(null);
   const[lastComebackAward,setLastComebackAward]=useState(0);
@@ -1362,6 +1365,8 @@ export default function LokApp(){
   const[mail,setMail]=useState([]);const[lastMailCheck,setLastMailCheck]=useState(Date.now());const[lokpalIrritation,setLokpalIrritation]=useState({});const[kids,setKids]=useState(false);const[showLilLok,setShowLilLok]=useState(false);const fabBounceRef=useRef(null);const[blotSpeech,setBlotSpeech]=useState("");const[blotTapStreak,setBlotTapStreak]=useState(0);const blotTapTimerRef=useRef(null);const[floatingTokens,setFloatingTokens]=useState([]);const[giftPop,setGiftPop]=useState(null);const[onboarded,setOnboarded]=useState(false);const[showOnboard,setShowOnboard]=useState(false);const[showHint,setShowHint]=useState(false);const[sound,setSound]=useState(false);const[feedMode,setFeedMode]=useState("discover");const[daily,setDaily]=useState({day:null,streak:0,claimed:false,prompt:""});const[xp,setXp]=useState(0);const[quests,setQuests]=useState(null);const[flair,setFlair]=useState("");const[adVisible,setAdVisible]=useState(true);const[notifications,setNotifications]=useState([]);const[notifUnread,setNotifUnread]=useState(0);
   const[sessionPin,setSessionPin]=useState(null);const[pinInput,setPinInput]=useState("");const[pinError,setPinError]=useState("");const[pinUnlocked,setPinUnlocked]=useState(true);
   const vp=useViewport();
+  const gyro=useGyroscope(featureFlags.enableGyroscope);
+  useEffect(()=>{setGyroMotion(gyro.motion);},[gyro.motion]);
   // The frame-pacing module is plain state, not React state, because the rAF
   // loops that read it live outside the component tree. Push the flag to it
   // whenever the setting changes.
@@ -1496,7 +1501,7 @@ export default function LokApp(){
     const dayOfYear=d=>Math.floor((d-new Date(d.getFullYear(),0,0))/86400000);const todayPromptIdx=(new Date().getFullYear()*366+dayOfYear(new Date()))%PROMPTS.length;
     const makeSeedLazy=(drawFn,n,id,meta)=>({...meta,id,frames:[],_pendingDraw:drawFn,_pendingN:n,paceMs:meta.paceMs});
     const seed=[makeSeedLazy(drawBounce,14,"seed1",{title:"Bounce study",votes:41,voted:false,viewed:false,reactions:{splat:12,heart:30,drip:5},from:"studio",mode:"A",style:"bold",views:312}),makeSeedLazy(drawBloom,12,"seed2",{title:"Bloom",votes:67,voted:false,viewed:false,reactions:{splat:8,heart:52,drip:9},from:"studio",mode:"B",style:"series",views:540}),makeSeedLazy(drawNight,13,"seed3",{title:"Night flight",votes:29,voted:false,viewed:false,reactions:{splat:21,heart:14,drip:11},from:"studio",mode:"A",style:"bold",views:188})];
-    const save=await store.get(SAVE_KEY);const savedGallery=await store.get(GALLERY_KEY);const flags=await store.get("lok:flags");if(flags){setFeatureFlags(f=>({...f,...flags}));if(flags.defaultTab)setTab(flags.defaultTab);}const todayKey=new Date().toDateString();
+    const save=await store.get(SAVE_KEY);const savedGallery=await store.get(GALLERY_KEY);const flags=await store.get("lok:flags");if(flags){setFeatureFlags(f=>({...f,...flags}));if(flags.defaultTab)setTab(flags.defaultTab);}if(save?.featureFlags){setFeatureFlags(f=>({...f,...save.featureFlags}));}const todayKey=new Date().toDateString();
     let loadedDaily={day:todayKey,streak:1,claimed:false,prompt:PROMPTS[todayPromptIdx]};
     let gap=0;
     if(save){setLoks(save.loks??60);setLokPass(!!save.lokPass);setUiTheme(save.uiTheme||"riso");setOwnedThemes(save.ownedThemes||["riso"]);setEffect(save.effect||"none");setOwnedEffects(save.ownedEffects||["none"]);setOwnedTiers(save.ownedTiers||[10]);setCcTier(!!save.ccTier);setBigBattleOwned(!!save.bigBattleOwned);setWins(save.wins??0);if(save.profile)setProfile(pr=>({...save.profile,name:save.profile.name||starterHandle(save.profile.avatarSeed??pr.avatarSeed)}));setBookmarks(save.bookmarks||[]);setFollowing(save.following||[]);setKids(!!save.kids);if(save.customLilLok)setCustomLilLok(save.customLilLok);if(save.cosmetics)setCosmetics({nameColor:"default",frame:"none",reactionPack:"base",avatarAccent:"none",blotBorder:"none",paper:"plain",gear:"none",...save.cosmetics});if(save.owned){const migrated=Object.fromEntries(Object.entries(save.owned).map(([k,v])=>[k,v.map(i=>typeof i==="string"?{id:i,ts:0}:i)]));setOwned({nameColor:[{id:"default",ts:0}],frame:[{id:"none",ts:0}],reactionPack:[{id:"base",ts:0}],avatarAccent:[{id:"none",ts:0}],blotBorder:[{id:"none",ts:0}],paper:[{id:"plain",ts:0}],gear:[{id:"none",ts:0}],...migrated});}setOnboarded(!!save.onboarded);setSound(!!save.sound);setXp(save.xp??0);setFlair(save.flair||"");setQuestsCompleted(save.questsCompleted??0);setTotalEarned(save.totalEarned??0);setTraceHinted(!!save.traceHinted);setRewardClaims(save.rewardClaims||{});setDoubleLoksUntil(save.doubleLoksUntil||0);setPace(save.pace||"sweep");setSpeed(save.speed??1);setSoundLab(!!save.soundLab);setSoundQueue(save.soundQueue||[]);setFounder(!!save.founder);setTotalSpent(save.totalSpent??0);setFodHistory(save.fodHistory||[]);setHapticGrammar(save.hapticGrammar||"default");setFourthWall(save.fourthWall??100);setBotPosted(save.botPosted||[]);if(!save.onboarded)setShowHint(false);else setShowHint(true);
@@ -1598,7 +1603,7 @@ export default function LokApp(){
     const ownList={effect:setOwnedEffects,sky:setOwnedSkies}[t.key];
     if(ownList)ownList(o=>[...new Set([...o,item.id])]);else setOwned(o=>add(o,t.key));
     equip?.(item.id);return true;},[]);
-  const getSaveBlob=useCallback(()=>({botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok:{...lillok,lastSeen:Date.now()},modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,comebackStyle:celebrationStyle,lastComebackAward,lastOfflineBonus,legacyStudio,legacyBrushes,tutorialProgress,rewardClaims,doubleLoksUntil,chests,goggles,mail,lastMailCheck,lokpalIrritation}),[botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok,modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,celebrationStyle,lastComebackAward,lastOfflineBonus,tutorialProgress,rewardClaims,doubleLoksUntil,chests,goggles,mail,lastMailCheck,lokpalIrritation]);
+  const getSaveBlob=useCallback(()=>({botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok:{...lillok,lastSeen:Date.now()},modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,comebackStyle:celebrationStyle,lastComebackAward,lastOfflineBonus,legacyStudio,legacyBrushes,tutorialProgress,rewardClaims,doubleLoksUntil,chests,goggles,mail,lastMailCheck,lokpalIrritation,featureFlags}),[botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok,modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,celebrationStyle,lastComebackAward,lastOfflineBonus,tutorialProgress,rewardClaims,doubleLoksUntil,chests,goggles,mail,lastMailCheck,lokpalIrritation,featureFlags]);
   const doSave=useCallback(()=>{const b=getSaveBlob();store.set(SAVE_KEY,b);store.set(SAVE_KEY+":at",Date.now());
     // Mirror to the cloud so progress follows the user between phone, iPad, and
     // desktop. Fire-and-forget: a failed sync must never block the local save,
@@ -1751,7 +1756,7 @@ export default function LokApp(){
     <input type="password" maxLength={6} inputMode="numeric" autoFocus value={pinInput} onChange={e=>{setPinInput(e.target.value);setPinError("");}} onKeyDown={e=>{if(e.key==="Enter"){if(pinInput===sessionPin){setPinUnlocked(true);setPinInput("");setPinError("");}else{setPinError("Wrong PIN");setPinInput("");}}}} className="w-full rounded-xl px-4 py-3 text-center text-2xl font-extrabold tracking-widest" style={{maxWidth:220,border:`3px solid ${pinError?"#C23B22":ART.ink}`,background:"#fff",color:ART.ink,outline:"none",animation:"inkfade .5s .5s ease both"}} aria-label="Enter PIN"/>
     {pinError&&<div style={{color:"#C23B22",fontSize:13,fontWeight:700}}>{pinError}</div>}
   </div>);
-  if(!ready)return(<Loader/>);
+  if(!ready)return(<Loader gyroMotion={gyroMotion} enableGyroscope={featureFlags.enableGyroscope}/>);
   return(<ThemeCtx.Provider value={T}>
     <div className={`min-h-screen w-full lok-motion-${featureFlags.lokMotion||"subtle"} ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:resolveFont(fontPack),...(isUnlocked("night_shift",level)&&nightShiftAmount()>0.02?{filter:`brightness(${1-nightShiftAmount()*0.16}) saturate(${1-nightShiftAmount()*0.22}) hue-rotate(${-nightShiftAmount()*8}deg)`,transition:"filter 4s linear"}:{}),animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none"}}>
       <GlobalStyle T={T} pace={pace} speed={speed}/><ThemeBackdrop themeId={uiTheme} pace={pace}/><SkyEffect sky={sky} paper={T.paper}/><PageEffect effect={effect}/>{/* Ink Weather (roadmap, LV2): a second, unbought effect layer the day picks for you */}
@@ -1880,24 +1885,25 @@ export default function LokApp(){
   </ThemeCtx.Provider>);
 }
 
-function Loader(){
-  const logoRef=useRef(null);const pos=useRef({x:0,y:0,px:0,py:0,vx:0,vy:0,down:false});const gyroRequested=useRef(false);
+function Loader({gyroMotion={gamma:0,beta:0,alpha:0},enableGyroscope=true}){
+  const logoRef=useRef(null);const pos=useRef({x:0,y:0,px:0,py:0,vx:0,vy:0,down:false});
   useEffect(()=>{const el=logoRef.current;if(!el)return;
     const onMove=e=>{pos.current.x=e.clientX;pos.current.y=e.clientY;};
     const onDown=()=>{pos.current.down=true;};const onUp=()=>{pos.current.down=false;};
-    const onMotion=e=>{if(!e.gamma||!e.beta)return;const gx=Math.max(-90,Math.min(90,e.gamma))*2;const gy=Math.max(-45,Math.min(45,e.beta))*4;pos.current.x=window.innerWidth/2+gx;pos.current.y=window.innerHeight/2+gy;};
-    const requestGyroPermission=async()=>{if(!gyroRequested.current){gyroRequested.current=true;if(typeof DeviceMotionEvent!=="undefined"&&DeviceMotionEvent.requestPermission){try{const p=await DeviceMotionEvent.requestPermission();if(p==="granted")window.addEventListener("devicemotion",onMotion);}catch{}}else{window.addEventListener("devicemotion",onMotion);}}};
-    window.addEventListener("pointermove",onMove);window.addEventListener("pointerdown",onDown);window.addEventListener("pointerup",onUp);window.addEventListener("touchstart",requestGyroPermission,{once:true});window.addEventListener("click",requestGyroPermission,{once:true});requestGyroPermission();
+    window.addEventListener("pointermove",onMove);window.addEventListener("pointerdown",onDown);window.addEventListener("pointerup",onUp);
     const stop=pacedLoop(()=>{
-      const {x,y,px,py,vx,vy,down}=pos.current;const rect=el.getBoundingClientRect();
+      let x=pos.current.x,y=pos.current.y;
+      // Apply gyroscope motion if enabled
+      if(enableGyroscope&&(gyroMotion.gamma||gyroMotion.beta)){const gx=Math.max(-90,Math.min(90,gyroMotion.gamma))*2;const gy=Math.max(-45,Math.min(45,gyroMotion.beta))*4;x=window.innerWidth/2+gx;y=window.innerHeight/2+gy;}
+      const {px,py,vx,vy,down}=pos.current;const rect=el.getBoundingClientRect();
       const targetX=x-rect.left-rect.width/2;const targetY=y-rect.top-rect.height/2;
       const ax=(targetX-px)*0.15;const ay=(targetY-py)*0.15;
       pos.current.vx=(vx+ax)*0.86;pos.current.vy=(vy+ay)*0.86;
       pos.current.px+=pos.current.vx;pos.current.py+=pos.current.vy;
       el.style.transform=`perspective(500px) rotateY(${pos.current.px/24}deg) rotateX(${-pos.current.py/24}deg) scale(${down?0.9:1})`;
     });
-    return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerdown",onDown);window.removeEventListener("pointerup",onUp);window.removeEventListener("devicemotion",onMotion);window.removeEventListener("touchstart",requestGyroPermission);window.removeEventListener("click",requestGyroPermission);stop();};
-  },[]);
+    return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerdown",onDown);window.removeEventListener("pointerup",onUp);stop();};
+  },[enableGyroscope,gyroMotion]);
 
   return(<div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:ART.paper,color:ART.ink,fontFamily:"'Bricolage Grotesque',system-ui,sans-serif"}}>
     <style>{`@keyframes inkdrop{0%{transform:scaleY(0.2) scaleX(0.8);opacity:0}40%{transform:scaleY(1.1) scaleX(0.95);opacity:1}60%{transform:scaleY(0.9) scaleX(1.05)}100%{transform:scale(1);opacity:1}} @keyframes inkfade{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}} @keyframes inkpulse{0%,100%{opacity:.4}50%{opacity:1}}`}</style>
