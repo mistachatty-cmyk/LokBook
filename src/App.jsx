@@ -68,7 +68,7 @@ import { ChestInventory } from "./components/ChestInventory.jsx";
 import { ChestOpen } from "./components/ChestOpen.jsx";
 import { XrayPreview } from "./components/XrayPreview.jsx";
 import { Mail } from "./pages/Mail.jsx";
-import { CHEST_TYPES, generateChestReward, getRandomChestType, LOKPAL_NAMES, LOKPAL_GREETINGS } from "./constants.jsx";
+import { CHEST_TYPES, generateChestReward, getRandomChestType, LOKPAL_NAMES, LOKPAL_GREETINGS, LOKPAL_IRRITATION_MESSAGES } from "./constants.jsx";
 
 // Font packs were fully inert: the root style read `cosmetics.fontPack`, but
 // buying one writes the top-level `fontPack` state, which nothing ever read.
@@ -1350,7 +1350,7 @@ export default function LokApp(){
   const[comebackCelebration,setComebackCelebration]=useState(null);
   const[bookmarks,setBookmarks]=useState([]);const[following,setFollowing]=useState([]);const[lillok,setLillok]=useState({ink:80,bond:30,stasis:false,name:"Blot",lastSeen:Date.now()});const[customLilLok,setCustomLilLok]=useState(null);const[cosmetics,setCosmetics]=useState({nameColor:"default",frame:"none",reactionPack:"base",avatarAccent:"none",blotBorder:"none",blotPersonality:"vibes",blotIdleAnimation:"float",blotExpression:"neutral",blotBounce:"gentle",xrayVisionCommon:false,xrayVisionUncommon:false,xrayVisionRare:false,xrayVisionEpic:false,xrayVisionLegendary:false,xrayVisionMythic:false});const[owned,setOwned]=useState({nameColor:["default"],frame:["none"],reactionPack:["base"],avatarAccent:["none"],blotBorder:["none"],blotPersonality:["vibes"],blotIdleAnimation:["float"],blotExpression:["neutral"],blotBounce:["gentle"]});
   const[goggles,setGoggles]=useState({uncommon:0,rare:0,epic:0,legendary:0,mythic:0});
-  const[mail,setMail]=useState([]);const[lastMailCheck,setLastMailCheck]=useState(Date.now());const[kids,setKids]=useState(false);const[showLilLok,setShowLilLok]=useState(false);const fabBounceRef=useRef(null);const[blotSpeech,setBlotSpeech]=useState("");const[blotTapStreak,setBlotTapStreak]=useState(0);const blotTapTimerRef=useRef(null);const[floatingTokens,setFloatingTokens]=useState([]);const[giftPop,setGiftPop]=useState(null);const[onboarded,setOnboarded]=useState(false);const[showOnboard,setShowOnboard]=useState(false);const[showHint,setShowHint]=useState(false);const[sound,setSound]=useState(false);const[feedMode,setFeedMode]=useState("discover");const[daily,setDaily]=useState({day:null,streak:0,claimed:false,prompt:""});const[xp,setXp]=useState(0);const[quests,setQuests]=useState(null);const[flair,setFlair]=useState("");const[adVisible,setAdVisible]=useState(true);const[notifications,setNotifications]=useState([]);const[notifUnread,setNotifUnread]=useState(0);
+  const[mail,setMail]=useState([]);const[lastMailCheck,setLastMailCheck]=useState(Date.now());const[lokpalIrritation,setLokpalIrritation]=useState({});const[kids,setKids]=useState(false);const[showLilLok,setShowLilLok]=useState(false);const fabBounceRef=useRef(null);const[blotSpeech,setBlotSpeech]=useState("");const[blotTapStreak,setBlotTapStreak]=useState(0);const blotTapTimerRef=useRef(null);const[floatingTokens,setFloatingTokens]=useState([]);const[giftPop,setGiftPop]=useState(null);const[onboarded,setOnboarded]=useState(false);const[showOnboard,setShowOnboard]=useState(false);const[showHint,setShowHint]=useState(false);const[sound,setSound]=useState(false);const[feedMode,setFeedMode]=useState("discover");const[daily,setDaily]=useState({day:null,streak:0,claimed:false,prompt:""});const[xp,setXp]=useState(0);const[quests,setQuests]=useState(null);const[flair,setFlair]=useState("");const[adVisible,setAdVisible]=useState(true);const[notifications,setNotifications]=useState([]);const[notifUnread,setNotifUnread]=useState(0);
   const[sessionPin,setSessionPin]=useState(null);const[pinInput,setPinInput]=useState("");const[pinError,setPinError]=useState("");const[pinUnlocked,setPinUnlocked]=useState(true);
   const vp=useViewport();
   // The frame-pacing module is plain state, not React state, because the rAF
@@ -1505,6 +1505,7 @@ export default function LokApp(){
     if(save.goggles)setGoggles(save.goggles);
     if(save.mail)setMail(save.mail);
     if(save.lastMailCheck)setLastMailCheck(save.lastMailCheck);
+    if(save.lokpalIrritation)setLokpalIrritation(save.lokpalIrritation);
     if(save.daily?.day){if(save.daily.day===todayKey)loadedDaily=save.daily;else{const diff=Math.round((new Date(todayKey)-new Date(new Date(save.daily.day).toDateString()))/86400000);loadedDaily={day:todayKey,streak:diff===1?(save.daily.streak||0)+1:1,claimed:false,prompt:PROMPTS[todayPromptIdx]};}}
     gap=Date.now()-(save.lillok?.lastSeen||Date.now());const ll=save.lillok||lillok;const buffer=1-((ll.bond||0)/100)*0.5;const inkDrain=Math.min(ll.ink,Math.floor(gap/60000)*1.2*buffer);const newInk=Math.max(0,ll.ink-inkDrain);setLillok({...ll,stasis:ll.stasis||(newInk===0&&gap>600000),ink:newInk,inkZeroAt:null,lastSeen:Date.now()});}
     if(gap>=OFFLINE_BONUS_HOURS*60*60*1000&&(Date.now()-(save.lastOfflineBonus||0))>OFFLINE_BONUS_HOURS*60*60*1000){setLoks(l=>l+OFFLINE_BONUS_LOKS);setTotalEarned(t=>t+OFFLINE_BONUS_LOKS);setLastOfflineBonus(Date.now());setTimeout(()=>say(`Welcome back! +${OFFLINE_BONUS_LOKS} Loks for taking a break`,"success"),500);}
@@ -1517,7 +1518,7 @@ export default function LokApp(){
     applyLogo(appLogo);
   })().finally(()=>{const elapsed=Date.now()-loadStart.current;setTimeout(()=>setReady(true),Math.max(0,3500-elapsed));});const fb=setTimeout(()=>setReady(true),10000);return()=>clearTimeout(fb);},[]);
   useEffect(()=>{applyLogo(appLogo);},[appLogo]);
-  // LokPals mail generation: generate random mail every 12-24 hours (client-side check)
+  // LokPals mail generation with irritation system: generate random mail every 12-24 hours
   useEffect(()=>{
     if(!ready)return;
     const now=Date.now();
@@ -1525,15 +1526,32 @@ export default function LokApp(){
     if(now-lastMailCheck<interval)return;
     const unreadCount=mail.filter(m=>!m.opened).length;
     if(unreadCount>=5)return; // Max 5 unread at a time
+
     const sender=LOKPAL_NAMES[Math.floor(Math.random()*LOKPAL_NAMES.length)];
-    const greeting=LOKPAL_GREETINGS[Math.floor(Math.random()*LOKPAL_GREETINGS.length)];
-    const message=greeting.replace("[name]",lillok.name);
-    // Generate a random reward
+    const currentIrritation=lokpalIrritation[sender]||{level:0,mails:0};
+
+    // Stop sending if max irritation and unread mail exists
+    if(currentIrritation.level>=14&&unreadCount>0)return;
+
+    // Increment irritation if there's unread mail
+    if(unreadCount>0){
+      currentIrritation.level++;
+      currentIrritation.mails++;
+    }
+
+    // Select message based on irritation level
+    const messages=LOKPAL_IRRITATION_MESSAGES[currentIrritation.level]||LOKPAL_IRRITATION_MESSAGES[14];
+    const message=messages[Math.floor(Math.random()*messages.length)];
+
+    // Generate reward with degradation based on irritation
     const rewardTypes=["loks","cosmetic","xrayVision","goggles"];
     const rewardType=rewardTypes[Math.floor(Math.random()*rewardTypes.length)];
     let reward=null;
     if(rewardType==="loks"){
-      reward={type:"loks",amount:Math.floor(Math.random()*400)+100};
+      const baseLoks=Math.floor(Math.random()*400)+100; // 100-500
+      const degradationMultiplier=1-(currentIrritation.level*0.07); // Each level reduces by ~7%
+      const finalLoks=Math.floor(baseLoks*degradationMultiplier);
+      reward={type:"loks",amount:Math.max(10,finalLoks),baseAmount:baseLoks,irritationLevel:currentIrritation.level};
     }else if(rewardType==="cosmetic"){
       const cosmetics=["lillokSkin","lillokAura","lillokPet","reactionPack","voicePack"];
       const cat=cosmetics[Math.floor(Math.random()*cosmetics.length)];
@@ -1545,10 +1563,12 @@ export default function LokApp(){
       const rarities=["uncommon","rare","epic","legendary","mythic"];
       reward={type:"goggles",rarity:rarities[Math.floor(Math.random()*rarities.length)]};
     }
+
     const newMail={id:`mail-${Date.now()}`,sender,message,reward,timestamp:Date.now(),opened:false};
     setMail(m=>[...m,newMail]);
+    setLokpalIrritation(prev=>({...prev,[sender]:currentIrritation}));
     setLastMailCheck(Date.now());
-  },[ready,mail,lastMailCheck,lillok.name]);
+  },[ready,mail,lastMailCheck,lillok.name,lokpalIrritation]);
   // Scale via the root font-size, not CSS zoom: Tailwind's spacing/type scale is
   // rem-based, so this scales the whole UI uniformly, and unlike zoom it doesn't
   // desync position:fixed overlays (Settings, modals, previews) from the real
@@ -1567,7 +1587,7 @@ export default function LokApp(){
     const ownList={effect:setOwnedEffects,sky:setOwnedSkies}[t.key];
     if(ownList)ownList(o=>[...new Set([...o,item.id])]);else setOwned(o=>add(o,t.key));
     equip?.(item.id);return true;},[]);
-  const getSaveBlob=useCallback(()=>({botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok:{...lillok,lastSeen:Date.now()},modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,comebackStyle:celebrationStyle,lastComebackAward,lastOfflineBonus,legacyStudio,legacyBrushes,tutorialProgress,rewardClaims,doubleLoksUntil,chests,goggles,mail,lastMailCheck}),[botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok,modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,celebrationStyle,lastComebackAward,lastOfflineBonus,tutorialProgress,rewardClaims,doubleLoksUntil,chests,goggles,mail,lastMailCheck]);
+  const getSaveBlob=useCallback(()=>({botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok:{...lillok,lastSeen:Date.now()},modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,comebackStyle:celebrationStyle,lastComebackAward,lastOfflineBonus,legacyStudio,legacyBrushes,tutorialProgress,rewardClaims,doubleLoksUntil,chests,goggles,mail,lastMailCheck,lokpalIrritation}),[botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok,modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,celebrationStyle,lastComebackAward,lastOfflineBonus,tutorialProgress,rewardClaims,doubleLoksUntil,chests,goggles,mail,lastMailCheck,lokpalIrritation]);
   const doSave=useCallback(()=>{const b=getSaveBlob();store.set(SAVE_KEY,b);store.set(SAVE_KEY+":at",Date.now());
     // Mirror to the cloud so progress follows the user between phone, iPad, and
     // desktop. Fire-and-forget: a failed sync must never block the local save,
@@ -1575,6 +1595,48 @@ export default function LokApp(){
     // manual "Back up now" button, so either path reads the other's data.
     const uid=auth.getUserId();if(uid)pushSave(uid,b,galleryRef.current).catch(()=>{});
   },[getSaveBlob,auth]);
+
+  // Handle mail mark as read with happy mail generation on all clear
+  const handleMailMarkRead=useCallback(id=>{
+    setMail(m=>{const updated=m.map(x=>x.id===id?{...x,opened:true}:x);
+      // Check if ALL mail is now read
+      if(updated.every(x=>x.opened)){
+        // Find all senders from previously unread mail (before this mark)
+        const senders=new Set(m.filter(x=>!x.opened).map(x=>x.sender));
+        senders.forEach(sender=>{
+          const baseLoks=Math.floor(Math.random()*500)+250; // 250-750
+          const bonus=Math.floor(baseLoks*0.375); // 25-50% bonus
+          const finalLoks=baseLoks+bonus;
+
+          const happyMessages=[
+            `I missed you! Here's something special to make up for my mood 💝`,
+            `Wow, you actually opened them! Here's a bonus for making me happy ✨`,
+            `Welcome back! Let me make it up to you with this 🎉`,
+            `Thanks for checking in! You deserve this extra little something 💕`,
+            `You came back! I'm so happy right now 🌟`
+          ];
+
+          const happyMessage=happyMessages[Math.floor(Math.random()*happyMessages.length)];
+
+          const happyMail={
+            id:`happy-${Date.now()}-${Math.random()}`,
+            sender,
+            message:happyMessage,
+            reward:{type:"loks",amount:finalLoks,bonus:true},
+            timestamp:Date.now(),
+            opened:false
+          };
+
+          updated.push(happyMail);
+
+          // Reset irritation for this sender
+          setLokpalIrritation(prev=>({...prev,[sender]:{level:0,mails:0}}));
+        });
+      }
+      return updated;
+    });
+  },[]);
+
   const mintGuestPassCode=useCallback(async email=>{
     const code=await mintGuestPass(getSaveBlob(),email);
     if(code)store.set("lok:guestPassMinted",true);
@@ -1730,7 +1792,7 @@ export default function LokApp(){
           {tab==="front"&&<OpenFront kids={kids} loks={loks} dailyPrompt={daily.prompt} hinted={traceHinted} onHinted={()=>setTraceHinted(true)} onWager={amt=>{if(loks<amt)return false;setLoks(l=>l-amt);setTotalSpent(t=>t+amt);return true;}} onEarn={n=>{addLoks(n);questTick("front",Math.max(1,Math.round(n/5)));gainXp(n);setLillok(s=>s.stasis?s:({...s,ink:Math.max(0,s.ink-3)}));}} blip={blip} say={say}/>}
           {tab==="rooms"&&<Rooms profile={profile} userId={profile.name} myRooms={myRooms} setMyRooms={setMyRooms} pendingCode={pendingRoomCode} onPendingCodeUsed={()=>setPendingRoomCode(null)} onArtist={name=>setArtistView&&setArtistView(name)} say={say} blip={blip} hap={hap}/>}
           {tab==="roadmap"&&<Roadmap level={level} xp={xp} onClose={()=>setTab("feed")}/>}
-          {tab==="mail"&&<Mail mail={mail} T={T} onMarkRead={id=>setMail(m=>m.map(x=>x.id===id?{...x,opened:true}:x))} onDelete={id=>setMail(m=>m.filter(x=>x.id!==id))}/>}
+          {tab==="mail"&&<Mail mail={mail} T={T} onMarkRead={handleMailMarkRead} onDelete={id=>setMail(m=>m.filter(x=>x.id!==id))}/>}
           {tab==="shop"&&<Shop ccTier={ccTier} say={say} modules={modules} onBuyModule={m=>{if(modules.includes(m.id)){say("Already owned");return;}spend(m.price,()=>{setModules(o=>[...o,m.id]);blip("C6");},`${m.name} unlocked`);}} loks={loks} lokPass={lokPass} kids={kids} uiTheme={uiTheme} ownedThemes={ownedThemes} effect={effect} ownedEffects={ownedEffects} sky={sky} ownedSkies={ownedSkies} onSky={(id,s)=>{if(ownedSkies.includes(id)){setSky(id);say(`Equipped ${s.name}`);}else spend(s.price,()=>{setOwnedSkies(o=>[...o,id]);setSky(id);},`${s.name} unlocked`);}} animFx={animFx} ownedAnimFx={ownedAnimFx} onAnimFx={(id,f)=>{if(ownedAnimFx.includes(id)){setAnimFx(id);say(id==="none"?"FX off":`${f.name} equipped`);}else spend(f.price,()=>{setOwnedAnimFx(o=>[...o,id]);setAnimFx(id);},`${f.name} unlocked`);}} fontPack={fontPack} onFontPack={(id,f)=>spend(f.price,()=>{setOwned(o=>({...o,fontPack:[...(o.fontPack||[]),id]}));setFontPack(id);},`${f.name} set`)} cursorPack={cursorPack} onCursorPack={(id,c)=>spend(c.price,()=>{setOwned(o=>({...o,cursorPack:[...(o.cursorPack||[]),id]}));setCursorPack(id);},`${c.name} set`)} musicPack={musicPack} onMusicPack={(id,m)=>spend(m.price,()=>{setOwned(o=>({...o,musicPack:[...(o.musicPack||[]),id]}));setMusicPack(id);},`${m.name} set`)} stickerPack={stickerPack} onStickerPack={(id,s)=>spend(s.price,()=>{setOwned(o=>({...o,stickerPack:[...(o.stickerPack||[]),id]}));setStickerPack(id);},`${s.name} set`)} postExport={postExport} onPostExport={(id,e)=>spend(e.price,()=>{setOwned(o=>({...o,postExport:[...(o.postExport||[]),id]}));setPostExport(id);},`${e.name} set`)} mythicOwned={mythicOwned} mythicEquipped={mythicEquipped} dailyOwned={dailyOwned} weeklyOwned={weeklyOwned} onBuyMythic={(item,rotation)=>{if(rotation==="daily"||rotation==="weekly"){if(isArchivedRotation(item)){say(`${item.name} isn't active yet — it needs a real encoder, not just wiring`);return;}const ownedIds=rotation==="daily"?dailyOwned:weeklyOwned;if(ownedIds.includes(item.id)){applyRotation(item);say(`Equipped ${item.name}`);return;}spend(item.price,()=>{rotation==="daily"?setDailyOwned(o=>[...o,item.id]):setWeeklyOwned(o=>[...o,item.id]);applyRotation(item);blip("C6");},`${item.name} unlocked`);}else{if(mythicOwned.includes(item.id)){setMythicEquipped(item.id);say(`Equipped ${item.name}`);}else spend(item.price,()=>{setMythicOwned(o=>[...o,item.id]);setMythicEquipped(item.id);setTimeout(()=>setCelebration(item.name),100);setTimeout(()=>setCelebration(null),3000);},`${item.name} unlocked`);}}} cosmetics={cosmetics} owned={owned} setKids={setKids} onBuyCosmetic={(cat,item)=>{if((owned[cat]||[]).includes(item.id)){setCosmetics(c=>({...c,[cat]:item.id}));blip("D5");say(`Equipped ${item.name}`);if(cat==="blotPersonality")setBlotSpeech(getBlotResponse(item.id,"greet",lillok.name));}else spend(item.price,()=>{setOwned(o=>({...o,[cat]:[...(o[cat]||[]),item.id]}));setCosmetics(c=>({...c,[cat]:item.id}));blip("C6");setBlotSpeech(getBlotResponse(cat==="blotPersonality"?item.id:cosmetics.blotPersonality,"purchase",lillok.name));},`${item.name} unlocked`);}} onBuyPass={()=>{setLokPass(true);setOwnedThemes(Object.keys(THEMES));blip("C6");say("LokPass active!");}} onTheme={id=>{if(ownedThemes.includes(id)){setUiTheme(id);say(`Equipped ${THEMES[id].name}`);}else spend(THEMES[id].price,()=>{setOwnedThemes(o=>[...o,id]);setUiTheme(id);},`${THEMES[id].name} unlocked`);}} onEffect={(id,e)=>{if(ownedEffects.includes(id)){setEffect(id);say(id==="none"?"Effects off":`${e.name} equipped`);}else spend(e.price,()=>{setOwnedEffects(o=>[...o,id]);setEffect(id);},`${e.name} unlocked`);}} onCc={()=>spend(120,()=>setCcTier(true),"Studio Pro unlocked")} celebrationStyle={celebrationStyle} onCelebrationStyle={id=>setCelebrationStyle(id)}/>}
         </Suspense>
         </div>

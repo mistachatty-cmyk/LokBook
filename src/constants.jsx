@@ -252,6 +252,40 @@ export const LOKPAL_GREETINGS = [
   "Sending good vibes your way!"
 ];
 
+// LokPal irritation message tiers (escalating tone)
+export const LOKPAL_IRRITATION_MESSAGES = [
+  // Level 0: Normal (same as greetings)
+  ["Hi there! I found something for you!", "Hey! Got a surprise in store.", "Thought of you today — here's a gift!", "A little something came your way.", "Found this and thought you'd like it!", "Sending good vibes your way!"],
+  // Level 1: Slightly sad
+  ["Hey... got something if you want it", "Just... leaving this here", "Found something for you", "Thought of you, even though..."],
+  // Level 2: Hint of frustration
+  ["Look, I grabbed this for you", "Not trying to beg but... here", "Got a thing. You interested?", "I mean, if you care..."],
+  // Level 3: Noticeably bothered
+  ["Seriously though, where've you been", "I mean, I got you something, but...", "It's fine if you don't want this", "Another gift for your collection, apparently"],
+  // Level 4: Sarcastic
+  ["You know what, fine. More stuff for you", "Cool cool, just me over here finding things", "Whatever, here's another gift", "Because I love doing this 😒"],
+  // Level 5: Fed up
+  ["Is this some kind of game? Leaving you stuff", "Do you even open your mail?", "Starting to feel ignored honestly", "Can't believe I'm still doing this"],
+  // Level 6: Irritated
+  ["Oh great, another gift nobody wants", "I'm getting real tired of this", "Cool cool cool cool fine"],
+  // Level 7: Angry
+  ["You know what... I'm done being nice", "Stop ignoring me", "This is ridiculous", "Seriously?? SERIOUSLY???"],
+  // Level 8: Very angry
+  ["FINE. HERE'S YOUR STUFF. UNGRATEFUL", "Wow. Okay. Message received", "I see how it is now", "Thanks for NOTHING"],
+  // Level 9: Furious
+  ["I'm literally putting gifts on your doorstep and you're IGNORING ME", "This is insulting", "One more unread and I'm OUT", "DO YOU EVEN CARE???"],
+  // Level 10: Stopped trying
+  ["Not sending ANOTHER thing until you open your mail", "I'm DONE", "See you when you decide to show up", "I give up."],
+  // Level 11: Resigned sadness
+  ["...", "Still here. Waiting.", "(sighs)", "Is this even worth it anymore?"],
+  // Level 12: Begging
+  ["You're killing me here", "Please just open ONE email", "I'm begging you", "Come back... please?"],
+  // Level 13: Completely broken
+  ["I GIVE UP", "Consider my feelings hurt", "Not sending ANYTHING until you read", "You've broken me, truly"],
+  // Level 14: Done forever
+  ["............", "I'm too hurt to even send gifts anymore", "We're done until you show respect", "Goodbye."]
+];
+
 export const COMMENT_REWARD_TRIGGERS = [
   { phrase: "beautiful", regex: /beautiful/i, reward: 15 },
   { phrase: "amazing", regex: /amazing/i, reward: 15 },

@@ -3,9 +3,22 @@ import { LOKPAL_NAMES, LOKPAL_GREETINGS } from "../constants.jsx";
 export function Mail({ mail = [], T, onMarkRead, onDelete }) {
   const formatReward = (reward) => {
     if (!reward) return "???";
-    if (reward.type === "loks") return `+${reward.amount} Loks`;
+    if (reward.type === "loks") {
+      if (reward.bonus) {
+        return `+${reward.amount} Loks (sorry bonus! 💝)`;
+      } else if (reward.irritationLevel !== undefined) {
+        const degraded = reward.irritationLevel > 0;
+        if (degraded) {
+          const irr = reward.irritationLevel;
+          const irritText = irr <= 3 ? "slightly tired 😑" : irr <= 6 ? "annoyed 😠" : irr <= 9 ? "very frustrated 😤" : "extremely fed up 💔";
+          return `+${reward.amount} Loks (was ${reward.baseAmount}, LokPal ${irritText})`;
+        }
+      }
+      return `+${reward.amount} Loks`;
+    }
     if (reward.type === "xrayVision") return `✨ X-ray Vision: ${reward.rarity}`;
     if (reward.type === "goggles") return `🔍 ${reward.rarity.charAt(0).toUpperCase()}${reward.rarity.slice(1)} Goggles`;
+    if (reward.type === "cosmetic") return `🎨 ${reward.itemName}`;
     if (reward.type === "item") return `📦 ${reward.itemName}`;
     return "Surprise gift";
   };
