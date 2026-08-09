@@ -136,6 +136,15 @@ export const BLOT_BOUNCES = [
   { id: "wobbly", name: "Wobbly Bounce", price: 25, desc: "Unbalanced and jiggly", giftReward: "flower" },
 ];
 
+export const CHEST_TYPES = [
+  { id: "common", name: "Common Chest", rarity: "common", emoji: "📦", color: "#9CA3AF", animIntensity: 0.5, baseLoktokens: [50, 150] },
+  { id: "uncommon", name: "Uncommon Chest", rarity: "uncommon", emoji: "🎁", color: "#22C55E", animIntensity: 1.0, baseLoktokens: [150, 350] },
+  { id: "rare", name: "Rare Chest", rarity: "rare", emoji: "📫", color: "#3B82F6", animIntensity: 1.5, baseLoktokens: [350, 750] },
+  { id: "epic", name: "Epic Chest", rarity: "epic", emoji: "🏆", color: "#A855F7", animIntensity: 2.0, baseLoktokens: [750, 1500] },
+  { id: "legendary", name: "Legendary Chest", rarity: "legendary", emoji: "👑", color: "#F59E0B", animIntensity: 2.5, baseLoktokens: [1500, 3000] },
+  { id: "mythic", name: "Mythic Chest", rarity: "mythic", emoji: "✨", color: "rainbow", animIntensity: 3.0, baseLoktokens: [3000, 6000] },
+];
+
 export const BLOT_GIFTS = [
   { id: "heart", name: "Heart", emoji: "❤️", rarity: "common" },
   { id: "star", name: "Star", emoji: "⭐", rarity: "common" },
@@ -146,6 +155,48 @@ export const BLOT_GIFTS = [
   { id: "rainbow", name: "Rainbow", emoji: "🌈", rarity: "epic" },
   { id: "meteor", name: "Meteor", emoji: "☄️", rarity: "epic" },
 ];
+
+// Lok Chest reward system — 20% chance for any store item, 80% for tokens
+export function generateChestReward(chestType, ownedModules = []) {
+  const chest = CHEST_TYPES.find(c => c.id === chestType);
+  if (!chest) return { type: "loks", amount: 100 };
+
+  const [min, max] = chest.baseLoktokens;
+  const isFreeItem = Math.random() < 0.2; // 20% chance for store item
+
+  if (isFreeItem) {
+    // Get items with no requirement and not already owned
+    const itemPool = [
+      ...LILLOK_GEAR.filter(g => g.price <= 150 && !g.rarity),
+      ...PAPERS.filter(p => p.price <= 60),
+      ...EFFECTS.filter(e => e.price <= 60),
+      ...FRAMES.filter(f => f.price <= 60),
+      ...SKIES.filter(s => s.price <= 60),
+      ...BLOT_PERSONALITIES.slice(0, 2), // just vibes and goofy
+    ].filter(item => !ownedModules.includes(item.id));
+
+    if (itemPool.length > 0) {
+      const item = itemPool[Math.floor(Math.random() * itemPool.length)];
+      return { type: "item", itemId: item.id, itemName: item.name };
+    }
+  }
+
+  // 80% or fallback: Lok tokens
+  const amount = Math.floor(min + Math.random() * (max - min));
+  return { type: "loks", amount };
+}
+
+export function getRandomChestType() {
+  // Weighted distribution: common > uncommon > rare > epic > legendary > mythic
+  const weights = [40, 30, 15, 10, 4, 1];
+  const rand = Math.random() * 100;
+  let sum = 0;
+  for (let i = 0; i < weights.length; i++) {
+    sum += weights[i];
+    if (rand < sum) return CHEST_TYPES[i].id;
+  }
+  return "common";
+}
 
 export const COMMENT_REWARD_TRIGGERS = [
   { phrase: "beautiful", regex: /beautiful/i, reward: 15 },

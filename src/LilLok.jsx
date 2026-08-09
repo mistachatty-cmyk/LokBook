@@ -3,6 +3,7 @@ import { REVIVAL_MAX, LILLOK_SPEECH } from "./constants.jsx";
 import { useT, ART } from "./theme/theme.js";
 import { MiniDraw } from "./engine/draw.jsx";
 import { getLilLokLine, lilLokPhase } from "./engine/lillok.js";
+import { ChestInventory } from "./components/ChestInventory.jsx";
 
 export function LilLokBubble({ text, ink = ART.ink, paper = ART.paper, voicePack = "default" }) {
   if (!text) return null;
@@ -60,7 +61,7 @@ export function LilLokSprite({ phase, ink, size = 88, custom, gear, skin, aura, 
   </svg>);
 }
 
-export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onFeed, onFlask, onClose, say, setLillok, onPublish, onSaveCustom, gear, skin="none", aura="none", pet="none" }) {
+export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onFeed, onFlask, onClose, say, setLillok, onPublish, onSaveCustom, gear, skin="none", aura="none", pet="none", chests=[], owned=[], modules=[] }) {
   const T = useT();
   const [mode, setMode] = useState("care");
   const [feeding, setFeeding] = useState(false);
@@ -89,8 +90,8 @@ export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onF
         <div className="flex-1"><div className="lok-display text-xl font-extrabold">{lillok.name} <span className="text-sm font-bold opacity-60">· {phase}</span></div><div className="text-xs opacity-70">Living Ink companion</div></div>
         <button onClick={onClose} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{ border: `2.5px solid ${T.ink}` }} aria-label="Close LilLok panel">✕</button>
       </div>
-      <div className="mt-3 flex gap-1.5">{[["care", "Care"], ["revive", "Revival animator"], ["build", "Make your own"]].map(([id, l]) => (
-        <button key={id} onClick={() => setMode(id)} className="lok-btn flex-1 py-1.5 rounded-full text-xs font-bold" style={{ border: `2.5px solid ${T.ink}`, background: mode === id ? T.ink : T.card, color: mode === id ? T.paper : T.ink }}>{l}</button>))}</div>
+      <div className="mt-3 flex gap-1.5 flex-wrap">{[["care", "Care"], ["revive", "Revival animator"], ["build", "Make your own"], ["chests", "🎁 Chests"]].map(([id, l]) => (
+        <button key={id} onClick={() => setMode(id)} className="lok-btn flex-1 py-1.5 rounded-full text-xs font-bold" style={{ border: `2.5px solid ${T.ink}`, background: mode === id ? T.ink : T.card, color: mode === id ? T.paper : T.ink, minWidth: "80px" }}>{l}</button>))}</div>
       {mode === "care" && (<>
         <div className="mt-3 rounded-xl p-3" style={{ background: phase === "critical" ? "rgba(200,50,50,.08)" : phase === "decaying" ? "rgba(142,147,168,.1)" : phase === "stasis" ? "rgba(154,146,134,.12)" : "rgba(47,169,160,.09)", border: `1.5px solid ${phase === "thriving" ? T.alt : "#8E93A8"}` }}>
           <div className="font-bold text-sm">{phase === "thriving" ? `${lillok.name} is thriving` : phase === "critical" ? `${lillok.name} is about to go quiet` : phase === "decaying" ? `${lillok.name} is drying out` : `${lillok.name} is in stasis`}</div>
@@ -135,6 +136,16 @@ export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onF
         <button onClick={() => { setBArt(a => ({ ...a, [emotion]: draw.current.snapshot() })); draw.current.clear(); say(`${emotion} face saved`); }} className="lok-btn lok-display mt-2 w-full py-2 rounded-xl font-bold text-sm" style={{ background: T.ink, color: T.paper }}>Save {emotion} face</button>
         <input value={bName} onChange={e => setBName(e.target.value)} placeholder="Name your LilLok" className="mt-2 w-full px-3 py-2.5 rounded-xl font-bold" style={{ border: `3px solid ${T.ink}`, background: T.paper, color: T.ink }} aria-label="LilLok name" />
         <button onClick={() => { if (!bName.trim()) { say("Give it a name"); return; } if (!bArt.thriving || !bArt.decaying || !bArt.stasis) { say("Draw all 3 emotions first"); return; } onSaveCustom({ name: bName.trim(), art: bArt }); onClose(); }} className="lok-btn lok-display mt-2 w-full py-3 rounded-xl font-extrabold" style={{ background: T.accent, color: T.onAccent, border: `3px solid ${T.ink}` }}>Submit my LilLok</button>
+      </>)}
+      {mode === "chests" && (<>
+        <div className="mt-3 text-sm font-bold">Your Lok Chests · Tap to open</div>
+        <ChestInventory chests={chests} owned={modules} T={T} onOpen={(idx, reward) => {
+          if (reward.type === "loks") {
+            say(`+${reward.amount} Loks from chest!`, "success");
+          } else if (reward.type === "item") {
+            say(`Unlocked: ${reward.itemName}!`, "success");
+          }
+        }} />
       </>)}
     </div>
   </div>);
