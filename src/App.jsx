@@ -1711,6 +1711,8 @@ export default function LokApp(){
     if(c.fx==="chestrain"){const newChests=Array.from({length:10},()=>({id:`c${Date.now()}-${Math.random()}`,type:["common","uncommon","rare","epic","legendary","mythic"][Math.floor(Math.random()*6)]}));setChests(prev=>[...prev,...newChests]);hap([50,30,50]);say("🎁 Rain of 10 chests — for testing","success");}
     if(c.fx==="chestspree"){const rarities=["common","uncommon","rare","epic","legendary","mythic"];const newChests=rarities.flatMap(r=>Array.from({length:3},()=>({id:`c${Date.now()}-${Math.random()}`,type:r})));setChests(prev=>[...prev,...newChests]);hap([100,50,100,50,150]);say("🎁 Chest Spree! 18 chests unlocked — for testing","success");}
     if(c.fx==="chestview"){setShowChestViewer(prev=>!prev);}
+    if(c.fx==="chest1"){const newChests=[{id:`c${Date.now()}-${Math.random()}`,type:["common","uncommon","rare","epic","legendary","mythic"][Math.floor(Math.random()*6)]}];setChests(prev=>[...prev,...newChests]);hap([30,20,30]);say("🎁 +1 chest","success");}
+    if(c.fx==="chest5"){const newChests=Array.from({length:5},()=>({id:`c${Date.now()}-${Math.random()}`,type:["common","uncommon","rare","epic","legendary","mythic"][Math.floor(Math.random()*6)]}));setChests(prev=>[...prev,...newChests]);hap([50,30,50,30,50]);say("🎁 +5 chests","success");}
   },[say,hap,blip,pushNotif,ownedThemes,VOICE_PACKS,CELEBRATIONS,celebrationStyle]);
   const patchPost=(id,patch)=>setPosts(ps=>ps.map(p=>(p.id===id?{...p,...patch}:p)));
   // Pull an existing post back into Studio for real edits. Publishing while

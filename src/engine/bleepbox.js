@@ -25,6 +25,8 @@ const CODES = {
   "10vspvk": { fx: "chestrain" },  // add 10 random chests for testing
   "p3wyw4": { fx: "chestspree" },  // add 18 chests (3 per rarity) for testing
   "r6q49f": { fx: "chestview" },   // toggle chest viewer
+  "1cii4i8": { fx: "chest1" },     // add 1 chest
+  "1cii4ic": { fx: "chest5" },     // add 5 chests
 };
 
 export function resolveCheat(input) {
