@@ -6,6 +6,7 @@ import { CHUNK, ChunkIndex, makeCamera, screenToWorld, encodePoints, decodePoint
 import { useRoomChannel } from "../rooms/useRoomChannel.js";
 import { PROC_STAMPS, drawStampCard, stampBB, STAMP_W, STAMP_H } from "../rooms/stamps.js";
 import { MiniDraw, compressFrame, renderAvatar } from "../engine/draw.jsx";
+import { getDeviceId } from "../identity.js";
 import EmptyState from "../EmptyState.jsx";
 
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
@@ -234,7 +235,7 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
     const [sx, sy] = pos(e);
     const [wx, wy] = screenToWorld(cam.current, sx, sy);
     if (tool === "stamp" && pendingStamp && canDraw) { placeStamp(wx, wy); return; }
-    if (tool === "bleep" && isGallery) { setBleepDraft({ x: wx, y: wy }); return; }
+    if (tool === "bleep") { setBleepDraft({ x: wx, y: wy }); return; }
     if (tool === "pen" && canDraw) {
       drawing.current = { points: [[wx, wy]], sid: newStrokeId(userId) };
       progBuf.current = [wx, wy];
@@ -314,14 +315,18 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
   };
 
   // ----- bleeps -----
-  const bleepKey = `lok:bleep:${room.id}:${new Date().toDateString()}`;
   const sendBleep = (icon, note) => {
-    if (localStorage.getItem(bleepKey)) { say("One bleep per gallery per day — come back tomorrow 🌙", "error"); setBleepDraft(null); return; }
-    const d = { t: "bleep", x: bleepDraft.x, y: bleepDraft.y, icon, note: (note || "").slice(0, 40), color: color };
+    const deviceId = getDeviceId();
+    const d = { t: "bleep", x: bleepDraft.x, y: bleepDraft.y, icon, note: (note || "").slice(0, 40), device_id: deviceId };
     const row = { id: newStrokeId(userId), room_id: room.id, chunk: chunkKey(d.x, d.y), author_id: userId, author: userName, kind: "bleep", data: d };
     addRow(row); channel.send("s.commit", row);
-    sendMark(row).then(sent => { if (!sent) say("Offline — that bleep will land when you reconnect", "default"); });
-    localStorage.setItem(bleepKey, "1");
+    sendMark(row).then(sent => {
+      if (!sent) say("Offline — that bleep will land when you reconnect", "default");
+    }).catch(e => {
+      if (e.message?.includes("Rate limited")) say("One bleep per room per day — come back tomorrow 🌙", "error");
+      else say("Couldn't leave that bleep — try again", "error");
+      index.current.remove(row.id); // roll back optimistic add
+    });
     setBleepDraft(null); say("Bleep left ✦ your mark lives here now", "success"); hap && hap([30, 20, 30]);
   };
 
@@ -381,7 +386,7 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onWheel={wheel} role="img" aria-label="Shared infinite canvas" />
       {!loaded && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="lok-display font-extrabold px-4 py-2 rounded-xl" style={{ background: T.card, border: `3px solid ${T.ink}` }}>unrolling the canvas…</div></div>}
       {!canDraw && !isGallery && <button onClick={askToDraw} className="lok-btn absolute left-1/2 px-4 py-2.5 rounded-2xl lok-display font-extrabold" style={{ bottom: 86, transform: "translateX(-50%)", background: T.ink, color: T.paper, border: `3px solid ${T.accent}`, boxShadow: `4px 4px 0 ${T.accent}` }}>✋ Ask to draw</button>}
-      {isGallery && !canDraw && <div className="absolute left-1/2 px-3 py-1.5 rounded-full text-xs font-bold pointer-events-none" style={{ bottom: 90, transform: "translateX(-50%)", background: T.card, border: `2px solid ${T.ink}`, opacity: 0.85 }}>drifting… tap 💧 to leave one bleep</div>}
+      {!canDraw && <div className="absolute left-1/2 px-3 py-1.5 rounded-full text-xs font-bold pointer-events-none" style={{ bottom: 90, transform: "translateX(-50%)", background: T.card, border: `2px solid ${T.ink}`, opacity: 0.85 }}>tap 💧 to leave a bleep</div>}
       {pendingStamp && <div className="absolute left-1/2 top-3 px-3 py-1.5 rounded-full text-xs font-bold pointer-events-none" style={{ transform: "translateX(-50%)", background: T.ink, color: T.paper }}>tap the canvas to place your animation ✦</div>}
       {permReqs.map(r => (<div key={r.userId} className="absolute left-1/2 top-3 flex items-center gap-2 px-3 py-2 rounded-2xl" style={{ transform: "translateX(-50%)", background: T.card, border: `3px solid ${T.accent}`, boxShadow: `4px 4px 0 ${T.shadow}`, animation: "lokrise .25s ease" }}>
         <span className="text-sm font-bold">{r.name} wants to draw</span>
@@ -395,7 +400,7 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
         <button onClick={() => setTool("pan")} aria-pressed={tool === "pan"} className="lok-btn shrink-0 px-2.5 py-1.5 rounded-full text-xs font-bold" style={btn(tool === "pan")}>🖐 Pan</button>
         {canDraw && <button onClick={() => setTool("pen")} aria-pressed={tool === "pen"} className="lok-btn shrink-0 px-2.5 py-1.5 rounded-full text-xs font-bold" style={btn(tool === "pen")}>✏️ Draw</button>}
         {canDraw && <button onClick={() => setShowStamps(true)} className="lok-btn shrink-0 px-2.5 py-1.5 rounded-full text-xs font-bold" style={btn(tool === "stamp")}>✦ Stamps</button>}
-        {isGallery && <button onClick={() => setTool("bleep")} aria-pressed={tool === "bleep"} className="lok-btn shrink-0 px-2.5 py-1.5 rounded-full text-xs font-bold" style={btn(tool === "bleep")}>💧 Bleep</button>}
+        <button onClick={() => setTool("bleep")} aria-pressed={tool === "bleep"} className="lok-btn shrink-0 px-2.5 py-1.5 rounded-full text-xs font-bold" style={btn(tool === "bleep")}>💧 Bleep</button>
         {canDraw && <button onClick={undo} className="lok-btn shrink-0 px-2.5 py-1.5 rounded-full text-xs font-bold" style={btn(false)}>↩ Undo</button>}
         <button onClick={capturePage} className="lok-btn shrink-0 px-2.5 py-1.5 rounded-full text-xs font-bold" style={btn(false)}>📔 Save page</button>
         <div className="ml-auto shrink-0 flex items-center gap-1 text-[10px] font-bold opacity-60"><button onClick={() => { cam.current.z = Math.min(6, cam.current.z * 1.25); }} className="lok-btn w-6 h-6 rounded-full" style={{ border: `2px solid ${T.ink}` }}>+</button><button onClick={() => { cam.current.z = Math.max(0.1, cam.current.z * 0.8); }} className="lok-btn w-6 h-6 rounded-full" style={{ border: `2px solid ${T.ink}` }}>−</button></div>
@@ -459,7 +464,7 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
     {bleepDraft && (<div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,.4)" }} onClick={() => setBleepDraft(null)}>
       <div className="w-full rounded-t-3xl p-5" style={{ maxWidth: 480, background: T.card, border: `3px solid ${T.ink}`, animation: "lokrise .25s ease" }} onClick={e => e.stopPropagation()}>
         <div className="lok-display text-lg font-extrabold">Leave a bleep</div>
-        <p className="text-xs opacity-70 mt-0.5">A tiny mark that says "I passed through here". One per gallery per day.</p>
+        <p className="text-xs opacity-70 mt-0.5">A tiny mark that says "I passed through here". One per room per day.</p>
         <BleepComposer onSend={sendBleep} T={T} />
       </div>
     </div>)}

@@ -22,3 +22,16 @@ export function suggestHandle(wanted, seed = 0) {
   const base = (wanted || "").trim().replace(/\s+/g, ".").slice(0, 18) || starterHandle(seed);
   return isReservedName(base) ? `${base}.${(seed % 89) + 10}` : base;
 }
+
+// Stable device ID for anonymous guests in Rooms. Persists across browser sessions
+// so rate limiting and attribution work consistently. Differs from userId which
+// can be re-randomized, and from actual auth which many guests lack.
+export function getDeviceId() {
+  const key = "lok:device-id";
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(key, id);
+  }
+  return id;
+}

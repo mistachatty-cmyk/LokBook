@@ -68,12 +68,15 @@ export async function flush() {
 /**
  * Send a mark, queueing it for retry if the write fails.
  * Resolves true when it landed immediately, false when it was queued.
+ * Rejects on rate limit (don't retry) or other permanent errors.
  */
 export async function sendMark(row) {
   try {
     await roomsApi.insertStroke(row);
     return true;
-  } catch {
+  } catch (e) {
+    // Rate limit errors should reject, not retry
+    if (e.message?.includes("Rate limited")) throw e;
     enqueue(row);
     return false;
   }
