@@ -42,7 +42,7 @@ BEGIN
     ELSE 0                    -- unknown/client-side reward: not grantable here
   END;
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql IMMUTABLE SET search_path = public;
 
 -- RPC: claim_reward — records a grant if the cooldown has elapsed.
 -- Returns {success, message, expires_at, loks_granted}.
@@ -104,4 +104,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+-- Postgres grants EXECUTE on a new function to PUBLIC by default, so a bare
+-- GRANT ... TO authenticated here does not actually stop `anon` from calling
+-- it — the security advisor caught this on the first deploy. The function
+-- itself refuses an anonymous caller (auth.uid() IS NULL), so this was never
+-- a privilege escalation, but there is no reason to leave the door unlocked.
+REVOKE EXECUTE ON FUNCTION claim_reward(TEXT) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION claim_reward(TEXT) FROM anon;
 GRANT EXECUTE ON FUNCTION claim_reward(TEXT) TO authenticated;
