@@ -61,7 +61,7 @@ export function LilLokSprite({ phase, ink, size = 88, custom, gear, skin, aura, 
   </svg>);
 }
 
-export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onFeed, onFlask, onClose, say, setLillok, onPublish, onSaveCustom, gear, skin="none", aura="none", pet="none", chests=[], owned=[], modules=[] }) {
+export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onFeed, onFlask, onClose, say, setLillok, onPublish, onSaveCustom, gear, skin="none", aura="none", pet="none", chests=[], owned=[], modules=[], setLoks, setModules, setCosmetics, setGoggles, setChests, setTotalEarned }) {
   const T = useT();
   const [mode, setMode] = useState("care");
   const [feeding, setFeeding] = useState(false);
@@ -141,10 +141,22 @@ export default function LilLokPanel({ lillok, phase, kids, custom, loks = 0, onF
         <div className="mt-3 text-sm font-bold">Your Lok Chests · Tap to open</div>
         <ChestInventory chests={chests} owned={modules} T={T} onOpen={(idx, reward) => {
           if (reward.type === "loks") {
+            setLoks(l => l + reward.amount);
+            if (setTotalEarned) setTotalEarned(t => t + reward.amount);
             say(`+${reward.amount} Loks from chest!`, "success");
           } else if (reward.type === "item") {
+            setModules(m => [...m, reward.itemId]);
             say(`Unlocked: ${reward.itemName}!`, "success");
+          } else if (reward.type === "xrayVision") {
+            const xrayKey = `xrayVision${reward.rarity.charAt(0).toUpperCase()}${reward.rarity.slice(1)}`;
+            setCosmetics(c => ({ ...c, [xrayKey]: true }));
+            say(`🔍 X-ray Vision unlocked: ${reward.rarity}!`, "success");
+          } else if (reward.type === "goggles") {
+            setGoggles(g => ({ ...g, [reward.rarity]: (g[reward.rarity] || 0) + 1 }));
+            say(`🥽 Goggles acquired: ${reward.rarity}!`, "success");
           }
+          // Remove opened chest from inventory
+          if (setChests) setChests(c => c.filter((_, i) => i !== idx));
         }} />
       </>)}
     </div>
