@@ -575,14 +575,30 @@ export function MusicSheet({ music, onClose, say, devMode = false, lokPass = fal
   const [newName, setNewName] = useState("");
   const [picked, setPicked] = useState(() => new Set());
   const [gainOpenId, setGainOpenId] = useState(null);
+  const [coverStep, setCoverStep] = useState(false);
+  const [coverMode, setCoverMode] = useState("single");
+  const [perCovers, setPerCovers] = useState(() => new Map());
+  const singleCoverRef = useRef(null);
+  const perCoverRef = useRef(null);
+  const [perCoverTarget, setPerCoverTarget] = useState(null);
 
   const linkOuts = list.filter(t => t.kind !== "file");
-  const startCreate = () => { setCreating(true); setNewName(""); setPicked(new Set()); };
-  const finishCreate = () => {
+  const startCreate = () => { setCreating(true); setNewName(""); setPicked(new Set()); setCoverStep(false); setCoverMode("single"); setPerCovers(new Map()); };
+  const goToCovers = () => {
     if (!picked.size) { say?.("Pick at least one track", "error"); return; }
+    setCoverStep(true);
+  };
+  const finishCreate = async () => {
+    if (coverMode === "single" && singleCoverRef.current?.files?.[0]) {
+      const f = singleCoverRef.current.files[0];
+      for (const id of picked) await putCover(id, f);
+    } else if (coverMode === "per") {
+      for (const [id, f] of perCovers) await putCover(id, f);
+    }
     createPlaylist(newName, [...picked]);
     say?.(`Playlist "${newName || "New playlist"}" created`, "success");
     setCreating(false);
+    setCoverStep(false);
   };
 
   if (fullScreen && music.current) {
@@ -698,13 +714,41 @@ export function MusicSheet({ music, onClose, say, devMode = false, lokPass = fal
               <button onClick={() => playPlaylist(p.id)} aria-pressed={activePlaylist?.id === p.id} className="lok-btn flex-1 text-left px-2 py-1.5 rounded-xl text-sm font-bold" style={{ border: `2px solid ${activePlaylist?.id === p.id ? T.accent : T.ink}`, background: activePlaylist?.id === p.id ? T.ink : T.card, color: activePlaylist?.id === p.id ? T.paper : T.ink }}>▶ {p.name} <span className="opacity-60 font-normal">· {p.trackIds.length}</span></button>
               <button onClick={() => deletePlaylist(p.id)} aria-label={`Delete playlist ${p.name}`} className="lok-btn text-xs font-bold opacity-60 px-1.5">✕</button>
             </div>))}
-          </>) : (<div className="mt-1">
+          </>) : !coverStep ? (<div className="mt-1">
             <input value={newName} onChange={e => setNewName(e.target.value.slice(0, 40))} placeholder="Playlist name" aria-label="New playlist name" autoFocus className="w-full px-3 py-2 rounded-xl font-bold text-sm mb-2" style={{ border: `2.5px solid ${T.ink}`, background: T.card, color: T.ink }} />
             {allPlayable.length === 0 ? <div className="text-xs opacity-50 py-1">Add some tracks first.</div> : allPlayable.map(t => (
               <label key={t.id} className="flex items-center gap-2 py-1 text-sm font-bold"><input type="checkbox" checked={picked.has(t.id)} onChange={e => setPicked(s => { const n = new Set(s); e.target.checked ? n.add(t.id) : n.delete(t.id); return n; })} style={{ accentColor: T.accent }} />{t.title}</label>
             ))}
             <div className="mt-2 flex gap-2">
               <button onClick={() => setCreating(false)} className="lok-btn flex-1 py-2 rounded-xl text-sm font-bold" style={{ border: `2.5px solid ${T.ink}` }}>Cancel</button>
+              <button onClick={goToCovers} className="lok-btn flex-1 lok-display py-2 rounded-xl font-extrabold" style={{ background: T.accent, color: T.onAccent, border: `3px solid ${T.ink}` }}>Next: cover art →</button>
+            </div>
+          </div>) : (<div className="mt-1">
+            <div className="text-xs font-bold mb-2 opacity-80">Cover art for "{newName || "New playlist"}" ({picked.size} track{picked.size > 1 ? "s" : ""})</div>
+            <div className="flex gap-1.5 mb-2">
+              <button onClick={() => setCoverMode("single")} aria-pressed={coverMode === "single"} className="lok-btn flex-1 py-2 rounded-xl text-xs font-extrabold" style={{ border: `2.5px solid ${T.ink}`, background: coverMode === "single" ? T.ink : T.card, color: coverMode === "single" ? T.paper : T.ink }}>One image for all</button>
+              <button onClick={() => setCoverMode("per")} aria-pressed={coverMode === "per"} className="lok-btn flex-1 py-2 rounded-xl text-xs font-extrabold" style={{ border: `2.5px solid ${T.ink}`, background: coverMode === "per" ? T.ink : T.card, color: coverMode === "per" ? T.paper : T.ink }}>Pick per-song</button>
+            </div>
+            {coverMode === "single" ? (
+              <div className="mb-2">
+                <input ref={singleCoverRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="w-full text-xs" aria-label="Cover image for all songs" />
+                <div className="text-[10px] opacity-50 mt-1">Optional — skip to create without art.</div>
+              </div>
+            ) : (
+              <div className="mb-2 max-h-48 overflow-y-auto">
+                {[...picked].map(id => {
+                  const t = allPlayable.find(x => x.id === id);
+                  if (!t) return null;
+                  return (<div key={id} className="flex items-center gap-2 py-1">
+                    <span className="flex-1 text-sm font-bold truncate">{t.title}</span>
+                    <button onClick={() => { setPerCoverTarget(id); perCoverRef.current?.click(); }} className="lok-btn px-2 py-1 rounded-full text-[10px] font-extrabold" style={{ border: `2px solid ${T.ink}`, background: perCovers.has(id) ? T.accent : T.card, color: perCovers.has(id) ? T.onAccent : T.ink }}>{perCovers.has(id) ? "✓ Set" : "Pick image"}</button>
+                  </div>);
+                })}
+                <input ref={perCoverRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden aria-hidden="true" onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f && perCoverTarget) setPerCovers(m => new Map(m).set(perCoverTarget, f)); }} />
+              </div>
+            )}
+            <div className="mt-2 flex gap-2">
+              <button onClick={() => setCoverStep(false)} className="lok-btn flex-1 py-2 rounded-xl text-sm font-bold" style={{ border: `2.5px solid ${T.ink}` }}>← Back</button>
               <button onClick={finishCreate} className="lok-btn flex-1 lok-display py-2 rounded-xl font-extrabold" style={{ background: T.accent, color: T.onAccent, border: `3px solid ${T.ink}` }}>Create</button>
             </div>
           </div>)}
