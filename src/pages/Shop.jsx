@@ -5,7 +5,7 @@ import { useT, THEMES, SKIN_WAVE_GATE, SKIN_WAVE_3_GATE, SKIN_WAVE_4_GATE, SKIN_
 import {
   RARITY, EFFECTS, NAME_COLORS, PAPERS, MYTHIC_ITEMS, CELEBRATIONS, ANIMATION_FX, SKIES,
   CURSORS, FONT_PACKS, STICKER_PACKS, POST_EXPORTS, FRAMES, REACTION_PACKS, AVATAR_ACCENTS,
-  STUDIO_MODULES, BLOT_BORDERS, BLOT_PERSONALITIES, LILLOK_GEAR, LILLOK_SKINS, LILLOK_AURAS, LILLOK_PETS,
+  STUDIO_MODULES, BLOT_BORDERS, BLOT_PERSONALITIES, BLOT_IDLE_ANIMATIONS, BLOT_EXPRESSIONS, BLOT_BOUNCES, LILLOK_GEAR, LILLOK_SKINS, LILLOK_AURAS, LILLOK_PETS,
   VOICE_PACKS, MUSIC_PACKS, getDailyRotation, getWeeklyRotation,
 } from "../constants.jsx";
 import MythicPreview from "../MythicPreview.jsx";
@@ -83,6 +83,9 @@ export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kid
     ["Avatar accent",AVATAR_ACCENTS.find(a=>a.id===cosmetics.avatarAccent)?.name||cosmetics.avatarAccent,"none",()=>onBuyCosmetic("avatarAccent",AVATAR_ACCENTS.find(a=>a.id==="none"))],
     ["Blot border",BLOT_BORDERS.find(b=>b.id===cosmetics.blotBorder)?.name||cosmetics.blotBorder,"none",()=>onBuyCosmetic("blotBorder",BLOT_BORDERS.find(b=>b.id==="none"))],
     ["Blot personality",BLOT_PERSONALITIES.find(p=>p.id===cosmetics.blotPersonality)?.name||cosmetics.blotPersonality,"vibes",()=>onBuyCosmetic("blotPersonality",BLOT_PERSONALITIES.find(p=>p.id==="vibes"))],
+    ["Blot idle animation",BLOT_IDLE_ANIMATIONS.find(a=>a.id===cosmetics.blotIdleAnimation)?.name||cosmetics.blotIdleAnimation,"float",()=>onBuyCosmetic("blotIdleAnimation",BLOT_IDLE_ANIMATIONS.find(a=>a.id==="float"))],
+    ["Blot expression",BLOT_EXPRESSIONS.find(e=>e.id===cosmetics.blotExpression)?.name||cosmetics.blotExpression,"neutral",()=>onBuyCosmetic("blotExpression",BLOT_EXPRESSIONS.find(e=>e.id==="neutral"))],
+    ["Blot bounce",BLOT_BOUNCES.find(b=>b.id===cosmetics.blotBounce)?.name||cosmetics.blotBounce,"gentle",()=>onBuyCosmetic("blotBounce",BLOT_BOUNCES.find(b=>b.id==="gentle"))],
     ["LilLok gear",LILLOK_GEAR.find(g=>g.id===cosmetics.gear)?.name||cosmetics.gear||"None","none",()=>onBuyCosmetic("gear",LILLOK_GEAR.find(g=>g.id==="none"))],
     ["LilLok skin",LILLOK_SKINS.find(s=>s.id===cosmetics.lillokSkin)?.name||cosmetics.lillokSkin||"None","none",()=>onBuyCosmetic("lillokSkin",LILLOK_SKINS.find(s=>s.id==="none"))],
     ["LilLok aura",LILLOK_AURAS.find(a=>a.id===cosmetics.lillokAura)?.name||cosmetics.lillokAura||"None","none",()=>onBuyCosmetic("lillokAura",LILLOK_AURAS.find(a=>a.id==="none"))],
@@ -188,6 +191,9 @@ export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kid
       </div>
     </Section>
     <Section title="Blot personalities" sub="Unlock unique voices for your LilLok companion."><div className="grid grid-cols-2 gap-2">{BLOT_PERSONALITIES.map(p=>(<ShopItem key={p.id} owned={has("blotPersonality",p.id)} equipped={eq("blotPersonality",p.id)} price={p.price} onClick={()=>buy("blotPersonality",p)}><div className="font-bold text-sm">{p.emoji} {p.name}</div><div className="text-[10px] opacity-70">{p.desc}</div></ShopItem>))}</div></Section>
+    <Section title="Idle animations" sub="How your blot moves when resting."><div className="grid grid-cols-2 gap-2">{BLOT_IDLE_ANIMATIONS.map(a=>(<ShopItem key={a.id} owned={has("blotIdleAnimation",a.id)} equipped={eq("blotIdleAnimation",a.id)} price={a.price} onClick={()=>buy("blotIdleAnimation",a)}><div className="font-bold text-sm">{a.name}</div><div className="text-[10px] opacity-70">{a.desc}</div></ShopItem>))}</div></Section>
+    <Section title="Expressions" sub="How your blot looks and feels."><div className="grid grid-cols-2 gap-2">{BLOT_EXPRESSIONS.map(e=>(<ShopItem key={e.id} owned={has("blotExpression",e.id)} equipped={eq("blotExpression",e.id)} price={e.price} onClick={()=>buy("blotExpression",e)}><div className="font-bold text-sm">{e.name}</div><div className="text-[10px] opacity-70">{e.desc}</div></ShopItem>))}</div></Section>
+    <Section title="Bounce styles" sub="Animation style when your blot taps."><div className="grid grid-cols-2 gap-2">{BLOT_BOUNCES.map(b=>(<ShopItem key={b.id} owned={has("blotBounce",b.id)} equipped={eq("blotBounce",b.id)} price={b.price} onClick={()=>buy("blotBounce",b)}><div className="font-bold text-sm">{b.name}</div><div className="text-[10px] opacity-70">{b.desc}</div></ShopItem>))}</div></Section>
     <Section title="LilLok gear" sub="Accessories for your ink buddy."><div className="grid grid-cols-2 gap-2">{LILLOK_GEAR.filter(g=>g.id!=="none").map(g=>(<ShopItem key={g.id} owned={has("gear",g.id)} equipped={eq("gear",g.id)} price={g.price} onClick={()=>buy("gear",g)}><div className="font-bold text-sm">{g.name}</div><div className="text-[10px] opacity-70">LilLok accessory</div></ShopItem>))}</div></Section></>)}
     {activeTab==="lillok"&&(<>
       <Section title="LilLok Skins" sub="Change your LilLok's appearance."><div className="grid grid-cols-2 gap-2">{LILLOK_SKINS.filter(s=>s.id!=="none").map(s=>(<ShopItem key={s.id} owned={has("lillokSkin",s.id)} equipped={eq("lillokSkin",s.id)} price={s.price} onClick={()=>buy("lillokSkin",s)}><div className="font-bold text-sm">{s.name}</div><div className="text-[10px] opacity-70">LilLok skin</div></ShopItem>))}</div></Section>

@@ -46,6 +46,37 @@
   85% { opacity: 1; }
   100% { opacity: 0; transform: translateY(-16px); }
 }
+@keyframes blotSway {
+  0%, 100% { transform: translateX(0px) rotate(0deg); }
+  25% { transform: translateX(6px) rotate(1deg); }
+  75% { transform: translateX(-6px) rotate(-1deg); }
+}
+@keyframes blotPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.9; }
+}
+@keyframes blotWiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-2deg); }
+  75% { transform: rotate(2deg); }
+}
+@keyframes blotBounceIdle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes blotSpinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes blotTokenPop {
+  0% { opacity: 1; transform: scale(1) translateY(0px); }
+  100% { opacity: 0; transform: scale(0.8) translateY(-40px); }
+}
+@keyframes blotGiftPop {
+  0% { opacity: 0; transform: scale(0); }
+  50% { transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
 .rarity-common { border-color: #9CA3AF !important; }
 .rarity-uncommon { border-color: #22C55E !important; box-shadow: 0 0 6px rgba(34,197,94,0.3); }
 .rarity-rare { border-color: #3B82F6 !important; box-shadow: 0 0 8px rgba(59,130,246,0.35); }

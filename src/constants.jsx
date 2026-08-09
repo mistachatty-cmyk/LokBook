@@ -110,6 +110,43 @@ export const BLOT_PERSONALITIES = [
   { id: "chill", name: "Zen Master", price: 50, emoji: "🧘", desc: "Relaxed vibes, encouraging self-care and balance" },
 ];
 
+export const BLOT_IDLE_ANIMATIONS = [
+  { id: "float", name: "Gentle Float", price: 0, desc: "Soft up-and-down floating" },
+  { id: "sway", name: "Sway", price: 25, desc: "Side-to-side gentle swaying" },
+  { id: "pulse", name: "Pulse", price: 35, desc: "Rhythmic breathing-like pulse" },
+  { id: "wiggle", name: "Wiggle", price: 30, desc: "Playful wiggling motion" },
+  { id: "bounce_idle", name: "Bouncy Rest", price: 40, desc: "Subtle bouncing while idle" },
+  { id: "spin_slow", name: "Slow Spin", price: 45, desc: "Gentle rotating motion" },
+];
+
+export const BLOT_EXPRESSIONS = [
+  { id: "neutral", name: "Neutral", price: 0, desc: "Calm and centered" },
+  { id: "happy", name: "Happy", price: 20, desc: "Cheerful and bright" },
+  { id: "excited", name: "Excited", price: 25, desc: "Eyes wide and energetic" },
+  { id: "sleepy", name: "Sleepy", price: 20, desc: "Relaxed and drowsy" },
+  { id: "thinking", name: "Thinking", price: 30, desc: "Pondering and thoughtful" },
+  { id: "playful", name: "Playful", price: 25, desc: "Mischievous and fun" },
+];
+
+export const BLOT_BOUNCES = [
+  { id: "gentle", name: "Gentle Bounce", price: 0, desc: "Soft and subtle bounce" },
+  { id: "energetic", name: "Energetic Bounce", price: 30, desc: "Punchy and enthusiastic" },
+  { id: "bouncy", name: "Super Bouncy", price: 40, desc: "High-energy bouncing" },
+  { id: "elastic", name: "Elastic Bounce", price: 35, desc: "Stretchy springy motion" },
+  { id: "wobbly", name: "Wobbly Bounce", price: 25, desc: "Unbalanced and jiggly" },
+];
+
+export const BLOT_GIFTS = [
+  { id: "heart", name: "Heart", emoji: "❤️", rarity: "common" },
+  { id: "star", name: "Star", emoji: "⭐", rarity: "common" },
+  { id: "flower", name: "Flower", emoji: "🌸", rarity: "uncommon" },
+  { id: "sparkle", name: "Sparkle", emoji: "✨", rarity: "uncommon" },
+  { id: "treasure", name: "Treasure", emoji: "💎", rarity: "rare" },
+  { id: "crown", name: "Crown", emoji: "👑", rarity: "rare" },
+  { id: "rainbow", name: "Rainbow", emoji: "🌈", rarity: "epic" },
+  { id: "meteor", name: "Meteor", emoji: "☄️", rarity: "epic" },
+];
+
 export const FOD_WINDOW_DAYS = 7;
 export const ANIMATED_AVATAR_SPEND = 5000;
 
