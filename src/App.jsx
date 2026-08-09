@@ -25,7 +25,7 @@ import {
 import { paperBase, drawBounce, drawBloom, drawNight, renderSequence, renderDoodle, renderAvatar, traceShape } from "./engine/draw.jsx";
 import { TUTORIAL_PROJECTS, getTutorialGhostFrames } from "./engine/tutorials.js";
 import NameTag from "./NameTag.jsx";
-import { FramedAvatar, ReactionIcon, PageEffect, GlobalStyle } from "./art.jsx";
+import { FramedAvatar, ReactionIcon, PageEffect, SkyEffect, GlobalStyle } from "./art.jsx";
 import LilLokPanel, { LilLokBubble, LilLokSprite } from "./LilLok.jsx";
 import InterventionFX from "./InterventionFX.jsx";
 import EmptyState from "./EmptyState.jsx";
@@ -1337,7 +1337,7 @@ export default function LokApp(){
   const pushNotif=useCallback((msg,type="info")=>{setNotifications(ns=>[...ns.slice(-49),{id:Date.now(),msg,type,ts:Date.now()}]);setNotifUnread(n=>n+1);},[]);
   const say=useCallback((m,type="default")=>{const id=Date.now()+Math.random();setToasts(t=>[...t.slice(-4),{id,msg:m,type}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),2600);},[]);
   const showLine=useCallback((ctx="")=>{const s={name:lillok.name,wins,loks,ink:lillok.ink,bond:lillok.bond};setFabBubble(getLilLokLine(lilLokPhase(lillok),ctx,s,fourthWall));setTimeout(()=>setFabBubble(""),3500);},[lillok,wins,loks,fourthWall]);
-  const gainXp=useCallback(n=>setXp(x=>{const before=Math.floor(x/100);const nx=x+n;if(Math.floor(nx/100)>before){setTimeout(()=>say(`Level ${Math.floor(nx/100)+1}! New flair unlocked`),300);}return nx;}),[say]);
+  const gainXp=useCallback(n=>setXp(x=>{const before=Math.floor(x/100);const nx=x+n;if(Math.floor(nx/100)>before){setTimeout(()=>{say(`Level ${Math.floor(nx/100)+1}! New flair unlocked`);setShowRoadmap(true);},300);}return nx;}),[say]);
   const questTick=useCallback((track,amt=1)=>{setQuests(q=>{if(!q)return q;let paid=0,msg=null,doneCount=0;const items=q.items.map(it=>{if(it.track!==track||it.done)return it;const progress=Math.min(it.goal,it.progress+amt);const done=progress>=it.goal;if(done){paid+=it.reward;doneCount++;msg=`Quest done: ${it.label} · +${it.reward}`;}return{...it,progress,done};});if(paid){setLoks(l=>l+paid);setTotalEarned(t=>t+paid);gainXp(paid);setTimeout(()=>say(msg,"success"),250);setQuestsCompleted(c=>{const nc=c+doneCount;const m=[10,25,50,100].find(x=>c<x&&nc>=x);if(m){const bonus=m*2;setLoks(l=>l+bonus);setTotalEarned(t=>t+bonus);setTimeout(()=>{say(`🎖 ${m} quests done · +${bonus} bonus Loks`,"success");hap([200,100,200,100,200]);},700);}return nc;});}return{...q,items};});},[gainXp,say,hap]);
   useEffect(()=>{(async()=>{
     const dayOfYear=d=>Math.floor((d-new Date(d.getFullYear(),0,0))/86400000);const todayPromptIdx=(new Date().getFullYear()*366+dayOfYear(new Date()))%PROMPTS.length;
@@ -1484,7 +1484,7 @@ export default function LokApp(){
   if(!ready)return(<Loader/>);
   return(<ThemeCtx.Provider value={T}>
     <div className={`min-h-screen w-full lok-motion-${featureFlags.lokMotion||"subtle"} ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:resolveFont(fontPack),...(isUnlocked("night_shift",level)&&nightShiftAmount()>0.02?{filter:`brightness(${1-nightShiftAmount()*0.16}) saturate(${1-nightShiftAmount()*0.22}) hue-rotate(${-nightShiftAmount()*8}deg)`,transition:"filter 4s linear"}:{}),animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none"}}>
-      <GlobalStyle T={T} pace={pace} speed={speed}/><ThemeBackdrop themeId={uiTheme} pace={pace}/><PageEffect effect={effect}/>{/* Ink Weather (roadmap, LV2): a second, unbought effect layer the day picks for you */}
+      <GlobalStyle T={T} pace={pace} speed={speed}/><ThemeBackdrop themeId={uiTheme} pace={pace}/><SkyEffect sky={sky} paper={T.paper}/><PageEffect effect={effect}/>{/* Ink Weather (roadmap, LV2): a second, unbought effect layer the day picks for you */}
       {isUnlocked("ink_weather",level)&&inkWeatherToday()!=="none"&&inkWeatherToday()!==effect&&<PageEffect effect={inkWeatherToday()}/>}
       {!focusMode && <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3" style={{background:T.paper,borderBottom:`3px solid ${T.ink}`}}>
         <button onClick={()=>setTab("feed")} aria-label="Go to feed" className="lok-btn lok-display text-2xl font-extrabold tracking-tight select-none" style={{background:"transparent",border:"none",padding:0,whiteSpace:"nowrap",textShadow:`3px 2px 0 ${T.accent}`}}>
