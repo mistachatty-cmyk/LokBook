@@ -22,6 +22,9 @@ const CODES = {
   "i3e195": { fx: "vibemode" },    // cycle celebration style
   "y468tj": { fx: "devmode" },     // unlock all dev options/debugging
   "2cr2oi": { fx: "tokens10k" },   // grant 10,000 Loks
+  "10vspvk": { fx: "chestrain" },  // add 10 random chests for testing
+  "p3wyw4": { fx: "chestspree" },  // add 18 chests (3 per rarity) for testing
+  "r6q49f": { fx: "chestview" },   // toggle chest viewer
 };
 
 export function resolveCheat(input) {

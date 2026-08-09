@@ -107,7 +107,8 @@ export const getCommentReward = (text) => {
 
 // Ink Weather: deterministic per calendar day, so everyone sees the same sky
 // and nobody can farm it. Reuses page-effect ids the renderer already knows.
-const WEATHER = ["none", "soot", "petals", "snow", "embers", "none", "fireflies", "bubbles"];
+// 4 new weathers: rain, fog, aurora, dust — notable but not distracting
+const WEATHER = ["rain", "fog", "aurora", "dust"];
 export const inkWeatherToday = (d = new Date()) =>
   WEATHER[Math.floor(d.getTime() / 86400000) % WEATHER.length];
 
