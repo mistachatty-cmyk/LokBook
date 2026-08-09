@@ -1126,7 +1126,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
     </section>)}
     {showSettings&&(<div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,.35)"}} onClick={()=>setShowSettings(false)}>
       <div className="w-full rounded-t-3xl p-5 overflow-y-auto overscroll-contain" style={{maxWidth:560,maxHeight:"min(85vh, 85dvh)",background:T.card,border:`3px solid ${T.ink}`,animation:"lokrise .25s ease",WebkitOverflowScrolling:"touch"}} onClick={e=>e.stopPropagation()}>
-        <div className="sticky top-0 flex items-center justify-between mb-3 pb-1 -mt-5 -mx-5 px-5 pt-5" style={{background:T.card,zIndex:1}}><div className="lok-display text-lg font-extrabold">Settings</div><button onClick={()=>setShowSettings(false)} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Close settings">✕</button></div>
+        <div className="sticky top-0 flex items-center justify-between px-5 py-4 mb-2" style={{background:T.card,borderBottom:`1px solid ${T.shadow}`,zIndex:10}}><div className="lok-display text-lg font-extrabold">Settings</div><button onClick={()=>setShowSettings(false)} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Close settings">✕</button></div>
         <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${T.ink}`,background:T.paper}}>
           <div className="lok-display font-extrabold text-sm">📱 Add Lok to your home screen</div>
           <div className="text-xs opacity-70 mt-1 leading-snug">{isIOS?"Tap the Share button in Safari, then \u201CAdd to Home Screen\u201D. Lok opens full-screen like a native app.":"Install Lok as an app — it gets its own icon and opens full-screen, no browser bars."}</div>
@@ -1250,7 +1250,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
           {soundQueue.some(i=>i.kind==="spotify"&&slPlaying===i.id)&&(()=>{const it=soundQueue.find(i=>i.id===slPlaying);const m=it&&it.url.match(/spotify\.com\/(track|album|playlist)\/([\w]+)/);return m?<iframe title="soundlab-sp" style={{width:"100%",height:80,border:0,borderRadius:12,marginTop:8}} src={`https://open.spotify.com/embed/${m[1]}/${m[2]}`} allow="autoplay; encrypted-media"/>:null;})()}
         </div>)}
         <div className="p-3 rounded-2xl" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>
-          <div className="p-3 rounded-2xl mb-2" style={{border:`2px dashed ${T.shadow}`,background:T.paper,opacity:0.85}}>
+          {devMode&&<div className="p-3 rounded-2xl mb-2" style={{border:`2px dashed ${T.shadow}`,background:T.paper,opacity:0.85}}>
           <div className="font-bold text-sm">🫧 BadBleep Box</div>
           <div className="text-[10px] opacity-50 mt-0.5">tap a code below or type to search</div>
           <div className="mt-2 flex gap-1.5 mb-2">
@@ -1258,12 +1258,12 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
             <button onClick={()=>{onCheat&&onCheat(bleepCode);setBleepCode("");}} className="lok-btn px-3 py-2 rounded-xl font-extrabold text-sm shrink-0" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}>bleep</button>
           </div>
           <div className="max-h-32 overflow-y-auto text-xs font-bold" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}}>
-            {[["gratitude","+1000 Loks"],["dev mode","unlock all"],["comeback","activate"],["mercs","+200 Loks"],["overflow","max ink"],["revive","from stasis"],["new flip","fresh day"],["pin code","random"],["whisper","all voices"],["nightmode","dark mode"],["doubledown","2x Loks"],["resolve","finish quests"],["vibemode","celebration"],["debug","dev options"],["tokens","10k Loks"]].map(([name,desc])=>{const query=bleepCode.toLowerCase().replace(/[^a-z0-9]/g,"");const matches=query===""||name.includes(query)||desc.includes(query);return matches?<button key={name} onClick={()=>{const codes={"gratitude":"merci","dev mode":"supableep","comeback":"cincoorso","mercs":"mercmerc","overflow":"inkoverflow","revive":"phoenix","new flip":"fodskip","pin code":"pinball","whisper":"whisper","nightmode":"nightmode","doubledown":"doubledown","resolve":"resolve","vibemode":"vibemode","debug":"devmode","tokens":"Tokens10K"};onCheat&&onCheat(codes[name]||name);setBleepCode("");}} className="lok-btn px-2 py-1.5 rounded-lg text-left" style={{border:`1.5px solid ${T.ink}`,background:T.card,color:T.ink,opacity:0.8}}>
+            {[["gratitude","+1000 Loks"],["dev mode","unlock all"],["comeback","activate"],["mercs","+200 Loks"],["overflow","max ink"],["revive","from stasis"],["new flip","fresh day"],["pin code","random"],["whisper","all voices"],["nightmode","dark mode"],["doubledown","2x Loks"],["resolve","finish quests"],["vibemode","celebration"],["debug","dev options"],["tokens","10k Loks"]].map(([name,desc])=>{const query=bleepCode.toLowerCase().replace(/[^a-z0-9]/g,"");const matches=query===""||name.includes(query)||desc.includes(query);return matches?<button key={name} onClick={()=>{const codes={"gratitude":"merci","dev mode":"supableep","comeback":"cincoorso","mercs":"mercmerc","overflow":"inkoverflow","revive":"phoenix","new flip":"fodskip","pin code":"pinball","whisper":"whisper","nightmode":"nightmode","doubledown":"doubledown","resolve":"resolve","vibemode":"vibemode","debug":"devmode","tokens":"tokens10k"};onCheat&&onCheat(codes[name]||name);setBleepCode("");}} className="lok-btn px-2 py-1.5 rounded-lg text-left" style={{border:`1.5px solid ${T.ink}`,background:T.card,color:T.ink,opacity:0.8}}>
               <div>{name}</div>
               <div className="text-[8px] opacity-60">{desc}</div>
             </button>:null;})}
           </div>
-        </div>
+        </div>}
           <div className="font-bold text-sm">About</div>
           <div className="text-xs opacity-70 mt-0.5 leading-snug select-none" onClick={e=>{versionTap();devTap.current++;clearTimeout(devTimer.current);devTimer.current=setTimeout(()=>devTap.current=0,1200);if(devTap.current>=7){devTap.current=0;setDevMode(d=>!d);say(devMode?"Dev mode off":"Dev mode on");}}} style={{cursor:"default"}}>LokBook + Lok N Slide · <span style={{fontWeight:700}}>alpha v1.2</span> · Your gallery and LilLok save automatically on this device. Lok Juniors mode is in the Shop.</div>
         </div>
