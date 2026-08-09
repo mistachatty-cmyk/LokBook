@@ -2,6 +2,7 @@ import { Component } from "react";
 
 const style = {
   wrapper: { minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#F2EDE2", color: "#23306B", fontFamily: "'Bricolage Grotesque',system-ui,sans-serif", padding: 32, textAlign: "center" },
+  wrapperCompact: { minHeight: 240, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "transparent", color: "#23306B", fontFamily: "'Bricolage Grotesque',system-ui,sans-serif", padding: 24, textAlign: "center" },
   icon: { fontSize: 48, marginBottom: 16 },
   title: { fontWeight: 800, fontSize: 22, letterSpacing: "-0.02em", marginBottom: 8 },
   msg: { fontSize: 14, opacity: 0.6, marginBottom: 24, lineHeight: 1.5 },
@@ -18,14 +19,18 @@ export default class ErrorBoundary extends Component {
     return { error };
   }
 
+  componentDidCatch(error, errorInfo) {
+    console.error("LokBook crashed:", error, errorInfo?.componentStack);
+  }
+
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <div style={style.wrapper}>
+      <div style={this.props.compact ? style.wrapperCompact : style.wrapper}>
         <div style={style.icon}>⎛⎝⏝⏝⎠⎞</div>
         <div style={style.title}>Splot!</div>
         <div style={style.msg}>
-          Something went wrong in the studio.<br />
+          Something went wrong{this.props.compact ? "" : " in the studio"}.<br />
           The ink must have smudged.
         </div>
         <button style={style.btn} onClick={() => { this.setState({ error: null }); }}>

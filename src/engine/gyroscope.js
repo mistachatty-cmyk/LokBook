@@ -5,8 +5,8 @@ let deviceMotionListener = null;
 let currentMotion = { gamma: 0, beta: 0, alpha: 0 };
 let permissionRequested = false;
 
-export async function requestGyroPermission() {
-  if (permissionRequested) return false;
+export async function requestGyroPermission(force = false) {
+  if (permissionRequested && !force) return false;
   permissionRequested = true;
 
   try {
