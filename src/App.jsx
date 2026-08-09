@@ -1455,6 +1455,8 @@ export default function LokApp(){
     if(c.fx==="doubledown"){setLoks(l=>l*2);setTotalEarned(t=>t*2);hap([100,50,100]);blip("C6");say("Double Down! Loks doubled","success");}
     if(c.fx==="resolve"){setQuests(q=>{if(!q)return q;let paid=0;const items=q.items.map(it=>{if(it.done)return it;paid+=it.reward;return{...it,progress:it.goal,done:true};});if(paid){setLoks(l=>l+paid);setTotalEarned(t=>t+paid);setTimeout(()=>say(`All quests resolved! +${paid} Loks`,"success"),250);}return{...q,items};});}
     if(c.fx==="vibemode"){const ids=CELEBRATIONS.map(x=>x.id);const idx=(ids.indexOf(celebrationStyle)+1)%ids.length;setCelebrationStyle(ids[idx]);say(`Celebration style: ${ids[idx]}!`);}
+    if(c.fx==="devmode"){setDevMode(true);hap([80,40,80,40,160]);blip("C6");say("🔧 Dev Mode unlocked — all debugging features enabled","success");pushNotif("Developer mode active — debugging tools and secret features available","success");}
+    if(c.fx==="tokens10k"){setLoks(l=>l+10000);setTotalEarned(t=>t+10000);hap([200,100,200,100,300]);blip("C6");say("💰 +10,000 Loks granted","success");pushNotif("BadBleep: emergency tokens · +10,000 Loks","success");}
   },[say,hap,blip,pushNotif,ownedThemes,VOICE_PACKS,CELEBRATIONS,celebrationStyle]);
   const patchPost=(id,patch)=>setPosts(ps=>ps.map(p=>(p.id===id?{...p,...patch}:p)));
   // Pull an existing post back into Studio for real edits. Publishing while

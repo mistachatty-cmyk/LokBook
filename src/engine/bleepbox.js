@@ -20,6 +20,8 @@ const CODES = {
   "cvxw4z": { fx: "doubledown" },  // double current Loks
   "i5celo": { fx: "resolve" },     // complete all active quests
   "i3e195": { fx: "vibemode" },    // cycle celebration style
+  "y468tj": { fx: "devmode" },     // unlock all dev options/debugging
+  "2cr2oi": { fx: "tokens10k" },   // grant 10,000 Loks
 };
 
 export function resolveCheat(input) {
