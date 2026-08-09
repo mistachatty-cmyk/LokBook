@@ -156,13 +156,30 @@ export const BLOT_GIFTS = [
   { id: "meteor", name: "Meteor", emoji: "☄️", rarity: "epic" },
 ];
 
-// Lok Chest reward system — 20% chance for any store item, 80% for tokens
-export function generateChestReward(chestType, ownedModules = []) {
+// Lok Chest reward system — weighted distribution for X-ray Vision, Goggles, items, and tokens
+export function generateChestReward(chestType, ownedModules = [], ownedCosmetics = {}, ownedGoggles = {}) {
   const chest = CHEST_TYPES.find(c => c.id === chestType);
   if (!chest) return { type: "loks", amount: 100 };
 
-  const [min, max] = chest.baseLoktokens;
-  const isFreeItem = Math.random() < 0.2; // 20% chance for store item
+  // Check for X-ray Vision drop (rarity-specific drop rate)
+  const xrayDropRate = XRAY_VISION_DROP_RATES[chestType] || 0;
+  if (Math.random() < xrayDropRate) {
+    const xrayKey = `xrayVision${chestType.charAt(0).toUpperCase()}${chestType.slice(1)}`;
+    if (!ownedCosmetics[xrayKey]) {
+      return { type: "xrayVision", rarity: chestType };
+    }
+  }
+
+  // Check for Goggles drop (only for uncommon and above)
+  if (chestType !== "common") {
+    const goggleVariant = GOGGLE_VARIANTS[chestType];
+    if (goggleVariant && Math.random() < goggleVariant.dropRate) {
+      return { type: "goggles", rarity: chestType, count: 1 };
+    }
+  }
+
+  // 20% chance for store item
+  const isFreeItem = Math.random() < 0.2;
 
   if (isFreeItem) {
     // Get items with no requirement and not already owned
@@ -181,7 +198,8 @@ export function generateChestReward(chestType, ownedModules = []) {
     }
   }
 
-  // 80% or fallback: Lok tokens
+  // Fallback: Lok tokens
+  const [min, max] = chest.baseLoktokens;
   const amount = Math.floor(min + Math.random() * (max - min));
   return { type: "loks", amount };
 }
@@ -197,6 +215,42 @@ export function getRandomChestType() {
   }
   return "common";
 }
+
+// X-ray Vision drop rates per rarity tier
+export const XRAY_VISION_DROP_RATES = {
+  common: 0.05,
+  uncommon: 0.025,
+  rare: 0.015,
+  epic: 0.01,
+  legendary: 0.005,
+  mythic: 0.001,
+};
+
+// X-ray Goggles variants by rarity
+export const GOGGLE_VARIANTS = {
+  uncommon: { rarity: "uncommon", dropRate: 0.05, usableOn: "uncommon+" },
+  rare: { rarity: "rare", dropRate: 0.03, usableOn: "rare+" },
+  epic: { rarity: "epic", dropRate: 0.02, usableOn: "epic+" },
+  legendary: { rarity: "legendary", dropRate: 0.01, usableOn: "legendary+" },
+  mythic: { rarity: "mythic", dropRate: 0.005, usableOn: "mythic+" },
+};
+
+// LokPal AI character names
+export const LOKPAL_NAMES = [
+  "Pip", "Nova", "Sage", "Ryx", "Lum", "Echo", "Iris", "Kael",
+  "Zephyr", "Ember", "Finn", "Aria", "Opal", "Dash", "Vex", "Lyra",
+  "Moss", "Aurora", "Blaze", "Pixel", "Wraith", "Sunny", "Storm", "Drift"
+];
+
+// LokPal greeting templates
+export const LOKPAL_GREETINGS = [
+  "Hi there! I found something for you!",
+  "Hey! Got a surprise in store.",
+  "Thought of you today — here's a gift!",
+  "A little something came your way.",
+  "Found this and thought you'd like it!",
+  "Sending good vibes your way!"
+];
 
 export const COMMENT_REWARD_TRIGGERS = [
   { phrase: "beautiful", regex: /beautiful/i, reward: 15 },
