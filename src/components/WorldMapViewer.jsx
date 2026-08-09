@@ -12,22 +12,35 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'defa
 
     // Dynamically import globe.gl only in browser environment
     import('globe.gl').then(({ default: Globe }) => {
-      // Get theme settings with fallback to default
-      const themeSettings = THEME_GLOBE_SETTINGS[theme] || THEME_GLOBE_SETTINGS.default;
+      try {
+        // Get theme settings with fallback to default
+        const themeSettings = THEME_GLOBE_SETTINGS[theme] || THEME_GLOBE_SETTINGS.default;
 
-      // Initialize globe
-      const globe = Globe()
-        .globeImageUrl('//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg')
-        .bumpImageUrl('//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png')
-        .backgroundColor(themeSettings.backgroundColor)
-        .atmosphereColor(themeSettings.atmosphereColor)
-        .atmosphereAltitude(0.1)
-        .autoRotate(GLOBE_CONFIG.autoRotate)
-        .autoRotateSpeed(GLOBE_CONFIG.autoRotateSpeed);
+        // Ensure container has dimensions
+        const container = containerRef.current;
+        if (!container) return;
 
-      globeRef.current = globe;
-      globe(containerRef.current);
-      setGlobeReady(true);
+        const width = container.clientWidth || window.innerWidth;
+        const height = container.clientHeight || window.innerHeight;
+
+        // Initialize globe
+        const globe = Globe()
+          .width(width)
+          .height(height)
+          .globeImageUrl('//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg')
+          .bumpImageUrl('//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png')
+          .backgroundColor(themeSettings.backgroundColor)
+          .atmosphereColor(themeSettings.atmosphereColor)
+          .atmosphereAltitude(0.1)
+          .autoRotate(GLOBE_CONFIG.autoRotate)
+          .autoRotateSpeed(GLOBE_CONFIG.autoRotateSpeed);
+
+        globeRef.current = globe;
+        globe(container);
+        setGlobeReady(true);
+      } catch (err) {
+        console.error('Globe initialization error:', err);
+      }
 
       // Set camera position
       globe.pointOfView({ altitude: 2.5 });
@@ -109,6 +122,9 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'defa
           position: 'absolute',
           inset: 0,
           zIndex: 1,
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
         }}
       />
 
