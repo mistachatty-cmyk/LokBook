@@ -147,6 +147,19 @@ export const BLOT_GIFTS = [
   { id: "meteor", name: "Meteor", emoji: "☄️", rarity: "epic" },
 ];
 
+export const COMMENT_REWARD_TRIGGERS = [
+  { phrase: "beautiful", regex: /beautiful/i, reward: 15 },
+  { phrase: "amazing", regex: /amazing/i, reward: 15 },
+  { phrase: "incredible", regex: /incredible/i, reward: 15 },
+  { phrase: "love this", regex: /love\s+this/i, reward: 15 },
+  { phrase: "so cool", regex: /so\s+cool/i, reward: 15 },
+  { phrase: "talent", regex: /talent/i, reward: 15 },
+  { phrase: "masterpiece", regex: /masterpiece/i, reward: 15 },
+  { phrase: "stunning", regex: /stunning/i, reward: 15 },
+  { phrase: "brilliant", regex: /brilliant/i, reward: 15 },
+  { phrase: "gorgeous", regex: /gorgeous/i, reward: 15 },
+];
+
 export const FOD_WINDOW_DAYS = 7;
 export const ANIMATED_AVATAR_SPEND = 5000;
 

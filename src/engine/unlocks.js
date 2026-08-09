@@ -85,6 +85,8 @@ export const UNLOCK_TRACK = [
   },
 ];
 
+import { COMMENT_REWARD_TRIGGERS } from "../constants.jsx";
+
 export const levelFor = xp => Math.max(1, Math.floor((xp || 0) / 100) + 1);
 export const isUnlocked = (id, level) => {
   const u = UNLOCK_TRACK.find(x => x.id === id);
@@ -92,6 +94,16 @@ export const isUnlocked = (id, level) => {
 };
 export const unlockedAt = level => UNLOCK_TRACK.filter(u => level >= u.level);
 export const nextUnlock = level => UNLOCK_TRACK.find(u => level < u.level) || null;
+
+export const getCommentReward = (text) => {
+  if (!text) return null;
+  for (const trigger of COMMENT_REWARD_TRIGGERS) {
+    if (trigger.regex.test(text)) {
+      return trigger.reward;
+    }
+  }
+  return null;
+};
 
 // Ink Weather: deterministic per calendar day, so everyone sees the same sky
 // and nobody can farm it. Reuses page-effect ids the renderer already knows.
