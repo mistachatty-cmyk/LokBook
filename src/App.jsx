@@ -1886,8 +1886,8 @@ function Loader(){
     const onMove=e=>{pos.current.x=e.clientX;pos.current.y=e.clientY;};
     const onDown=()=>{pos.current.down=true;};const onUp=()=>{pos.current.down=false;};
     const onMotion=e=>{if(!e.gamma||!e.beta)return;const gx=Math.max(-90,Math.min(90,e.gamma))*2;const gy=Math.max(-45,Math.min(45,e.beta))*4;pos.current.x=window.innerWidth/2+gx;pos.current.y=window.innerHeight/2+gy;};
-    const requestGyroPermission=async()=>{if(typeof DeviceMotionEvent!=="undefined"&&DeviceMotionEvent.requestPermission){try{const p=await DeviceMotionEvent.requestPermission();if(p==="granted")window.addEventListener("devicemotion",onMotion);}catch{}}else{window.addEventListener("devicemotion",onMotion);}};
-    window.addEventListener("pointermove",onMove);window.addEventListener("pointerdown",onDown);window.addEventListener("pointerup",onUp);window.addEventListener("touchstart",()=>{if(!gyroRequested.current){gyroRequested.current=true;requestGyroPermission();}},{once:true});
+    const requestGyroPermission=async()=>{if(!gyroRequested.current){gyroRequested.current=true;if(typeof DeviceMotionEvent!=="undefined"&&DeviceMotionEvent.requestPermission){try{const p=await DeviceMotionEvent.requestPermission();if(p==="granted")window.addEventListener("devicemotion",onMotion);}catch{}}else{window.addEventListener("devicemotion",onMotion);}}};
+    window.addEventListener("pointermove",onMove);window.addEventListener("pointerdown",onDown);window.addEventListener("pointerup",onUp);window.addEventListener("touchstart",requestGyroPermission,{once:true});window.addEventListener("click",requestGyroPermission,{once:true});requestGyroPermission();
     const stop=pacedLoop(()=>{
       const {x,y,px,py,vx,vy,down}=pos.current;const rect=el.getBoundingClientRect();
       const targetX=x-rect.left-rect.width/2;const targetY=y-rect.top-rect.height/2;
@@ -1896,7 +1896,7 @@ function Loader(){
       pos.current.px+=pos.current.vx;pos.current.py+=pos.current.vy;
       el.style.transform=`perspective(500px) rotateY(${pos.current.px/24}deg) rotateX(${-pos.current.py/24}deg) scale(${down?0.9:1})`;
     });
-    return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerdown",onDown);window.removeEventListener("pointerup",onUp);window.removeEventListener("devicemotion",onMotion);stop();};
+    return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerdown",onDown);window.removeEventListener("pointerup",onUp);window.removeEventListener("devicemotion",onMotion);window.removeEventListener("touchstart",requestGyroPermission);window.removeEventListener("click",requestGyroPermission);stop();};
   },[]);
 
   return(<div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:ART.paper,color:ART.ink,fontFamily:"'Bricolage Grotesque',system-ui,sans-serif"}}>
