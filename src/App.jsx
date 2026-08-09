@@ -1537,7 +1537,7 @@ export default function LokApp(){
     seed.forEach((s,i)=>{if(!s._pendingDraw)return;setTimeout(()=>{const frames=renderSequence(s._pendingDraw,s._pendingN);const paceMs=[110,150,130][i];setPosts(ps=>ps.map(p=>p.id===s.id?{...p,frames,paceMs}:p));},i*80+50);});
     if(window.steamworks?.isAvailable)checkAchievements({posts:userPosts.length,streak:daily.streak||0,founder,votes:questsCompleted,totalSpent,mythicOwned:mythicOwned.length});
     applyLogo(appLogo);
-  })().finally(()=>{const elapsed=Date.now()-loadStart.current;setTimeout(()=>setReady(true),Math.max(0,3500-elapsed));});const fb=setTimeout(()=>setReady(true),10000);return()=>clearTimeout(fb);},[]);
+  })().finally(()=>{const elapsed=Date.now()-loadStart.current;if(!featureFlags.showLokinButton)setTimeout(()=>setReady(true),Math.max(0,3500-elapsed));});const fb=setTimeout(()=>setReady(true),10000);return()=>clearTimeout(fb);},[featureFlags.showLokinButton]);
   useEffect(()=>{applyLogo(appLogo);},[appLogo]);
   // LokPals mail generation with irritation system: generate random mail every 12-24 hours
   useEffect(()=>{
