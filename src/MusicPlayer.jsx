@@ -558,6 +558,7 @@ export function MusicTicker({ music, onOpen }) {
 export function MusicSheet({ music, onClose, say, devMode = false, lokPass = false, signedIn = false, onGetLokPass, onSignIn }) {
   const T = useT();
   const [url, setUrl] = useState("");
+  const [fullScreen, setFullScreen] = useState(false);
   const fileRef = useRef(null);
   const folderRef = useRef(null);
   // `'webkitdirectory' in input` is true on basically every engine, including
@@ -584,12 +585,37 @@ export function MusicSheet({ music, onClose, say, devMode = false, lokPass = fal
     setCreating(false);
   };
 
+  if (fullScreen && music.current) {
+    return (
+      <div className="fixed inset-0 z-[55] flex flex-col items-center justify-center" style={{ background: T.paper }} onClick={onClose}>
+        <div className="absolute inset-0 flex flex-col" style={{ zIndex: 1 }} onClick={e => e.stopPropagation()}>
+          <div className="flex-1 flex flex-col items-center justify-center p-6">
+            {music.currentIsVideo ? <VideoStage music={music} /> : <CoverStage music={music} />}
+            <div className="w-full max-w-96 mt-6" style={{ height: 180 }}>
+              <MusicVisualizer music={music} style={music.prefs.visualizerStyle} height={180} />
+            </div>
+            {music.current && <div className="mt-6 text-center font-bold"><div className="text-xl" style={{ color: T.ink }}>{music.current.title}</div></div>}
+          </div>
+          <div className="flex items-center justify-center gap-4 pb-8 px-4">
+            <button onClick={() => music.skip(-1)} disabled={!music.playable.length} className="lok-btn w-12 h-12 rounded-full font-extrabold text-lg" style={{ border: `2.5px solid ${T.ink}`, background: T.card, opacity: music.playable.length ? 1 : .4 }}>◀◀</button>
+            <button onClick={music.toggle} disabled={!music.playable.length} className="lok-btn w-16 h-16 rounded-full lok-display font-extrabold text-2xl" style={{ background: T.accent, color: T.onAccent, border: `3px solid ${T.ink}`, opacity: music.playable.length ? 1 : .4 }}>{music.playing ? "❚❚" : "▶"}</button>
+            <button onClick={() => music.skip(1)} disabled={!music.playable.length} className="lok-btn w-12 h-12 rounded-full font-extrabold text-lg" style={{ border: `2.5px solid ${T.ink}`, background: T.card, opacity: music.playable.length ? 1 : .4 }}>▶▶</button>
+          </div>
+          <button onClick={() => setFullScreen(false)} className="absolute top-4 right-4 lok-btn px-4 py-2 rounded-xl font-extrabold text-lg" style={{ border: `2.5px solid ${T.ink}`, background: T.card, color: T.ink }} aria-label="Exit full screen">✕</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[55] flex items-end justify-center" style={{ background: "rgba(0,0,0,.35)" }} onClick={onClose}>
       <div className="w-full rounded-t-3xl p-5 overflow-y-auto overscroll-contain" style={{ maxWidth: 560, maxHeight: "85vh", background: T.card, border: `3px solid ${T.ink}`, animation: "lokrise .25s ease" }} onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 flex items-center justify-between mb-3 pb-1 -mt-5 -mx-5 px-5 pt-5" style={{ background: T.card, zIndex: 1 }}>
           <div className="lok-display text-lg font-extrabold">🎵 Music</div>
-          <button onClick={onClose} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{ border: `2.5px solid ${T.ink}` }} aria-label="Close music player">✕</button>
+          <div className="flex items-center gap-1.5">
+            {music.current && <button onClick={() => setFullScreen(true)} className="lok-btn px-3 py-1 rounded-lg font-bold text-lg" style={{ border: `2.5px solid ${T.ink}` }} aria-label="Full screen">⛶</button>}
+            <button onClick={onClose} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{ border: `2.5px solid ${T.ink}` }} aria-label="Close music player">✕</button>
+          </div>
         </div>
 
         <CloudBackupBadge music={music} lokPass={lokPass} signedIn={signedIn} onGetLokPass={onGetLokPass} onSignIn={onSignIn} say={say} />
