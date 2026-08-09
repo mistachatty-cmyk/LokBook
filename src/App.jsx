@@ -1609,6 +1609,16 @@ export default function LokApp(){
     document.documentElement.style.filter=featureFlags.invertColors?"invert(1) hue-rotate(180deg)":"none";
     return()=>{document.documentElement.style.fontSize="";document.documentElement.style.filter="";};
   },[featureFlags.uiScale,featureFlags.invertColors]);
+  // Gyroscope motion tracking for device tilt effects throughout the app
+  useEffect(()=>{
+    if(!featureFlags.enableGyroscope)return;
+    const onMotion=e=>{
+      if(typeof e.gamma!=="number"||typeof e.beta!=="number")return;
+      setGyroMotion({gamma:e.gamma,beta:e.beta,alpha:e.alpha||0});
+    };
+    window.addEventListener("devicemotion",onMotion);
+    return()=>window.removeEventListener("devicemotion",onMotion);
+  },[featureFlags.enableGyroscope]);
   // A rotation purchase lands in the SAME state the Shop already renders from,
   // so a daily/weekly item behaves exactly like its non-rotation equivalent
   // instead of vanishing into dailyOwned/weeklyOwned (docs/AUDIT.md Finding 2).
