@@ -1233,6 +1233,8 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
           <div className="text-[10px] opacity-55 leading-snug ml-6">Uncaps animation on 120Hz displays. Costs battery, and Reduce Motion still overrides it.</div>
           <label className="mt-2 flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={!!featureFlags.enableGyroscope} onChange={e=>onSetFlag&&onSetFlag("enableGyroscope",e.target.checked)} style={{accentColor:T.accent}}/> Gyroscope (tilt interaction)</label>
           <div className="text-[10px] opacity-55 leading-snug ml-6">Enable device motion detection for interactive tilt effects.</div>
+          <label className="mt-2 flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={!!featureFlags.showLokinButton} onChange={e=>onSetFlag&&onSetFlag("showLokinButton",e.target.checked)} style={{accentColor:T.accent}}/> Show Lok-in button on load screen</label>
+          <div className="text-[10px] opacity-55 leading-snug ml-6">Click to enter the app instead of auto-transitioning.</div>
           <div className="mt-3 font-bold text-sm">Default page</div>
           <div className="text-xs opacity-70 mt-0.5 mb-1.5 leading-snug">Which tab Lok opens to.</div>
           <div className="grid grid-cols-3 gap-1.5">{[["feed","Feed"],["gallery","You"],["studio","Studio"],["battle","Battle"],["front","Rush"],["rooms","Rooms"]].map(([id,label])=>(
@@ -1353,7 +1355,7 @@ export default function LokApp(){
   const[questsCompleted,setQuestsCompleted]=useState(0);const[totalEarned,setTotalEarned]=useState(0);const[traceHinted,setTraceHinted]=useState(false);const[fabBubble,setFabBubble]=useState("");const[adIdx,setAdIdx]=useState(0);const[installEvt,setInstallEvt]=useState(null);const[showSettings,setShowSettings]=useState(false);const auth=useAuth();const music=useMusic({userId:auth.getUserId()});const[showMusic,setShowMusic]=useState(false);const[showRoadmap,setShowRoadmap]=useState(false);const[showChestViewer,setShowChestViewer]=useState(false);
   const[loks,setLoks]=useState(260);const[myRooms,setMyRooms]=useState([]);const[pendingRoomCode,setPendingRoomCode]=useState(()=>{try{return new URLSearchParams(location.search).get("room")||null;}catch{return null;}});const[pace,setPace]=useState("sweep");const[speed,setSpeed]=useState(1);const[soundLab,setSoundLab]=useState(false);const[soundQueue,setSoundQueue]=useState([]);const[founder,setFounder]=useState(false);const[totalSpent,setTotalSpent]=useState(0);const[fodHistory,setFodHistory]=useState([]);const[lokPass,setLokPass]=useState(false);const[uiTheme,setUiTheme]=useState("riso");const[ownedThemes,setOwnedThemes]=useState(["riso"]);const[effect,setEffect]=useState("none");const[ownedEffects,setOwnedEffects]=useState(["none"]);const[ownedTiers,setOwnedTiers]=useState([10]);const[ccTier,setCcTier]=useState(false);const[bigBattleOwned,setBigBattleOwned]=useState(false);const[wins,setWins]=useState(0);
   const[profile,setProfile]=useState(()=>{const seed=Math.floor(Math.random()*9999);return{name:starterHandle(seed),bio:"",avatarSeed:seed,links:[{label:"Lok page",url:"coming soon"}]};});
-  const[focusMode,setFocusMode]=useState(false);  const[featureFlags,setFeatureFlags]=useState({compactUi:false,vibe:"default",uiScale:"normal",lokMotion:"subtle",combatUIMode:"unified",enableGyroscope:true});const[gyroMotion,setGyroMotion]=useState({gamma:0,beta:0,alpha:0});const[weatherOverride,setWeatherOverrideLocal]=useState(getWeatherOverride());
+  const[focusMode,setFocusMode]=useState(false);  const[featureFlags,setFeatureFlags]=useState({compactUi:false,vibe:"default",uiScale:"normal",lokMotion:"subtle",combatUIMode:"unified",enableGyroscope:true,showLokinButton:true});const[gyroMotion,setGyroMotion]=useState({gamma:0,beta:0,alpha:0});const[weatherOverride,setWeatherOverrideLocal]=useState(getWeatherOverride());
   const[comebackActive,setComebackActive]=useState(false);const[legacyStudio,setLegacyStudio]=useState(false);const[legacyBrushes,setLegacyBrushes]=useState(false);
   const[studioFrames,setStudioFrames]=useState([]);const[studioFrameDurations,setStudioFrameDurations]=useState([]);const[studioTitle,setStudioTitle]=useState("");const[studioDraftImg,setStudioDraftImg]=useState(null);
   const[lastComebackAward,setLastComebackAward]=useState(0);
@@ -1756,7 +1758,7 @@ export default function LokApp(){
     <input type="password" maxLength={6} inputMode="numeric" autoFocus value={pinInput} onChange={e=>{setPinInput(e.target.value);setPinError("");}} onKeyDown={e=>{if(e.key==="Enter"){if(pinInput===sessionPin){setPinUnlocked(true);setPinInput("");setPinError("");}else{setPinError("Wrong PIN");setPinInput("");}}}} className="w-full rounded-xl px-4 py-3 text-center text-2xl font-extrabold tracking-widest" style={{maxWidth:220,border:`3px solid ${pinError?"#C23B22":ART.ink}`,background:"#fff",color:ART.ink,outline:"none",animation:"inkfade .5s .5s ease both"}} aria-label="Enter PIN"/>
     {pinError&&<div style={{color:"#C23B22",fontSize:13,fontWeight:700}}>{pinError}</div>}
   </div>);
-  if(!ready)return(<Loader gyroMotion={gyroMotion} enableGyroscope={featureFlags.enableGyroscope}/>);
+  if(!ready)return(<Loader gyroMotion={gyroMotion} enableGyroscope={featureFlags.enableGyroscope} showLokinButton={featureFlags.showLokinButton} onLokinClick={() => setReady(true)}/>);
   return(<ThemeCtx.Provider value={T}>
     {/* Z-index hierarchy: z-10 (content overlays) < z-20 (main content) < z-30 (sticky header) < z-39 (nav) < z-40 (ads) < z-41 (music) < z-42 (FAB) < z-50 (modals) < z-70 (roadmap) < z-85 (sync) */}
     <div className={`min-h-screen w-full lok-motion-${featureFlags.lokMotion||"subtle"} ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:resolveFont(fontPack),...(isUnlocked("night_shift",level)&&nightShiftAmount()>0.02?{filter:`brightness(${1-nightShiftAmount()*0.16}) saturate(${1-nightShiftAmount()*0.22}) hue-rotate(${-nightShiftAmount()*8}deg)`,transition:"filter 4s linear"}:{}),animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none"}}>
@@ -1886,8 +1888,8 @@ export default function LokApp(){
   </ThemeCtx.Provider>);
 }
 
-function Loader({gyroMotion={gamma:0,beta:0,alpha:0},enableGyroscope=true}){
-  const logoRef=useRef(null);const pos=useRef({x:0,y:0,px:0,py:0,vx:0,vy:0,down:false});
+function Loader({gyroMotion={gamma:0,beta:0,alpha:0},enableGyroscope=true,showLokinButton=true,onLokinClick}){
+  const logoRef=useRef(null);const pos=useRef({x:0,y:0,px:0,py:0,vx:0,vy:0,down:false});const[showButton,setShowButton]=useState(false);
   useEffect(()=>{const el=logoRef.current;if(!el)return;
     const onMove=e=>{pos.current.x=e.clientX;pos.current.y=e.clientY;};
     const onDown=()=>{pos.current.down=true;};const onUp=()=>{pos.current.down=false;};
@@ -1906,6 +1908,11 @@ function Loader({gyroMotion={gamma:0,beta:0,alpha:0},enableGyroscope=true}){
     return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerdown",onDown);window.removeEventListener("pointerup",onUp);stop();};
   },[enableGyroscope,gyroMotion]);
 
+  useEffect(()=>{
+    const timer=setTimeout(()=>setShowButton(true),2000);
+    return()=>clearTimeout(timer);
+  },[]);
+
   return(<div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:ART.paper,color:ART.ink,fontFamily:"'Bricolage Grotesque',system-ui,sans-serif"}}>
     <style>{`@keyframes inkdrop{0%{transform:scaleY(0.2) scaleX(0.8);opacity:0}40%{transform:scaleY(1.1) scaleX(0.95);opacity:1}60%{transform:scaleY(0.9) scaleX(1.05)}100%{transform:scale(1);opacity:1}} @keyframes inkfade{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}} @keyframes inkpulse{0%,100%{opacity:.4}50%{opacity:1}}`}</style>
     <div ref={logoRef} className="relative" style={{animation:"inkdrop .7s cubic-bezier(.34,1.56,.64,1) forwards",marginBottom:20, width: 64, height: 64, transition: 'transform 0.1s ease-out'}}>
@@ -1915,5 +1922,6 @@ function Loader({gyroMotion={gamma:0,beta:0,alpha:0},enableGyroscope=true}){
     <div style={{fontWeight:800,fontSize:26,letterSpacing:"-0.02em",animation:"inkfade .5s .3s ease both"}}>LokBook</div>
     <div style={{fontSize:13,opacity:0.5,marginTop:6,animation:"inkfade .5s .5s ease both"}}>loading your ink…</div>
     <div style={{display:"flex",gap:6,marginTop:20,animation:"inkfade .5s .7s ease both"}}>{[0,1,2].map(i=><div key={i} style={{width:7,height:7,borderRadius:"50%",background:ART.ink,animation:`inkpulse 1.2s ${i*0.2}s ease-in-out infinite`}}/>)}</div>
+    {showButton&&showLokinButton&&(<button onClick={onLokinClick} className="lok-btn lok-display" style={{marginTop:32,paddingLeft:24,paddingRight:24,paddingTop:12,paddingBottom:12,borderRadius:16,fontWeight:800,fontSize:16,background:ART.ink,color:ART.paper,border:`3px solid ${ART.ink}`,cursor:"pointer",animation:"lokinAppear 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards",boxShadow:"0 8px 0 rgba(0,0,0,0.15)",transition:"all 0.2s ease"}} onMouseEnter={e=>{e.target.style.transform="translateY(-4px)";e.target.style.boxShadow="0 12px 0 rgba(0,0,0,0.2)";}} onMouseLeave={e=>{e.target.style.transform="translateY(0)";e.target.style.boxShadow="0 8px 0 rgba(0,0,0,0.15)";}} aria-label="Enter LokBook">Lok In</button>)}
   </div>);
 }
