@@ -169,7 +169,16 @@ export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kid
       {!modules.includes("module_uber")&&<Section title="Studio Pro" sub="Blend modes, symmetry (mirror · radial), fill, eyedropper, marker &amp; chalk brushes"><div className="flex items-center justify-between p-2.5 rounded-xl" style={{border:`3px solid ${T.ink}`,background:T.card}}><div className="font-bold text-sm">Pro easel unlock</div>{ccTier?<span className="text-sm font-extrabold" style={{color:T.alt}}>Owned ✓</span>:<button onClick={onCc} className="lok-btn px-3 py-1 rounded-full text-sm font-extrabold" style={{background:T.accent,color:T.onAccent,border:`2.5px solid ${T.ink}`}}>120 Loks</button>}</div></Section>}
     </>)}
     {activeTab==="paper"&&(<Section title="Canvas paper" sub="Paper textures and drawing guides."><div className="grid grid-cols-2 gap-2">{PAPERS.map(p=>(<ShopItem key={p.id} owned={has("paper",p.id)} equipped={eq("paper",p.id)} price={p.price} onClick={()=>buy("paper",p)}><div className="font-bold text-sm">{p.name}</div><div className="text-[10px] opacity-70">Canvas texture</div></ShopItem>))}</div></Section>)}
-    {activeTab==="blot"&&(<><Section title="Blot borders" sub="Borders for your LilLok container.">
+    {activeTab==="blot"&&(<><div className="mt-4 p-4 rounded-2xl text-center" style={{background:T.card,border:`2px solid ${T.shadow}`}}>
+      <div className="text-xs font-bold opacity-70 mb-2">Current blot</div>
+      <div className="flex items-center justify-center" style={{height:140}}>
+        <div className="rounded-full flex items-center justify-center" style={{width:120,height:120,background:T.paper,...blotBorderStyle(cosmetics.blotBorder,T)}}>
+          <div style={{width:90,height:90,borderRadius:"50%",background:`linear-gradient(135deg, ${T.ink}66, ${T.accent}33)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>🫧</div>
+        </div>
+      </div>
+      <div className="mt-2 text-sm font-bold">{BLOT_BORDERS.find(b=>b.id===cosmetics.blotBorder)?.name||"Default"}</div>
+    </div>
+    <Section title="Blot borders" sub="Borders for your LilLok container.">
       <div className="grid grid-cols-2 gap-2">{BLOT_BORDERS.map(b=>(
         <ShopItem key={b.id} owned={has("blotBorder",b.id)} equipped={eq("blotBorder",b.id)} price={b.price} onClick={()=>buy("blotBorder",b)}
           swatch={<div className="flex items-center justify-center py-3"><div className="rounded-full" style={{width:44,height:44,background:T.paper,...blotBorderStyle(b.id,T)}}/></div>}>

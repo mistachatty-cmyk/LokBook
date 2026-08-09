@@ -1191,10 +1191,16 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
         <div className="p-3 rounded-2xl" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>
           <div className="p-3 rounded-2xl mb-2" style={{border:`2px dashed ${T.shadow}`,background:T.paper,opacity:0.85}}>
           <div className="font-bold text-sm">🫧 BadBleep Box</div>
-          <div className="text-[10px] opacity-50 mt-0.5">whisper something the ink might recognize</div>
-          <div className="mt-1.5 flex gap-1.5">
-            <input value={bleepCode} onChange={e=>setBleepCode(e.target.value)} placeholder="…" aria-label="BadBleep code" className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2px solid ${T.shadow}`,background:T.card,color:T.ink}} onKeyDown={e=>{if(e.key==="Enter"){onCheat&&onCheat(bleepCode);setBleepCode("");}}}/>
+          <div className="text-[10px] opacity-50 mt-0.5">tap a code below or type to search</div>
+          <div className="mt-2 flex gap-1.5 mb-2">
+            <input value={bleepCode} onChange={e=>setBleepCode(e.target.value)} placeholder="type or tap…" aria-label="BadBleep code" className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{border:`2px solid ${T.shadow}`,background:T.card,color:T.ink}} onKeyDown={e=>{if(e.key==="Enter"){onCheat&&onCheat(bleepCode);setBleepCode("");}}}/>
             <button onClick={()=>{onCheat&&onCheat(bleepCode);setBleepCode("");}} className="lok-btn px-3 py-2 rounded-xl font-extrabold text-sm shrink-0" style={{border:`2.5px solid ${T.ink}`,background:T.card,color:T.ink}}>bleep</button>
+          </div>
+          <div className="max-h-32 overflow-y-auto text-xs font-bold" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}}>
+            {[["gratitude","+1000 Loks"],["dev mode","unlock all"],["comeback","activate"],["mercs","+200 Loks"],["overflow","max ink"],["revive","from stasis"],["new flip","fresh day"],["pin code","random"],["whisper","all voices"],["nightmode","dark mode"],["doubledown","2x Loks"],["resolve","finish quests"],["vibemode","celebration"],["debug","dev options"],["tokens","10k Loks"]].map(([name,desc])=>{const query=bleepCode.toLowerCase().replace(/[^a-z0-9]/g,"");const matches=query===""||name.includes(query)||desc.includes(query);return matches?<button key={name} onClick={()=>{const codes={"gratitude":"merci","dev mode":"supableep","comeback":"cincoorso","mercs":"mercmerc","overflow":"inkoverflow","revive":"phoenix","new flip":"fodskip","pin code":"pinball","whisper":"whisper","nightmode":"nightmode","doubledown":"doubledown","resolve":"resolve","vibemode":"vibemode","debug":"devmode","tokens":"Tokens10K"};onCheat&&onCheat(codes[name]||name);setBleepCode("");}} className="lok-btn px-2 py-1.5 rounded-lg text-left" style={{border:`1.5px solid ${T.ink}`,background:T.card,color:T.ink,opacity:0.8}}>
+              <div>{name}</div>
+              <div className="text-[8px] opacity-60">{desc}</div>
+            </button>:null;})}
           </div>
         </div>
           <div className="font-bold text-sm">About</div>
@@ -1582,7 +1588,8 @@ function Loader(){
   useEffect(()=>{const el=logoRef.current;if(!el)return;
     const onMove=e=>{pos.current.x=e.clientX;pos.current.y=e.clientY;};
     const onDown=()=>{pos.current.down=true;};const onUp=()=>{pos.current.down=false;};
-    window.addEventListener("pointermove",onMove);window.addEventListener("pointerdown",onDown);window.addEventListener("pointerup",onUp);
+    const onMotion=e=>{if(!e.gamma||!e.beta)return;const gx=Math.max(-90,Math.min(90,e.gamma))*2;const gy=Math.max(-45,Math.min(45,e.beta))*4;pos.current.x=window.innerWidth/2+gx;pos.current.y=window.innerHeight/2+gy;};
+    window.addEventListener("pointermove",onMove);window.addEventListener("pointerdown",onDown);window.addEventListener("pointerup",onUp);window.addEventListener("devicemotion",onMotion);
     let frame;const tick=()=>{
       const {x,y,px,py,vx,vy,down}=pos.current;const rect=el.getBoundingClientRect();
       const targetX=x-rect.left-rect.width/2;const targetY=y-rect.top-rect.height/2;
@@ -1593,7 +1600,7 @@ function Loader(){
       frame=requestAnimationFrame(tick);
     };
     tick();
-    return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerdown",onDown);window.removeEventListener("pointerup",onUp);cancelAnimationFrame(frame);};
+    return()=>{window.removeEventListener("pointermove",onMove);window.removeEventListener("pointerdown",onDown);window.removeEventListener("pointerup",onUp);window.removeEventListener("devicemotion",onMotion);cancelAnimationFrame(frame);};
   },[]);
 
   return(<div style={{minHeight:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:ART.paper,color:ART.ink,fontFamily:"'Bricolage Grotesque',system-ui,sans-serif"}}>
