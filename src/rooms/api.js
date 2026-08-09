@@ -78,4 +78,18 @@ export const roomsApi = {
   // same fix as insertStroke — `lok_stamps` is also empty in production
   saveStamp: s => post("lok_stamps", s, "resolution=merge-duplicates,return=minimal"),
   fetchStamps: (limit = 100) => get(`lok_stamps?public=eq.true&order=created_at.desc&limit=${limit}&select=*`),
+  // Loks balance and transfers
+  fetchBalance: async () => {
+    const rows = await get("lok_balances?select=loks");
+    return rows[0]?.loks || 0;
+  },
+  sendLoks: async (recipientId, amount, context = null) => {
+    const r = await timedFetch(`${SUPA_URL}/rest/v1/rpc/send_loks`, {
+      method: "POST",
+      headers: { ...headers(), Prefer: "return=representation" },
+      body: JSON.stringify({ recipient_user_id: recipientId, amount, context })
+    });
+    if (!r.ok) throw new Error(`send_loks ${r.status}`);
+    return r.json();
+  },
 };

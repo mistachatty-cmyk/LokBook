@@ -74,6 +74,8 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
   const [communityStamps, setCommunityStamps] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [pending, setPending] = useState(0); // marks queued by the outbox
+  const [tipTarget, setTipTarget] = useState(null); // {userId, name} for tip modal
+  const [tipAmount, setTipAmount] = useState("10");
   const miniRef = useRef(null); const [miniFrames, setMiniFrames] = useState([]);
   const canDraw = role === "owner" || role === "writer";
 
@@ -330,6 +332,24 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
     setBleepDraft(null); say("Bleep left ✦ your mark lives here now", "success"); hap && hap([30, 20, 30]);
   };
 
+  // ----- tipping -----
+  const sendTip = async () => {
+    if (!tipTarget || !tipAmount) return;
+    try {
+      const result = await roomsApi.sendLoks(tipTarget.userId, parseInt(tipAmount, 10), `room:${room.id}`);
+      if (result.success) {
+        say(`Sent ${tipAmount} Loks to ${tipTarget.name} ✓`, "success");
+        hap && hap([40, 20, 60]);
+      } else {
+        say(result.message || "Couldn't send that tip", "error");
+      }
+      setTipTarget(null);
+      setTipAmount("10");
+    } catch (e) {
+      say("Tip failed — check your connection", "error");
+    }
+  };
+
   // ----- permissions -----
   const askToDraw = () => { channel.send("perm.req", { userId, name: userName }); roomsApi.requestWrite(room.id, userId); say("Asked the host for the pen ✋"); };
   const grant = async r => { await roomsApi.grantWrite(room.id, r.userId); channel.send("perm.grant", { userId: r.userId }); setPermReqs(q2 => q2.filter(x => x.userId !== r.userId)); say(`${r.name} can draw now`, "success"); };
@@ -433,6 +453,7 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
           <button onClick={() => { setShowMembers(false); onArtist && onArtist(m.name); }} className="font-bold text-sm flex-1 text-left underline" style={{ color: T.ink }}>{m.name}{m.user_id === userId ? " (you)" : ""}</button>
           <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded uppercase" style={{ background: m.role === "owner" ? T.accent : m.role === "writer" ? T.alt : T.shadow, color: m.role === "reader" ? T.ink : "#fff" }}>{m.role}</span>
           {isOwner && m.role === "reader" && <button onClick={() => grant({ userId: m.user_id, name: m.name })} className="lok-btn text-[10px] font-extrabold px-2 py-1 rounded-full" style={{ border: `2px solid ${T.ink}` }}>give pen</button>}
+          {m.user_id !== userId && <button onClick={() => setTipTarget({ userId: m.user_id, name: m.name })} className="lok-btn text-[10px] font-extrabold px-2 py-1 rounded-full" style={{ border: `2px solid ${T.accent}`, color: T.accent }}>tip 💧</button>}
         </div>))}
       </div>
     </div>)}
@@ -466,6 +487,21 @@ function RoomCanvas({ room, userId, userName, say, onClose, onArtist, blip, hap 
         <div className="lok-display text-lg font-extrabold">Leave a bleep</div>
         <p className="text-xs opacity-70 mt-0.5">A tiny mark that says "I passed through here". One per room per day.</p>
         <BleepComposer onSend={sendBleep} T={T} />
+      </div>
+    </div>)}
+
+    {tipTarget && (<div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,.4)" }} onClick={() => setTipTarget(null)}>
+      <div className="w-full rounded-t-3xl p-5" style={{ maxWidth: 480, background: T.card, border: `3px solid ${T.ink}`, animation: "lokrise .25s ease" }} onClick={e => e.stopPropagation()}>
+        <div className="lok-display text-lg font-extrabold">Tip {tipTarget.name}</div>
+        <p className="text-xs opacity-70 mt-0.5">Send Loks from your balance. Daily limit: 500 Loks.</p>
+        <div className="mt-3 flex gap-2 items-center">
+          <input type="number" value={tipAmount} onChange={e => setTipAmount(e.target.value)} min="1" max="500" aria-label="Tip amount" className="flex-1 px-3 py-2 rounded-xl font-bold text-sm" style={{ border: `2.5px solid ${T.ink}`, background: T.paper, color: T.ink }} />
+          <span className="text-sm font-bold">Loks</span>
+        </div>
+        <div className="mt-3 flex gap-2">
+          <button onClick={() => setTipTarget(null)} className="lok-btn flex-1 py-2 rounded-xl text-sm font-bold" style={{ border: `2.5px solid ${T.ink}` }}>Cancel</button>
+          <button onClick={sendTip} className="lok-btn lok-display flex-1 py-2 rounded-xl font-extrabold" style={{ background: T.accent, color: T.onAccent, border: `3px solid ${T.ink}` }}>Send ✓</button>
+        </div>
       </div>
     </div>)}
 
