@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useT, ART } from "../theme/theme.js";
+import { useT, ART, blotBorderStyle } from "../theme/theme.js";
 import NameTag from "../NameTag.jsx";
 import { ReactionIcon, FramedAvatar } from "../art.jsx";
 import EmptyState from "../EmptyState.jsx";
 import LilLokPanel, { LilLokBubble, LilLokSprite } from "../LilLok.jsx";
 import { renderAvatar, renderSequence, renderDoodle, traceShape } from "../engine/draw.jsx";
 import * as auth from "../auth/auth.js";
-import { W, H, GAME_MANUAL_PAGES, BADGES, BADGE_CATEGORIES, PROMPTS, KID_PROMPTS, MODES, FRONT_NAMES, WAGERS, INTERVENTIONS, makeQuests, LILLOK_GEAR, blotBorderStyle, WEEKLY_PROMPT, PACE_PRESETS } from "../constants.jsx";
+import { W, H, GAME_MANUAL_PAGES, BADGES, BADGE_CATEGORIES, PROMPTS, KID_PROMPTS, MODES, FRONT_NAMES, WAGERS, INTERVENTIONS, makeQuests, LILLOK_GEAR, WEEKLY_PROMPT, PACE_PRESETS } from "../constants.jsx";
 import { encodeGIF } from "../engine/gif.js";
 import { makeRushRivals, rushScore, recordRush } from "../engine/bots.js";
 import { isReservedName } from "../identity.js";
