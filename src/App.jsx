@@ -1641,7 +1641,7 @@ export default function LokApp(){
           exist here so the column geometry is owned in one place. */}
       <div className="lok-shell" style={{display:"grid",justifyContent:"center",alignItems:"start",gap:vp.tier==="phone"?0:24,gridTemplateColumns:vp.tier==="desktop"?`${RAIL_W}px minmax(0,560px) ${RAIL_W}px`:vp.tier==="tablet"?`minmax(0,560px) ${RAIL_W}px`:"minmax(0,1fr)"}}>
         {vp.tier==="desktop"&&<aside className="lok-rail lok-rail-left" style={{position:"sticky",top:88}}>{ads.rails==="both"&&<AdRail side="left" onGetLokPass={()=>setTab("shop")}/>}</aside>}
-      <main className="mx-auto w-full px-4 pb-40" style={{maxWidth:560}}>
+      <main className="mx-auto w-full px-4" style={{maxWidth:560,paddingBottom:"calc(160px + env(safe-area-inset-bottom))"}}>
         <div key={tab} className="lok-tabin">
         {/* Shop, Rooms, and Roadmap are lazy — they are the heaviest pages and
             most sessions never open them, so they no longer sit in the initial
@@ -1737,12 +1737,13 @@ export default function LokApp(){
 }
 
 function Loader(){
-  const logoRef=useRef(null);const pos=useRef({x:0,y:0,px:0,py:0,vx:0,vy:0,down:false});
+  const logoRef=useRef(null);const pos=useRef({x:0,y:0,px:0,py:0,vx:0,vy:0,down:false});const gyroRequested=useRef(false);
   useEffect(()=>{const el=logoRef.current;if(!el)return;
     const onMove=e=>{pos.current.x=e.clientX;pos.current.y=e.clientY;};
     const onDown=()=>{pos.current.down=true;};const onUp=()=>{pos.current.down=false;};
     const onMotion=e=>{if(!e.gamma||!e.beta)return;const gx=Math.max(-90,Math.min(90,e.gamma))*2;const gy=Math.max(-45,Math.min(45,e.beta))*4;pos.current.x=window.innerWidth/2+gx;pos.current.y=window.innerHeight/2+gy;};
-    window.addEventListener("pointermove",onMove);window.addEventListener("pointerdown",onDown);window.addEventListener("pointerup",onUp);window.addEventListener("devicemotion",onMotion);
+    const requestGyroPermission=async()=>{if(typeof DeviceMotionEvent!=="undefined"&&DeviceMotionEvent.requestPermission){try{const p=await DeviceMotionEvent.requestPermission();if(p==="granted")window.addEventListener("devicemotion",onMotion);}catch{}}else{window.addEventListener("devicemotion",onMotion);}};
+    window.addEventListener("pointermove",onMove);window.addEventListener("pointerdown",onDown);window.addEventListener("pointerup",onUp);window.addEventListener("touchstart",()=>{if(!gyroRequested.current){gyroRequested.current=true;requestGyroPermission();}},{once:true});
     const stop=pacedLoop(()=>{
       const {x,y,px,py,vx,vy,down}=pos.current;const rect=el.getBoundingClientRect();
       const targetX=x-rect.left-rect.width/2;const targetY=y-rect.top-rect.height/2;
