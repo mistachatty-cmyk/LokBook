@@ -2,7 +2,7 @@ import { useState, useRef, forwardRef, useImperativeHandle, useEffect } from "re
 import { useT, ART } from "./theme/theme.js";
 import { W, H, BLENDS, hasModule, getModuleLayers } from "./constants.jsx";
 import { getStroke } from 'perfect-freehand';
-import { paperBase } from "./engine/draw.jsx";
+import { paperBase, applyBloom } from "./engine/draw.jsx";
 import { cursorFor } from "./engine/cursors.js";
 import { ROTATION_PAPERS } from "./engine/rotation.js";
 import { hitSticker, drawStickerItem, getSticker } from "./engine/stickers.js";
@@ -17,6 +17,24 @@ const PALLETS={
   sunset:["#FF6B6B","#FF8E53","#FECA57","#48DBFB","#FF9FF3","#54A0FF","#FF9F43","#EE5A24","#F368E0","#0ABDE3","#FFC312","#C4E538"],
 };
 
+// Grain brush texture: a small grayscale noise tile, alpha-varied so it can
+// serve directly as a "source-in" mask (tinted per-dab to the current brush
+// color). Rendered once and reused — no image asset, no network dependency.
+let grainTexture=null;
+const getGrainTexture=()=>{
+  if(grainTexture)return grainTexture;
+  const size=64;const cv=document.createElement("canvas");cv.width=size;cv.height=size;
+  const ctx=cv.getContext("2d");
+  for(let i=0;i<900;i++){
+    const x=Math.random()*size,y=Math.random()*size;
+    const g=Math.floor(1+Math.random()*254);
+    ctx.fillStyle=`rgba(${g},${g},${g},${0.12+Math.random()*0.55})`;
+    ctx.beginPath();ctx.arc(x,y,0.4+Math.random()*1.1,0,Math.PI*2);ctx.fill();
+  }
+  grainTexture=cv;return cv;
+};
+const grainStampCv=typeof document!=="undefined"?document.createElement("canvas"):null;
+
 const DEMO_BRUSH_PRESETS=[
   {id:"starter",name:"Starter",flow:0.35,scatter:0.15,dabs:3,angleJitter:0.2,roundness:1},
   {id:"light",name:"Light Touch",flow:0.18,scatter:0.05,dabs:1,angleJitter:0.05,roundness:1},
@@ -25,7 +43,7 @@ const DEMO_BRUSH_PRESETS=[
   {id:"basics",name:"Bold Basics",flow:0.6,scatter:0.1,dabs:2,angleJitter:0.1,roundness:1},
 ];
 
-const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper="plain",legacyMode=false,onLegacyToggle,maxLayers:maxLayersProp,ccTier=false,animFx="none",cursorPack="default",stickers=[],onStickersChange,pendingSticker=null,onStickerPlaced},ref){
+const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper="plain",legacyMode=false,onLegacyToggle,maxLayers:maxLayersProp,ccTier=false,animFx="none",cursorPack="default",stickers=[],onStickersChange,pendingSticker=null,onStickerPlaced,say,grainIntroSeen=false,onGrainIntroSeen},ref){
   const T=useT();
   // Layer cap: the Studio TIERS system passes maxLayers explicitly; otherwise
   // fall back to whatever the owned layer modules allow.
@@ -35,7 +53,7 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const owns=id=>ccTier||hasModule(modules,id);
   const legacyRef=useRef(legacyMode);useEffect(()=>{legacyRef.current=legacyMode;},[legacyMode]);
   const hasMarker=owns("brush_marker");const hasChalk=owns("brush_chalk");const hasSym=owns("feat_symmetry");const hasCalligraphy=owns("brush_calligraphy");const hasNeon=owns("brush_neon");const hasSparkle=owns("brush_sparkle");const hasCrayon=owns("brush_crayon");const hasWash=owns("brush_wash");const hasGalaxy=owns("brush_galaxy");const showPro=hasMarker||hasChalk||hasSym||hasCalligraphy||hasNeon||hasSparkle||hasCrayon||hasWash||hasGalaxy;
-  const brushList=[["ink","Ink"]];if(hasMarker)brushList.push(["marker","Marker"]);if(hasChalk)brushList.push(["chalk","Chalk"]);if(hasCalligraphy)brushList.push(["calligraphy","Cali"]);if(hasNeon)brushList.push(["neon","Neon"]);if(hasSparkle)brushList.push(["sparkle","Sprkl"]);if(hasCrayon)brushList.push(["crayon","Crayon"]);if(hasWash)brushList.push(["wash","Wash"]);if(hasGalaxy)brushList.push(["galaxy","Galxy"]);
+  const brushList=[["ink","Ink"],["grain","Grain"]];if(hasMarker)brushList.push(["marker","Marker"]);if(hasChalk)brushList.push(["chalk","Chalk"]);if(hasCalligraphy)brushList.push(["calligraphy","Cali"]);if(hasNeon)brushList.push(["neon","Neon"]);if(hasSparkle)brushList.push(["sparkle","Sprkl"]);if(hasCrayon)brushList.push(["crayon","Crayon"]);if(hasWash)brushList.push(["wash","Wash"]);if(hasGalaxy)brushList.push(["galaxy","Galxy"]);
   const hasTools=modules.some(m=>["tool_spray","tool_glow","tool_watercolor","tool_pattern","tool_shape","tool_gradient","tool_push","tool_smudge","tool_clone","tool_blur","tool_replace","tool_rulers","tool_transform"].includes(m));
   const[layers,setLayers]=useState([{id:1,visible:true,opacity:1,blend:"source-over"}]);
   const[active,setActive]=useState(1);const[tool,setTool]=useState("pen");const[color,setColor]=useState(ART.ink);  const[recentColors,setRecentColors]=useState(()=>{try{const r=localStorage.getItem("lok:recentColors");return r?JSON.parse(r):[];}catch{return[];}});const[size,setSize]=useState(7);const[symmetry,setSymmetry]=useState("none");const[brush,setBrush]=useState("ink");const[cursorPos,setCursorPos]=useState(null);const[zoom,setZoom]=useState(1);const[pan,setPan]=useState({x:0,y:0});const[clonePt,setClonePt]=useState(null);const[shapeMode,setShapeMode]=useState("rect");const[showGuides,setShowGuides]=useState(false);const[anchorPt,setAnchorPt]=useState(null);const[blurAmount,setBlurAmount]=useState(5);  const[refImg,setRefImg]=useState(null);const[refIsVideo,setRefIsVideo]=useState(false);const[refOpacity,setRefOpacity]=useState(0.3);const[smoothStrength,setSmoothStrength]=useState(0.5);const[palette,setPalette]=useState("default");const[canvasSize,setCanvasSize]=useState("default");const isPanning=useRef(false);const panStart=useRef({x:0,y:0});const pinchRef=useRef(null);
@@ -88,7 +106,7 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const toImg=cv=>cv.toDataURL("image/webp",0.72);
   const strokePoints=useRef([]);
   useImperativeHandle(ref,()=>({
-    composite(pageNum=null){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");paperBase(ctx,pageNum);layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv&&l.visible){ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=l.blend;ctx.drawImage(cv,0,0);}});ctx.globalAlpha=1;ctx.globalCompositeOperation="source-over";
+    composite(pageNum=null,{bloom=false}={}){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");paperBase(ctx,pageNum);layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv&&l.visible){ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=l.blend;ctx.drawImage(cv,0,0);}});ctx.globalAlpha=1;ctx.globalCompositeOperation="source-over";
       // Stickers bake in here so every existing caller (capture, battle,
       // duels, the live draft poll) gets them for free with no signature
       // change. Stays synchronous: an image sticker not yet loaded into
@@ -96,7 +114,10 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
       // not become async (see the note in engine/stickers.js) — in practice
       // it's already loaded well before a capture happens.
       stickers.forEach(s=>drawStickerItem(ctx,s,{imageCache:stickerImages.current}));
-      return toImg(tmp);},
+      // Bloom only runs here, at real capture moments — never on the 2s
+      // draft-preview poll, which would pay the cost continuously for a
+      // thumbnail nobody scrutinizes closely.
+      return toImg(bloom?applyBloom(tmp):tmp);},
     blankFrame(){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;paperBase(tmp.getContext("2d"),null);return toImg(tmp);},
     clearAll(){layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv)cv.getContext("2d").clearRect(0,0,W,H);});undoStack.current=[];redoStack.current=[];},
     async restoreFromImage(dataUrl){if(!dataUrl)return;const cv=canvases.current.get(layers[0].id);if(!cv)return;const img=new Image();await new Promise(res=>{img.onload=res;img.onerror=res;img.src=dataUrl;});cv.getContext("2d",{willReadFrequently:true}).drawImage(img,0,0,W,H);},
@@ -137,6 +158,26 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const legacySparkleAt=(ctx,x,y)=>{ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;ctx.globalAlpha=0.9;const n=5+Math.round(Math.random()*4);for(let d=0;d<n;d++){const a=Math.random()*Math.PI*2,r=Math.random()*size*0.6;ctx.beginPath();ctx.arc(x+Math.cos(a)*r,y+Math.sin(a)*r,1+Math.random()*1.5,0,Math.PI*2);ctx.fill();}ctx.beginPath();ctx.arc(x,y,size*0.3,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(x-1,y-1,size*0.12,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;};
   const improvedSparkleAt=(ctx,x,y)=>{const p=pct();const pr=p.pressure;const es=size*(0.3+pr*0.7);ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;const n=10+Math.round(pr*10);for(let d=0;d<n;d++){ctx.globalAlpha=0.4+Math.random()*0.5;const a=Math.random()*Math.PI*2,r=Math.random()*es*0.8;const sd=0.5+Math.random()*2;ctx.beginPath();ctx.arc(x+Math.cos(a)*r,y+Math.sin(a)*r,sd,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=0.95;ctx.beginPath();ctx.arc(x,y,es*0.35,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff";ctx.globalAlpha=0.9;for(let d=0;d<4;d++){const sa=d*Math.PI/2;ctx.beginPath();ctx.arc(x+Math.cos(sa)*es*0.4,y+Math.sin(sa)*es*0.4,es*0.08,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;};
   const sparkleAt=(ctx,x,y)=>legacyRef.current?legacySparkleAt(ctx,x,y):improvedSparkleAt(ctx,x,y);
+  const grainAt=(ctx,x,y)=>{
+    if(!grainStampCv)return;
+    const p=pct();const pr=p.pressure;const es=size*(0.4+pr*0.8);
+    const tex=getGrainTexture();
+    const dim=Math.max(4,Math.round(es*2));
+    grainStampCv.width=dim;grainStampCv.height=dim;
+    const sctx=grainStampCv.getContext("2d");
+    sctx.clearRect(0,0,dim,dim);
+    sctx.save();sctx.translate(dim/2,dim/2);sctx.rotate((Math.random()-0.5)*0.6);
+    sctx.drawImage(tex,-dim/2,-dim/2,dim,dim);
+    sctx.restore();
+    sctx.globalCompositeOperation="source-in";
+    sctx.fillStyle=color;
+    sctx.fillRect(0,0,dim,dim);
+    sctx.globalCompositeOperation="source-over";
+    ctx.globalCompositeOperation="source-over";
+    ctx.globalAlpha=0.55+pr*0.35;
+    ctx.drawImage(grainStampCv,x-dim/2,y-dim/2);
+    ctx.globalAlpha=1;
+  };
   const legacyCrayonAt=(ctx,x,y)=>{ctx.globalCompositeOperation="source-over";ctx.globalAlpha=0.7+Math.random()*0.25;ctx.fillStyle=color;const ox=(Math.random()-0.5)*size*0.4,oy=(Math.random()-0.5)*size*0.4;const r=size*0.5+Math.random()*size*0.3;ctx.beginPath();ctx.arc(x+ox,y+oy,r,0,Math.PI*2);ctx.fill();for(let d=0;d<3;d++){ctx.fillStyle=color;ctx.globalAlpha=0.15+Math.random()*0.2;ctx.beginPath();ctx.arc(x+(Math.random()-0.5)*size*0.6,y+(Math.random()-0.5)*size*0.6,size*0.2+Math.random()*size*0.3,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;};
   const improvedCrayonAt=(ctx,x,y)=>{const p=pct();const pr=p.pressure;const es=size*(0.3+pr*0.7);ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;ctx.globalAlpha=0.5+pr*0.4;const ox=(Math.random()-0.5)*es*0.35,oy=(Math.random()-0.5)*es*0.35;ctx.beginPath();ctx.arc(x+ox,y+oy,es*0.4+Math.random()*es*0.3,0,Math.PI*2);ctx.fill();const n=4+Math.round(pr*4);for(let d=0;d<n;d++){ctx.fillStyle=color;ctx.globalAlpha=0.1+Math.random()*0.2*pr;ctx.beginPath();ctx.arc(x+(Math.random()-0.5)*es*0.7,y+(Math.random()-0.5)*es*0.7,es*0.15+Math.random()*es*0.25,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;};
   const crayonAt=(ctx,x,y)=>legacyRef.current?legacyCrayonAt(ctx,x,y):improvedCrayonAt(ctx,x,y);
@@ -148,7 +189,7 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const galaxyAt=(ctx,x,y)=>legacyRef.current?legacyGalaxyAt(ctx,x,y):improvedGalaxyAt(ctx,x,y);
   const partialPatternAt=(ctx,x,y)=>{ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;ctx.globalAlpha=0.15;const ps=[[x-size,y-size],[x,y-size],[x+size,y-size],[x-size,y],[x,y],[x+size,y],[x-size,y+size],[x,y+size],[x+size,y+size]];ps.forEach(([px,py])=>{ctx.fillRect(px,py,size*0.7,size*0.7);});ctx.globalAlpha=1;};
   const symXY=(x,y)=>{const o=[[x,y]];if(symmetry==="mirrorX"||symmetry==="quad")o.push([W-x,y]);if(symmetry==="mirrorY"||symmetry==="quad")o.push([x,H-y]);if(symmetry==="quad")o.push([W-x,H-y]);if(symmetry.startsWith("radial")){const n=+symmetry.slice(6),cx=W/2,cy=H/2;for(let i=1;i<n;i++){const a=(i/n)*Math.PI*2,c=Math.cos(a),s=Math.sin(a);o.push([cx+(x-cx)*c-(y-cy)*s,cy+(x-cx)*s+(y-cy)*c]);}}return o;};
-  const brushFn=brush==="spray"?sprayAt:brush==="glow"?glowAt:brush==="watercolor"?watercolorAt:brush==="pattern"?partialPatternAt:brush==="calligraphy"?calligraphyAt:brush==="neon"?neonAt:brush==="sparkle"?sparkleAt:brush==="crayon"?crayonAt:brush==="wash"?washAt:brush==="galaxy"?galaxyAt:brush==="custom"?customAt:null;
+  const brushFn=brush==="spray"?sprayAt:brush==="glow"?glowAt:brush==="watercolor"?watercolorAt:brush==="pattern"?partialPatternAt:brush==="calligraphy"?calligraphyAt:brush==="neon"?neonAt:brush==="sparkle"?sparkleAt:brush==="crayon"?crayonAt:brush==="wash"?washAt:brush==="galaxy"?galaxyAt:brush==="grain"?grainAt:brush==="custom"?customAt:null;
   const stamp=(ctx,x,y,start)=>{
     const pts=symXY(x,y);
     if(brushFn){pts.forEach(([sx,sy])=>brushFn(ctx,sx,sy));return;}
@@ -279,7 +320,7 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
       <button onClick={()=>setBrushLabOpen(o=>!o)} aria-pressed={brushLabOpen} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${brushLabOpen?T.accent:T.ink}`,background:brushLabOpen?T.ink:T.card,color:brushLabOpen?T.paper:T.ink}}>Brush Lab</button>
       <button onClick={()=>setDynamics(d=>!d)} aria-pressed={dynamics} title="Pressure & speed-based size dynamics" className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-bold" style={{border:`2px solid ${dynamics?T.accent:T.ink}`,background:dynamics?T.ink:T.card,color:dynamics?T.paper:T.ink}}>Dynamics</button>
       {showPro&&(<div className="flex items-center gap-1.5"><span className="text-xs font-bold opacity-60 shrink-0">pro</span>
-        {brushList.map(([id,l])=>(<button key={id} onClick={()=>{setBrush(id);if(tool==="eraser"||tool==="fill"||tool==="eyedrop")setTool("pen");}} aria-pressed={brush===id} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${brush===id?T.accent:T.ink}`,background:brush===id?T.ink:T.card,color:brush===id?T.paper:T.ink}}>{l}</button>))}
+        {brushList.map(([id,l])=>(<button key={id} onClick={()=>{setBrush(id);if(tool==="eraser"||tool==="fill"||tool==="eyedrop")setTool("pen");if(id==="grain"&&!grainIntroSeen){say&&say("🖌️ Grain — real canvas texture, try it on a big shape");onGrainIntroSeen&&onGrainIntroSeen();}}} aria-pressed={brush===id} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${brush===id?T.accent:T.ink}`,background:brush===id?T.ink:T.card,color:brush===id?T.paper:T.ink}}>{l}</button>))}
         {hasSym&&<select value={symmetry} onChange={e=>setSymmetry(e.target.value)} aria-label="Symmetry mode" className="shrink-0 px-2 py-1 rounded-full text-[11px] font-bold" style={{border:`2px solid ${symmetry!=="none"?T.accent:T.ink}`,background:symmetry!=="none"?T.ink:T.card,color:symmetry!=="none"?T.paper:T.ink}}>
           <option value="none">No symmetry</option><option value="mirrorX">Mirror X</option><option value="mirrorY">Mirror Y</option><option value="quad">4-Way</option><option value="radial4">Radial 4</option><option value="radial6">Radial 6</option><option value="radial8">Radial 8</option>
         </select>}</div>)}

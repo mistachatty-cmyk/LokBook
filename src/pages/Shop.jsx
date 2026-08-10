@@ -6,7 +6,7 @@ import {
   RARITY, EFFECTS, NAME_COLORS, PAPERS, MYTHIC_ITEMS, CELEBRATIONS, ANIMATION_FX, SKIES,
   CURSORS, FONT_PACKS, STICKER_PACKS, POST_EXPORTS, FRAMES, REACTION_PACKS, AVATAR_ACCENTS,
   STUDIO_MODULES, BLOT_BORDERS, BLOT_PERSONALITIES, BLOT_IDLE_ANIMATIONS, BLOT_EXPRESSIONS, BLOT_BOUNCES, LILLOK_GEAR, LILLOK_SKINS, LILLOK_AURAS, LILLOK_PETS,
-  VOICE_PACKS, MUSIC_PACKS, getDailyRotation, getWeeklyRotation,
+  VOICE_PACKS, MUSIC_PACKS, WORLD_SKINS, getDailyRotation, getWeeklyRotation,
 } from "../constants.jsx";
 import MythicPreview from "../MythicPreview.jsx";
 
@@ -166,6 +166,7 @@ export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kid
       <Section title="Avatar frames" sub="Decorative borders around your avatar."><div className="grid grid-cols-2 gap-2">{FRAMES.map(f=>{const own=has("frame",f.id);const e2=eq("frame",f.id);return(<ShopItem key={f.id} owned={own} equipped={e2} price={f.price} onClick={()=>buy("frame",f)}><div className="font-bold text-sm">{f.name}</div><div className="text-[10px] opacity-70">Avatar frame</div></ShopItem>);})}</div></Section>
       <Section title="Reaction packs" sub="Emoji/lok reaction sets for posts."><div className="grid grid-cols-2 gap-2">{REACTION_PACKS.map(r=>(<ShopItem key={r.id} owned={has("reactionPack",r.id)} equipped={eq("reactionPack",r.id)} price={r.price} onClick={()=>buy("reactionPack",r)}><div className="font-bold text-sm leading-tight">{r.name}</div><div className="text-[10px] opacity-70">Reaction set</div></ShopItem>))}</div></Section>
       <Section title="Avatar accents" sub="Small decorative elements on your avatar."><div className="grid grid-cols-2 gap-2">{AVATAR_ACCENTS.map(a=>(<ShopItem key={a.id} owned={has("avatarAccent",a.id)} equipped={eq("avatarAccent",a.id)} price={a.price} onClick={()=>buy("avatarAccent",a)}><div className="font-bold text-sm">{a.name}</div><div className="text-[10px] opacity-70">Avatar accent</div></ShopItem>))}</div></Section>
+      <Section title="World skins" sub="Change the look of the 3D globe in World."><div className="grid grid-cols-2 gap-2">{WORLD_SKINS.filter(s=>showAll||s.id!=="none").map(s=>(<ShopItem key={s.id} owned={has("globeSkin",s.id)} equipped={eq("globeSkin",s.id)} price={s.price} onClick={()=>buy("globeSkin",s)}><div className="font-bold text-sm">{s.name}</div><div className="text-[10px] opacity-70">{s.desc}</div></ShopItem>))}</div></Section>
     </>)}
     {activeTab==="studio"&&(<>
       <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">{moduleTypes.filter(t=>t.type!=="achievement").map(({type,label})=>(<button key={type} onClick={()=>setModTab(type)} className="lok-btn shrink-0 px-3 py-1.5 rounded-full text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:modTab===type?T.ink:T.card,color:modTab===type?T.paper:T.ink}}>{label}</button>))}</div>

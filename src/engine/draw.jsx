@@ -9,6 +9,41 @@ export function paperBase(ctx, pageNum = null, framed = true) {
   if (pageNum !== null) { ctx.fillStyle = "rgba(35,48,107,0.45)"; ctx.font = "700 20px monospace"; ctx.textAlign = "right"; ctx.fillText(String(pageNum + 1).padStart(2, "0"), W - 30, H - 30); ctx.textAlign = "left"; }
 }
 
+// Bloom/glow post-process: approximates a bright-area threshold via CSS
+// canvas filters (brightness+contrast crushes dark/mid tones toward black
+// while keeping bright/saturated strokes lit), blurs just that isolated
+// layer, then screens it back over the original. Stays fully synchronous —
+// Easel.jsx's composite() cannot become async (see the note there).
+export function applyBloom(srcCanvas, { threshold = 0.55, blur = 10, intensity = 0.5 } = {}) {
+  const w = srcCanvas.width, h = srcCanvas.height;
+
+  const bright = document.createElement("canvas");
+  bright.width = w; bright.height = h;
+  const bctx = bright.getContext("2d");
+  bctx.filter = `brightness(${1 - threshold}) contrast(6) saturate(1.4)`;
+  bctx.drawImage(srcCanvas, 0, 0);
+  bctx.filter = "none";
+
+  const blurred = document.createElement("canvas");
+  blurred.width = w; blurred.height = h;
+  const blctx = blurred.getContext("2d");
+  blctx.filter = `blur(${blur}px)`;
+  blctx.drawImage(bright, 0, 0);
+  blctx.filter = "none";
+
+  const out = document.createElement("canvas");
+  out.width = w; out.height = h;
+  const octx = out.getContext("2d");
+  octx.drawImage(srcCanvas, 0, 0);
+  octx.globalAlpha = intensity;
+  octx.globalCompositeOperation = "screen";
+  octx.drawImage(blurred, 0, 0);
+  octx.globalAlpha = 1;
+  octx.globalCompositeOperation = "source-over";
+
+  return out;
+}
+
 export function risoCircle(ctx, x, y, rx, ry, off = 5) {
   ctx.fillStyle = ART.pink;
   ctx.beginPath();

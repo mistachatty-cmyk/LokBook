@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { GLOBE_CONFIG, THEME_GLOBE_SETTINGS } from '../constants.jsx';
+import { GLOBE_CONFIG, WORLD_SKINS } from '../constants.jsx';
+import { THEMES } from '../theme/theme.js';
 
-export default function WorldMapViewer({ posts = [], userLocation, theme = 'default', gyroMotion = { gamma: 0, beta: 0, alpha: 0 }, onPostClick, onClose }) {
+// Deep space stays a fixed near-black across every theme (matching how
+// every real 3D-globe app renders the void) — it's the atmosphere glow and
+// markers that actually read as "themed," derived straight from the app's
+// own theme tokens rather than a separate hand-maintained lookup table that
+// only covered 3 of ~62 themes and silently fell back to default forever.
+// A purchasable skin (see WORLD_SKINS in constants.jsx) overrides the
+// theme-derived look with its own fixed texture + atmosphere tint.
+export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso', skin = 'none', gyroMotion = { gamma: 0, beta: 0, alpha: 0 }, onPostClick, onClose }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
   const [selectedPost, setSelectedPost] = useState(null);
@@ -13,10 +21,20 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'defa
 
     // Dynamically import globe.gl only in browser environment
     import('globe.gl').then(({ default: Globe }) => {
+      // Derive globe colors from the app's own theme tokens instead of a
+      // separate lookup table, so every theme (not just 3 of them) is covered.
+      // An equipped skin (WORLD_SKINS) overrides these with its own fixed
+      // texture + tint, same as any other cosmetic overriding a default look.
+      const T = THEMES[theme] || THEMES.riso;
+      const skinDef = WORLD_SKINS.find(s => s.id === skin);
+      const themeSettings = {
+        backgroundColor: skinDef?.backgroundColor || '#000011',
+        atmosphereColor: skinDef?.atmosphereColor || T.accent,
+      };
+      const globeTextureUrl = skinDef?.textureUrl || '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg';
+      const globeBumpUrl = skinDef?.bumpUrl || '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png';
+      let globe;
       try {
-        // Get theme settings with fallback to default
-        const themeSettings = THEME_GLOBE_SETTINGS[theme] || THEME_GLOBE_SETTINGS.default;
-
         // Ensure container has dimensions
         const container = containerRef.current;
         if (!container) return;
@@ -25,11 +43,11 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'defa
         const height = container.clientHeight || window.innerHeight;
 
         // Initialize globe
-        const globe = Globe()
+        globe = Globe()
           .width(width)
           .height(height)
-          .globeImageUrl('//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg')
-          .bumpImageUrl('//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png')
+          .globeImageUrl(globeTextureUrl)
+          .bumpImageUrl(globeBumpUrl)
           .backgroundColor(themeSettings.backgroundColor)
           .atmosphereColor(themeSettings.atmosphereColor)
           .atmosphereAltitude(0.1)
@@ -42,25 +60,25 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'defa
       } catch (err) {
         console.error('Globe initialization error:', err);
       }
+      // Everything below needs a successfully-initialized globe — bail out
+      // quietly rather than throwing (this used to reference `globe` from
+      // inside the try block above, which is out of scope here and threw a
+      // ReferenceError on every single open, regardless of theme).
+      if (!globe) return;
 
       // Set camera position
       globe.pointOfView({ altitude: 2.5 });
 
-      // Add user location marker if available
-      if (userLocation) {
-        const userMarkers = [{
-          lat: userLocation.lat,
-          lng: userLocation.lng,
-          size: 0.8,
-          color: '#4f46e5',
-        }];
-        globe.pointsData(userMarkers)
-          .pointColor(d => d.color)
-          .pointSize(d => d.size)
-          .pointAltitude(0.01);
-      }
-
-      // Add post location markers (only show public locations)
+      // User's own location + post pins share one pointsData call — setting
+      // it twice (as this used to do) makes the second call silently
+      // overwrite the first, so the two marker sets could never show together.
+      const userMarkers = userLocation ? [{
+        lat: userLocation.lat,
+        lng: userLocation.lng,
+        size: 0.8,
+        color: T.accent,
+        isUser: true,
+      }] : [];
       const postMarkers = posts
         .filter(post => post.latitude && post.longitude && post.location_privacy === 'everyone')
         .map((post, idx) => ({
@@ -68,16 +86,17 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'defa
           lat: post.latitude,
           lng: post.longitude,
           size: 0.5,
-          color: '#ec4899',
+          color: T.alt || T.accent,
           post,
         }));
 
-      if (postMarkers.length > 0) {
-        globe.pointsData(postMarkers)
+      if (userMarkers.length > 0 || postMarkers.length > 0) {
+        globe.pointsData([...userMarkers, ...postMarkers])
           .pointColor(d => d.color)
           .pointSize(d => d.size)
           .pointAltitude(0.01)
           .onPointClick(d => {
+            if (d.isUser) return;
             setSelectedPost(d.post);
             if (onPostClick) onPostClick(d.post);
           });
@@ -100,7 +119,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'defa
         }
       };
     }).catch(err => console.warn('Failed to load globe.gl', err));
-  }, [posts, userLocation, theme, onPostClick]);
+  }, [posts, userLocation, theme, skin, onPostClick]);
 
   useEffect(() => {
     if (!globeRef.current || !globeReady) return;

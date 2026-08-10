@@ -893,21 +893,24 @@ export const GLOBE_CONFIG = {
   autoRotateSpeed: 0.5,
 };
 
-// Theme-specific globe appearance settings
-export const THEME_GLOBE_SETTINGS = {
-  default: {
-    atmosphereColor: '#87CEEB',
-    glowColor: '#4a9eff',
-    backgroundColor: '#000011',
-  },
-  light: {
-    atmosphereColor: '#e0f0ff',
-    glowColor: '#2563eb',
-    backgroundColor: '#f0f5ff',
-  },
-  dark: {
-    atmosphereColor: '#1a1a3e',
-    glowColor: '#60a5fa',
-    backgroundColor: '#0a0a1a',
-  },
-};
+// Purchasable World globe skins. "none" (the default, free) follows the
+// current app theme's own colors — see WorldMapViewer.jsx. Each paid skin
+// overrides that with a fixed globe texture + atmosphere tint instead.
+// textureUrl/bumpUrl point at three-globe's existing stock CDN images for
+// now (no custom art pipeline available yet); swap these for bespoke
+// stylized textures later without touching anything else.
+export const WORLD_SKINS = [
+  { id: 'none', name: 'Default (theme)', price: 0, desc: 'Follows your equipped theme colors.' },
+  { id: 'cyberpunk', name: 'Cyberpunk Globe', price: 80, desc: 'Neon night-city glow.',
+    textureUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-dark.jpg',
+    bumpUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png',
+    atmosphereColor: '#ff2fd6', backgroundColor: '#050014' },
+  { id: 'organic', name: 'Organic Globe', price: 80, desc: 'Bioluminescent, pulsing atmosphere.',
+    textureUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg',
+    bumpUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png',
+    atmosphereColor: '#2fffa0', backgroundColor: '#001208' },
+  { id: 'retro', name: 'Retro Cartography', price: 80, desc: 'Vintage map colors.',
+    textureUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-day.jpg',
+    bumpUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png',
+    atmosphereColor: '#e8b14b', backgroundColor: '#1a1206' },
+];
