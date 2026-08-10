@@ -42,6 +42,11 @@ export function CombatHub({
   setWins,
   setPosts,
   nudgeGuestSave,
+  bloomEnabled,
+  bloomIntroSeen,
+  onBloomIntroSeen,
+  grainIntroSeen,
+  onGrainIntroSeen,
 }) {
   const [combatMode, setCombatMode] = useState(mode);
 
@@ -130,6 +135,11 @@ export function CombatHub({
             onUnlockBig={onUnlockBig}
             onResult={onResult}
             onPublish={onPublish}
+            bloomEnabled={bloomEnabled}
+            bloomIntroSeen={bloomIntroSeen}
+            onBloomIntroSeen={onBloomIntroSeen}
+            grainIntroSeen={grainIntroSeen}
+            onGrainIntroSeen={onGrainIntroSeen}
           />
         </>
       )}

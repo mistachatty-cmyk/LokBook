@@ -59,6 +59,11 @@ export const UNLOCK_TRACK = [
     detail: "Once in a while LilLok redraws one of your own posts in its own style and files it beside the original. You can keep it, or paint over it.",
   },
   {
+    level: 12, id: "xray_preview", name: "X-ray Preview", live: false,
+    blurb: "Peek at what a chest could hold before you open it.",
+    detail: "A scan button on each chest shows a handful of the rewards that rarity can roll — not a guarantee of what's inside, just a peek at the pool. The preview UI already exists; it needs a scan control wired into the chest inventory and a rarity-gated sample of possible rewards to show.",
+  },
+  {
     level: 13, id: "gravity_well", name: "Gravity Well", live: false,
     blurb: "Loose things fall toward your cursor.",
     detail: "Particles, stickers and page effects stop drifting straight down and start leaning toward wherever your pointer is. The whole app develops a slight pull.",
