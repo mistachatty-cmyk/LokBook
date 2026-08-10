@@ -15,12 +15,28 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   const [selectedPost, setSelectedPost] = useState(null);
   const [globeReady, setGlobeReady] = useState(false);
   const cameraRotationRef = useRef({ longitude: 0, latitude: 0 });
+  // The globe.gl chunk is ~2MB — on a weak connection it can fail, or just
+  // hang without ever technically rejecting. Previously any failure only
+  // hit console.warn/console.error, so the modal's header rendered fine
+  // while the globe area stayed permanently blank with zero feedback and
+  // no loading indicator either (the outer <Suspense> in App.jsx never
+  // actually fires here, since this isn't a React.lazy/use() resource).
+  const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
+  const [errorMsg, setErrorMsg] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     if (!containerRef.current) return;
+    setStatus('loading');
+    setErrorMsg('');
+    let cancelled = false;
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) { setStatus('error'); setErrorMsg("This is taking too long — your connection may be too slow to load the globe."); }
+    }, 12000);
 
     // Dynamically import globe.gl only in browser environment
     import('globe.gl').then(({ default: Globe }) => {
+      if (cancelled) return;
       // Derive globe colors from the app's own theme tokens instead of a
       // separate lookup table, so every theme (not just 3 of them) is covered.
       // An equipped skin (WORLD_SKINS) overrides these with its own fixed
@@ -56,9 +72,14 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
 
         globeRef.current = globe;
         globe(container);
+        clearTimeout(timeoutId);
         setGlobeReady(true);
+        setStatus('ready');
       } catch (err) {
         console.error('Globe initialization error:', err);
+        clearTimeout(timeoutId);
+        setStatus('error');
+        setErrorMsg("Couldn't start the globe. Try again.");
       }
       // Everything below needs a successfully-initialized globe — bail out
       // quietly rather than throwing (this used to reference `globe` from
@@ -118,8 +139,13 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           globeRef.current = null;
         }
       };
-    }).catch(err => console.warn('Failed to load globe.gl', err));
-  }, [posts, userLocation, theme, skin, onPostClick]);
+    }).catch(err => {
+      console.warn('Failed to load globe.gl', err);
+      if (!cancelled) { clearTimeout(timeoutId); setStatus('error'); setErrorMsg("Couldn't load the globe — check your connection."); }
+    });
+
+    return () => { cancelled = true; clearTimeout(timeoutId); };
+  }, [posts, userLocation, theme, skin, onPostClick, retryKey]);
 
   useEffect(() => {
     if (!globeRef.current || !globeReady) return;
@@ -164,6 +190,43 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           overflow: 'hidden',
         }}
       />
+
+      {/* Loading / error state — the globe area used to just stay silently
+          blank on a slow connection or failed chunk load, with no feedback
+          at all and no way to retry. */}
+      {status !== 'ready' && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 1,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: 14, color: '#fff', textAlign: 'center', padding: 24,
+        }}>
+          {status === 'loading' ? (
+            <>
+              <div style={{
+                width: 44, height: 44, borderRadius: '50%',
+                border: '3px solid rgba(255,255,255,0.25)', borderTopColor: '#fff',
+                animation: 'lokspin 0.8s linear infinite',
+              }} />
+              <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>Loading globe…</div>
+              <style>{`@keyframes lokspin{to{transform:rotate(360deg)}}`}</style>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 32 }}>🌐</div>
+              <div style={{ fontSize: 14, fontWeight: 600, maxWidth: 260, opacity: 0.9 }}>{errorMsg || "Couldn't load the globe."}</div>
+              <button
+                onClick={() => setRetryKey(k => k + 1)}
+                style={{
+                  background: '#fff', color: '#111', border: 'none', borderRadius: 8,
+                  padding: '8px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Retry
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Controls overlay */}
       <div style={{
