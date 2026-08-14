@@ -907,7 +907,12 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
     {showSettings&&(<div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,.35)"}} onClick={()=>setShowSettings(false)}>
       <ErrorBoundary compact>
       <div className="w-full rounded-t-3xl p-5 overflow-y-auto overscroll-contain" style={{maxWidth:560,maxHeight:"min(85vh, 85dvh)",background:T.card,border:`3px solid ${T.ink}`,animation:"lokrise .25s ease",WebkitOverflowScrolling:"touch"}} onClick={e=>e.stopPropagation()}>
-        <div className="sticky top-0 flex items-center justify-between px-5 py-4 mb-2" style={{background:T.card,borderBottom:`1px solid ${T.shadow}`,zIndex:10}}><div className="lok-display text-lg font-extrabold">Settings</div><button onClick={()=>setShowSettings(false)} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Close settings">✕</button></div>
+        {/* Full-bleed via negative margins that cancel the scroll container's
+            own p-5. Without them the header sat 20px down (the gap above
+            "Settings") and was inset 20px each side, so scrolled content
+            stayed visible in the strips above and beside it. Same pattern as
+            the roadmap sheet's header below. */}
+        <div className="sticky top-0 flex items-center justify-between -mt-5 -mx-5 px-5 pt-5 pb-4 mb-2" style={{background:T.card,borderBottom:`1px solid ${T.shadow}`,zIndex:10}}><div className="lok-display text-lg font-extrabold">Settings</div><button onClick={()=>setShowSettings(false)} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Close settings">✕</button></div>
         <div className="p-3 rounded-2xl mb-2" style={{border:`3px solid ${T.ink}`,background:T.paper}}>
           <div className="lok-display font-extrabold text-sm">📱 Add Lok to your home screen</div>
           <div className="text-xs opacity-70 mt-1 leading-snug">{isIOS?"Tap the Share button in Safari, then \u201CAdd to Home Screen\u201D. Lok opens full-screen like a native app.":"Install Lok as an app — it gets its own icon and opens full-screen, no browser bars."}</div>
@@ -1668,7 +1673,10 @@ export default function LokApp(){
         <MusicTicker music={music} onOpen={()=>setShowMusic(true)}/>
       </div>)}
       {showRoadmap&&<div className="fixed inset-0 z-[70] overflow-y-auto" style={{background:T.paper}}><Suspense fallback={<div className="py-10 text-center text-sm opacity-50">Loading…</div>}><Roadmap level={level} xp={xp} chests={chests} featureFlags={featureFlags} setFeatureFlags={setFeatureFlags} onClose={()=>setShowRoadmap(false)}/></Suspense></div>}
-      {showWorldMap&&<Suspense fallback={<div style={{position:"fixed",inset:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.8)",color:"#fff"}}>Loading map…</div>}><WorldMapViewer posts={posts.filter(p=>p.latitude&&p.longitude)} userLocation={userLocation} theme={uiTheme} skin={cosmetics.globeSkin} gyroMotion={featureFlags.enableGyroscope&&featureFlags.gyroWorldMap?gyroMotion:GYRO_ZERO} onPostClick={p=>setOpenIdx(posts.findIndex(x=>x.id===p.id))} onClose={()=>setShowWorldMap(false)}/></Suspense>}
+      {/* ErrorBoundary, not just Suspense: WebGL/Three.js can throw outright on
+          older or software-rendered devices, and without a boundary here that
+          took the entire app down to the crash screen instead of just World. */}
+      {showWorldMap&&<ErrorBoundary compact><Suspense fallback={<div style={{position:"fixed",inset:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.8)",color:"#fff"}}>Loading map…</div>}><WorldMapViewer posts={posts.filter(p=>p.latitude&&p.longitude)} userLocation={userLocation} theme={uiTheme} skin={cosmetics.globeSkin} gyroMotion={featureFlags.enableGyroscope&&featureFlags.gyroWorldMap?gyroMotion:GYRO_ZERO} onPostClick={p=>setOpenIdx(posts.findIndex(x=>x.id===p.id))} onClose={()=>setShowWorldMap(false)}/></Suspense></ErrorBoundary>}
       {showMail&&<div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:"rgba(0,0,0,.35)"}} onClick={()=>setShowMail(false)}>
         <div className="w-full rounded-t-3xl overflow-y-auto overscroll-contain" style={{maxWidth:560,maxHeight:"min(85vh, 85dvh)",background:T.card,border:`3px solid ${T.ink}`,animation:"lokrise .25s ease",WebkitOverflowScrolling:"touch"}} onClick={e=>e.stopPropagation()}>
           <div className="sticky top-0 flex items-center justify-between px-5 py-4" style={{background:T.card,borderBottom:`1px solid ${T.shadow}`,zIndex:10}}><div className="lok-display text-lg font-extrabold">Mail</div><button onClick={()=>setShowMail(false)} className="lok-btn px-3 py-1 rounded-lg font-bold" style={{border:`2.5px solid ${T.ink}`}} aria-label="Close mail">✕</button></div>
