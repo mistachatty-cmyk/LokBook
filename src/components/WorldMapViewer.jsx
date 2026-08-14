@@ -85,9 +85,21 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     if (!containerRef.current) return;
     setStatus('loading');
     setErrorMsg('');
+
+    // WebGL preflight, so "this browser can't do 3D at all" reports as itself
+    // instead of surfacing later as a confusing globe crash.
+    try {
+      const probe = document.createElement('canvas');
+      if (!(probe.getContext('webgl2') || probe.getContext('webgl'))) {
+        setStatus('error');
+        setErrorMsg("This browser can't render 3D (WebGL unavailable). Try opening LokBook in Safari or Chrome directly rather than inside another app.");
+        return;
+      }
+    } catch { /* fall through and let the real init report the failure */ }
+
     let cancelled = false;
     const timeoutId = setTimeout(() => {
-      if (!cancelled) { setStatus('error'); setErrorMsg("This is taking too long — your connection may be too slow to load the globe."); }
+      if (!cancelled) { setStatus('error'); setErrorMsg("Timed out after 12s loading the globe."); }
     }, 12000);
 
     // Dynamically import globe.gl and three only in browser environment —
@@ -123,12 +135,24 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           .backgroundColor(themeSettings.backgroundColor)
           .backgroundImageUrl(starfieldUrl)
           .atmosphereColor(themeSettings.atmosphereColor)
-          .atmosphereAltitude(0.1)
-          .autoRotate(GLOBE_CONFIG.autoRotate)
-          .autoRotateSpeed(GLOBE_CONFIG.autoRotateSpeed);
+          .atmosphereAltitude(0.1);
 
         globeRef.current = globe;
         globe(container);
+
+        // Auto-rotation lives on the OrbitControls object, NOT on the globe
+        // instance. Calling `.autoRotate()` in the builder chain above — which
+        // is what this did — threw "autoRotate is not a function" on every
+        // single open, on every device, since the feature was written. That
+        // TypeError was the real reason the globe never appeared; it has to
+        // be set here, after mounting, because controls() doesn't exist until
+        // the globe is attached to a container.
+        const controls = globe.controls();
+        if (controls) {
+          controls.autoRotate = GLOBE_CONFIG.autoRotate;
+          controls.autoRotateSpeed = GLOBE_CONFIG.autoRotateSpeed;
+        }
+
         clearTimeout(timeoutId);
         setGlobeReady(true);
         setStatus('ready');
@@ -136,7 +160,10 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         console.error('Globe initialization error:', err);
         clearTimeout(timeoutId);
         setStatus('error');
-        setErrorMsg("Couldn't start the globe. Try again.");
+        // Surface the real exception. A generic "try again" here hid a plain
+        // TypeError for several rounds of debugging, and console.error is
+        // unreadable on a phone — which is where this actually fails.
+        setErrorMsg(`${err?.name || 'Error'}: ${err?.message || String(err)}`);
       }
       // Everything below needs a successfully-initialized globe — bail out
       // quietly rather than throwing (this used to reference `globe` from
@@ -218,7 +245,11 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       };
     }).catch(err => {
       console.warn('Failed to load globe.gl', err);
-      if (!cancelled) { clearTimeout(timeoutId); setStatus('error'); setErrorMsg("Couldn't load the globe — check your connection."); }
+      if (!cancelled) {
+        clearTimeout(timeoutId);
+        setStatus('error');
+        setErrorMsg(`Failed to load 3D library — ${err?.name || 'Error'}: ${err?.message || String(err)}`);
+      }
     });
 
     return () => { cancelled = true; clearTimeout(timeoutId); };
@@ -300,7 +331,21 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           ) : (
             <>
               <div style={{ fontSize: 32 }}>🌐</div>
-              <div style={{ fontSize: 14, fontWeight: 600, maxWidth: 260, opacity: 0.9 }}>{errorMsg || "Couldn't load the globe."}</div>
+              {/* Selectable + tappable-to-copy: this is the only way an error
+                  is readable on a phone, where there is no console. */}
+              <div
+                onClick={() => { try { navigator.clipboard?.writeText(errorMsg || ''); } catch {} }}
+                style={{
+                  fontSize: 12, fontWeight: 600, maxWidth: 300, opacity: 0.95,
+                  fontFamily: 'ui-monospace, Menlo, monospace', lineHeight: 1.45,
+                  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: 8, padding: '10px 12px', userSelect: 'text',
+                  WebkitUserSelect: 'text', cursor: 'copy', wordBreak: 'break-word',
+                }}
+              >
+                {errorMsg || "Couldn't load the globe."}
+              </div>
+              <div style={{ fontSize: 11, opacity: 0.6 }}>tap the message to copy it</div>
               <button
                 onClick={() => setRetryKey(k => k + 1)}
                 style={{

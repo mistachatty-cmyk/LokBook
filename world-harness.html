@@ -1,0 +1,44 @@
+<!doctype html>
+<html><body style="margin:0">
+<div id="root"></div>
+<script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import WorldMapViewer from '/src/components/WorldMapViewer.jsx';
+
+window.__h = { done: false, status: null, error: null };
+window.addEventListener('error', e => { window.__h.error = e.message; });
+
+const posts = [
+  { id: 'p1', latitude: 40.7, longitude: -74.0, location_privacy: 'everyone', location_name: 'NYC', author: 'tinta' },
+  { id: 'p2', latitude: 51.5, longitude: -0.12, location_privacy: 'everyone', location_name: 'London', author: 'nib' },
+];
+
+createRoot(document.getElementById('root')).render(
+  React.createElement(WorldMapViewer, {
+    posts,
+    userLocation: { lat: 37.77, lng: -122.42 },
+    theme: 'riso',
+    skin: 'none',
+    gyroMotion: { gamma: 0, beta: 0, alpha: 0 },
+    onClose: () => {},
+  })
+);
+
+// Poll the rendered DOM to infer the component's status, since we can't read
+// its internal state from outside.
+const started = Date.now();
+const t = setInterval(() => {
+  const txt = document.body.innerText || '';
+  const hasCanvas = !!document.querySelector('canvas');
+  if (hasCanvas) { window.__h.status = 'ready'; window.__h.done = true; clearInterval(t); }
+  else if (/Error|error:|Timed out|Failed|WebGL|not a function/i.test(txt)) {
+    window.__h.status = 'error';
+    window.__h.error = txt.replace(/\s+/g, ' ').slice(0, 300);
+    window.__h.done = true; clearInterval(t);
+  } else if (Date.now() - started > 35000) {
+    window.__h.status = 'timeout'; window.__h.done = true; clearInterval(t);
+  }
+}, 400);
+</script>
+</body></html>

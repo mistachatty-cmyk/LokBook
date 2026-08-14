@@ -15,6 +15,7 @@
     "gen-icons": "node scripts/steam-icons.mjs",
     "smoke": "node scripts/smoke.mjs",
     "verify:rotation": "node scripts/verify-rotation.mjs",
+    "verify:world": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-world.mjs",
     "db:migrate": "supabase db push",
     "build:steam": "vite build --config vite.config.steam.js"
   },
@@ -22,13 +23,13 @@
     "@supabase/supabase-js": "^2.110.0",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-fs": "^2.0.0",
-    "globe.gl": "^2.28.0",
+    "globe.gl": "^2.46.1",
     "gsap": "^3.15.0",
     "perfect-freehand": "^1.2.3",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "0.152.2",
+    "three": "^0.185.1",
     "vite-plugin-pwa": "^1.3.0"
   },
   "devDependencies": {

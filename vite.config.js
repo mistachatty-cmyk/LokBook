@@ -6,12 +6,35 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   clearScreen: false,
   server: { port: 5173, strictPort: true },
+  // NOTE: do not add `resolve.dedupe: ['three']` here. It breaks three's
+  // subpath exports (three/webgpu, three/tsl) during dep pre-bundling, which
+  // three-globe imports. A single three instance is already guaranteed the
+  // right way — by package.json declaring a `three` range that satisfies
+  // globe.gl's own requirement, so npm never installs a nested second copy.
+  // (Two copies is what produced "matrixWorld.determinantAffine is not a
+  // function": meshes built by one three handed to a renderer from another.)
   optimizeDeps: {
-    exclude: ['@tauri-apps/api', '@tauri-apps/plugin-fs', '@tauri-apps/plugin-dialog', '@tauri-apps/plugin-shell', '@tauri-apps/plugin-process'],
+    // globe.gl/three-globe import three's subpath entries (three/webgpu,
+    // three/tsl). esbuild's dep pre-bundler fails to honour those export
+    // conditions and dies with 'Missing "./webgpu" specifier', which takes the
+    // whole dev server down. Rollup resolves them correctly, so production
+    // builds are unaffected — excluding these from pre-bundling keeps dev
+    // working without changing what ships.
+    exclude: ['@tauri-apps/api', '@tauri-apps/plugin-fs', '@tauri-apps/plugin-dialog', '@tauri-apps/plugin-shell', '@tauri-apps/plugin-process',
+      'globe.gl', 'three-globe', 'three-render-objects'],
   },
   build: {
     chunkSizeWarningLimit: 600,
-    rollupOptions: { output: { manualChunks: { vendor: ['react'], app: ['src/App.jsx'] } } },
+    rollupOptions: {
+      // LOK_TEST_HARNESS=1 adds world-harness.html as a second entry so the
+      // real WorldMapViewer can be driven headlessly against a production
+      // build (see scripts/verify-world.mjs). Never set in normal builds, so
+      // the harness is not part of anything that ships.
+      input: process.env.LOK_TEST_HARNESS
+        ? { main: 'index.html', harness: 'world-harness.html' }
+        : undefined,
+      output: { manualChunks: { vendor: ['react'], app: ['src/App.jsx'] } },
+    },
   },
   plugins: [
     react(),
