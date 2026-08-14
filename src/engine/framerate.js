@@ -18,10 +18,13 @@ let highRefresh = false;
 export function setHighRefresh(on) { highRefresh = !!on; }
 export function isHighRefresh() { return highRefresh; }
 
-function reduceMotion() {
+export function prefersReducedMotion() {
   if (typeof window === "undefined" || !window.matchMedia) return false;
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
+
+// Kept as a local alias so the rest of this module reads unchanged.
+const reduceMotion = prefersReducedMotion;
 
 /** Minimum ms between frames. 0 means "every frame the display offers". */
 export function frameBudget() {

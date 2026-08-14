@@ -226,18 +226,25 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
 
   useEffect(() => {
     if (!globeRef.current || !globeReady) return;
+    // Only steer the camera when the device is actually tilted. Driving
+    // pointOfView() unconditionally fought the user's own OrbitControls —
+    // every drag-to-rotate and pinch-to-zoom was snapped back on the next
+    // update, which on a phone arrives ~60x/sec.
+    const gx = gyroMotion.gamma || 0, gy = gyroMotion.beta || 0;
+    if (gx === 0 && gy === 0) return;
     const baseLongitude = 0;
     const baseLatitude = 20;
-    const rotationLongitude = (gyroMotion.gamma || 0) * 0.3;
-    const rotationLatitude = (gyroMotion.beta || 0) * 0.2;
     cameraRotationRef.current = {
-      longitude: baseLongitude + rotationLongitude,
-      latitude: baseLatitude - rotationLatitude
+      longitude: baseLongitude + gx * 0.3,
+      latitude: baseLatitude - gy * 0.2
     };
+    // Preserve whatever altitude the user has zoomed to — hard-coding 2.5
+    // here is what made pinch-to-zoom impossible while gyro was running.
+    const currentAltitude = globeRef.current.pointOfView()?.altitude ?? 2.5;
     globeRef.current.pointOfView({
       lat: cameraRotationRef.current.latitude,
       lng: cameraRotationRef.current.longitude,
-      altitude: 2.5
+      altitude: currentAltitude
     });
   }, [gyroMotion, globeReady]);
 
