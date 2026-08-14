@@ -203,8 +203,9 @@ export function GlobalStyle({ T, pace = "sweep", speed = 1 }) {
   @keyframes lokscan{from{background-position:0 0}to{background-position:0 40px}}
   @keyframes lokstatic{0%{transform:translate(0,0)}33%{transform:translate(-8px,5px)}66%{transform:translate(6px,-7px)}100%{transform:translate(0,0)}}
   *{-webkit-tap-highlight-color:transparent}
+  html,body{background:var(--lok-paper);overflow-x:hidden}
   html{scroll-behavior:smooth}
-  body{text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased}
+  body{text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;min-height:100dvh}
   .lok-display{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-0.01em}
   .lok-btn{transition:transform .14s cubic-bezier(.34,1.56,.64,1),box-shadow .14s ease,filter .14s ease;will-change:transform}
   .lok-btn:hover{filter:brightness(1.04)}

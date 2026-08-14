@@ -2,19 +2,71 @@ import { useEffect, useRef, useState } from 'react';
 import { GLOBE_CONFIG, WORLD_SKINS } from '../constants.jsx';
 import { THEMES } from '../theme/theme.js';
 
+// Procedural starfield: a small canvas of scattered dots, memoized per
+// (density, tint) pair — same pattern as Easel.jsx's getGrainTexture(), so
+// the space feel is available instantly with zero network dependency,
+// regardless of connection quality. Reused both as a CSS backdrop (visible
+// the instant World opens, through loading/error states) and as the actual
+// globe.gl scene background (real parallax when the globe rotates).
+const starfieldCache = new Map();
+function getStarfieldDataUrl(density = 160, tint = '#ffffff') {
+  const key = `${density}|${tint}`;
+  if (starfieldCache.has(key)) return starfieldCache.get(key);
+  const size = 512;
+  const cv = document.createElement('canvas');
+  cv.width = size; cv.height = size;
+  const ctx = cv.getContext('2d');
+  for (let i = 0; i < density; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    const r = 0.4 + Math.random() * 1.4;
+    const a = 0.15 + Math.random() * 0.75;
+    ctx.fillStyle = tint === '#ffffff' ? `rgba(255,255,255,${a})` : hexToRgba(tint, a);
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  const url = cv.toDataURL();
+  starfieldCache.set(key, url);
+  return url;
+}
+function hexToRgba(hex, a) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+// Builds the Three.js primitive for a marker, shaped by the equipped skin's
+// markerStyle. Kept to plain geometry/materials already shipped with the
+// `three` peer dependency globe.gl already pulls in — no new assets, no GLTF
+// loading.
+function buildMarkerMesh(THREE, kind, style, color) {
+  const isUser = kind === 'user';
+  const size = isUser ? 0.55 : 0.32;
+  let geometry;
+  if (style === 'crystal') geometry = new THREE.OctahedronGeometry(size);
+  else if (style === 'orb') geometry = new THREE.SphereGeometry(size, 12, 12);
+  else geometry = new THREE.ConeGeometry(size * 0.75, size * 2, 8); // beacon (default)
+  const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: isUser ? 0.95 : 0.85 });
+  const mesh = new THREE.Mesh(geometry, material);
+  if (style !== 'orb') mesh.rotation.x = Math.PI; // point the cone/crystal "down" onto the surface
+  return mesh;
+}
+
 // Deep space stays a fixed near-black across every theme (matching how
-// every real 3D-globe app renders the void) — it's the atmosphere glow and
-// markers that actually read as "themed," derived straight from the app's
-// own theme tokens rather than a separate hand-maintained lookup table that
-// only covered 3 of ~62 themes and silently fell back to default forever.
+// every real 3D-globe app renders the void) — it's the atmosphere glow,
+// starfield tint, and markers that actually read as "themed," derived
+// straight from the app's own theme tokens rather than a separate
+// hand-maintained lookup table that only covered 3 of ~62 themes and
+// silently fell back to default forever.
 // A purchasable skin (see WORLD_SKINS in constants.jsx) overrides the
-// theme-derived look with its own fixed texture + atmosphere tint.
+// theme-derived look with its own fixed texture, atmosphere tint, marker
+// shape, and starfield density/tint.
 export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso', skin = 'none', gyroMotion = { gamma: 0, beta: 0, alpha: 0 }, onPostClick, onClose }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
   const [selectedPost, setSelectedPost] = useState(null);
   const [globeReady, setGlobeReady] = useState(false);
   const cameraRotationRef = useRef({ longitude: 0, latitude: 0 });
+  const userMarkerMeshesRef = useRef([]);
+  const pulseFrameRef = useRef(0);
   // The globe.gl chunk is ~2MB — on a weak connection it can fail, or just
   // hang without ever technically rejecting. Previously any failure only
   // hit console.warn/console.error, so the modal's header rendered fine
@@ -25,6 +77,10 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   const [errorMsg, setErrorMsg] = useState('');
   const [retryKey, setRetryKey] = useState(0);
 
+  const T = THEMES[theme] || THEMES.riso;
+  const skinDef = WORLD_SKINS.find(s => s.id === skin) || WORLD_SKINS[0];
+  const starfieldUrl = getStarfieldDataUrl(skinDef.starfieldDensity ?? 160, skinDef.starfieldTint || '#ffffff');
+
   useEffect(() => {
     if (!containerRef.current) return;
     setStatus('loading');
@@ -34,21 +90,21 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       if (!cancelled) { setStatus('error'); setErrorMsg("This is taking too long — your connection may be too slow to load the globe."); }
     }, 12000);
 
-    // Dynamically import globe.gl only in browser environment
-    import('globe.gl').then(({ default: Globe }) => {
+    // Dynamically import globe.gl and three only in browser environment —
+    // both are code-split out of the main bundle since most sessions never
+    // open World.
+    Promise.all([import('globe.gl'), import('three')]).then(([{ default: Globe }, THREE]) => {
       if (cancelled) return;
       // Derive globe colors from the app's own theme tokens instead of a
       // separate lookup table, so every theme (not just 3 of them) is covered.
       // An equipped skin (WORLD_SKINS) overrides these with its own fixed
       // texture + tint, same as any other cosmetic overriding a default look.
-      const T = THEMES[theme] || THEMES.riso;
-      const skinDef = WORLD_SKINS.find(s => s.id === skin);
       const themeSettings = {
-        backgroundColor: skinDef?.backgroundColor || '#000011',
-        atmosphereColor: skinDef?.atmosphereColor || T.accent,
+        backgroundColor: skinDef.backgroundColor || '#000011',
+        atmosphereColor: skinDef.atmosphereColor || T.accent,
       };
-      const globeTextureUrl = skinDef?.textureUrl || '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg';
-      const globeBumpUrl = skinDef?.bumpUrl || '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png';
+      const globeTextureUrl = skinDef.textureUrl || '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg';
+      const globeBumpUrl = skinDef.bumpUrl || '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png';
       let globe;
       try {
         // Ensure container has dimensions
@@ -65,6 +121,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           .globeImageUrl(globeTextureUrl)
           .bumpImageUrl(globeBumpUrl)
           .backgroundColor(themeSettings.backgroundColor)
+          .backgroundImageUrl(starfieldUrl)
           .atmosphereColor(themeSettings.atmosphereColor)
           .atmosphereAltitude(0.1)
           .autoRotate(GLOBE_CONFIG.autoRotate)
@@ -90,38 +147,56 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       // Set camera position
       globe.pointOfView({ altitude: 2.5 });
 
-      // User's own location + post pins share one pointsData call — setting
-      // it twice (as this used to do) makes the second call silently
-      // overwrite the first, so the two marker sets could never show together.
+      // User's own location + post pins share one objectsData call — setting
+      // it twice would make the second call silently overwrite the first,
+      // so the two marker sets could never show together.
       const userMarkers = userLocation ? [{
         lat: userLocation.lat,
         lng: userLocation.lng,
-        size: 0.8,
+        kind: 'user',
         color: T.accent,
         isUser: true,
       }] : [];
       const postMarkers = posts
         .filter(post => post.latitude && post.longitude && post.location_privacy === 'everyone')
-        .map((post, idx) => ({
+        .map(post => ({
           id: post.id,
           lat: post.latitude,
           lng: post.longitude,
-          size: 0.5,
+          kind: 'post',
           color: T.alt || T.accent,
           post,
         }));
 
+      userMarkerMeshesRef.current = [];
       if (userMarkers.length > 0 || postMarkers.length > 0) {
-        globe.pointsData([...userMarkers, ...postMarkers])
-          .pointColor(d => d.color)
-          .pointSize(d => d.size)
-          .pointAltitude(0.01)
-          .onPointClick(d => {
+        globe.objectsData([...userMarkers, ...postMarkers])
+          .objectLat(d => d.lat)
+          .objectLng(d => d.lng)
+          .objectAltitude(0.015)
+          .objectThreeObject(d => {
+            const mesh = buildMarkerMesh(THREE, d.kind, skinDef.markerStyle || 'beacon', d.color);
+            if (d.isUser) userMarkerMeshesRef.current.push(mesh);
+            return mesh;
+          })
+          .onObjectClick(d => {
             if (d.isUser) return;
             setSelectedPost(d.post);
             if (onPostClick) onPostClick(d.post);
           });
       }
+
+      // Slow pulse on the user's own location marker — a plain scale
+      // oscillation driven by rAF rather than pulling in a full
+      // animation-loop hook just for one marker.
+      const animatePulse = () => {
+        pulseFrameRef.current = requestAnimationFrame(animatePulse);
+        if (!userMarkerMeshesRef.current.length) return;
+        const t = performance.now() / 700;
+        const s = 1 + Math.sin(t) * 0.22;
+        userMarkerMeshesRef.current.forEach(m => m.scale.setScalar(s));
+      };
+      pulseFrameRef.current = requestAnimationFrame(animatePulse);
 
       // Handle resize
       const handleResize = () => {
@@ -134,6 +209,8 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
 
       return () => {
         window.removeEventListener('resize', handleResize);
+        cancelAnimationFrame(pulseFrameRef.current);
+        userMarkerMeshesRef.current = [];
         // Clean up globe instance
         if (globeRef.current) {
           globeRef.current = null;
@@ -166,13 +243,16 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50 }}>
-      {/* Backdrop */}
+      {/* Backdrop — a generated starfield instead of a flat fill, so the
+          "you're in a simulated space" feel is present the instant World
+          opens, through the loading spinner and any error/retry state, not
+          just once the globe itself has finished loading. */}
       <div
         onClick={onClose}
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'rgba(0,0,0,0.8)',
+          background: `${skinDef.backgroundColor || '#000011'} url(${starfieldUrl}) repeat`,
           cursor: 'pointer',
           zIndex: 0,
         }}

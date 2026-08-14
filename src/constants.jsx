@@ -899,18 +899,29 @@ export const GLOBE_CONFIG = {
 // textureUrl/bumpUrl point at three-globe's existing stock CDN images for
 // now (no custom art pipeline available yet); swap these for bespoke
 // stylized textures later without touching anything else.
+//
+// markerStyle/starfieldDensity/starfieldTint make each skin a genuinely
+// different 3D *simulation*, not just a different texture: markerStyle picks
+// which Three.js primitive represents a post/user location on the globe
+// (see buildMarkerMesh in WorldMapViewer.jsx), and the starfield fields feed
+// getStarfieldDataUrl() there. All three are optional — omitting them falls
+// back to the 'none' skin's defaults, so nothing else needs updating.
 export const WORLD_SKINS = [
-  { id: 'none', name: 'Default (theme)', price: 0, desc: 'Follows your equipped theme colors.' },
+  { id: 'none', name: 'Default (theme)', price: 0, desc: 'Follows your equipped theme colors.',
+    markerStyle: 'beacon', starfieldDensity: 160, starfieldTint: '#ffffff' },
   { id: 'cyberpunk', name: 'Cyberpunk Globe', price: 80, desc: 'Neon night-city glow.',
     textureUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-dark.jpg',
     bumpUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png',
-    atmosphereColor: '#ff2fd6', backgroundColor: '#050014' },
+    atmosphereColor: '#ff2fd6', backgroundColor: '#050014',
+    markerStyle: 'crystal', starfieldDensity: 240, starfieldTint: '#ff2fd6' },
   { id: 'organic', name: 'Organic Globe', price: 80, desc: 'Bioluminescent, pulsing atmosphere.',
     textureUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg',
     bumpUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png',
-    atmosphereColor: '#2fffa0', backgroundColor: '#001208' },
+    atmosphereColor: '#2fffa0', backgroundColor: '#001208',
+    markerStyle: 'orb', starfieldDensity: 130, starfieldTint: '#2fffa0' },
   { id: 'retro', name: 'Retro Cartography', price: 80, desc: 'Vintage map colors.',
     textureUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-day.jpg',
     bumpUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png',
+    markerStyle: 'beacon', starfieldDensity: 90, starfieldTint: '#e8b14b',
     atmosphereColor: '#e8b14b', backgroundColor: '#1a1206' },
 ];
