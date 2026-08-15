@@ -16,6 +16,7 @@
     "smoke": "node scripts/smoke.mjs",
     "verify:rotation": "node scripts/verify-rotation.mjs",
     "verify:world": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-world.mjs",
+    "verify:cosmetics": "node scripts/verify-cosmetics.mjs",
     "db:migrate": "supabase db push",
     "build:steam": "vite build --config vite.config.steam.js"
   },

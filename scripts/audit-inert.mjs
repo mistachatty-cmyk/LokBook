@@ -16,8 +16,22 @@ const constants = read('src/constants.jsx');
 
 // 1. cosmetic categories
 const cosmeticKeys = [...new Set([...constants.matchAll(/onBuyCosmetic\(/g)].map(()=>0))];
-const cats = ["nameColor","frame","reactionPack","avatarAccent","blotBorder","paper","gear",
+// Derived, not hand-maintained. This used to be a literal array, which silently
+// rotted: `globeSkin` was added as a full cosmetic category (catalogue, Shop
+// section, buy/equip flow) and this audit never knew it existed, so it could
+// have gone inert unnoticed. Scrape the categories the Shop actually buys and
+// equips instead, then union with the known list so nothing is lost.
+const scrapeCats = src => new Set([
+  ...[...src.matchAll(/\bbuy\(\s*["'](\w+)["']/g)].map(m => m[1]),
+  ...[...src.matchAll(/\b(?:has|eq)\(\s*["'](\w+)["']/g)].map(m => m[1]),
+  ...[...src.matchAll(/onBuyCosmetic\(\s*["'](\w+)["']/g)].map(m => m[1]),
+  ...[...src.matchAll(/cosmetics\.(\w+)/g)].map(m => m[1]),
+]);
+const KNOWN = ["nameColor","frame","reactionPack","avatarAccent","blotBorder","paper","gear",
   "cursorPack","fontPack","stickerPack","postExport","lillokSkin","lillokAura","lillokPet","voicePack","musicPack"];
+const cats = [...new Set([...KNOWN, ...scrapeCats(read('src/pages/Shop.jsx'))])]
+  .filter(c => !/^(find|map|filter|length|id|name|price)$/.test(c))
+  .sort();
 // Some categories are NOT stored under the `cosmetics` object — they're top-level
 // state in App.jsx (e.g. `const [stickerPack,setStickerPack]=useState("emoji")`).
 // Grepping only `cosmetics.<key>` reported those as INERT when they were wired,

@@ -100,6 +100,11 @@ export const BLOT_BORDERS = [
   { id: "liquid", name: "Liquid glow", price: 90 },
   { id: "stitch", name: "Stitched Border", price: 40 },
   { id: "marble", name: "Marble Inlay", price: 75 },
+  // Ids below resolve to style objects in ROTATION_BORDERS (engine/rotation.js),
+  // spread into the blot-border lookup in theme/theme.js.
+  { id: "c_border_stitch", name: "Cross-stitch", price: 40 },
+  { id: "c_border_halo", name: "Halo ring", price: 65 },
+  { id: "c_border_glitch", name: "Glitch split", price: 55 },
 ];
 
 export const BLOT_PERSONALITIES = [
@@ -604,9 +609,21 @@ export const SKIES = [
   { id: "stars", name: "Starry Night", price: 35 },
   { id: "sunset", name: "Sunset Glow", price: 30 },
   { id: "aurora_sky", name: "Aurora Sky", price: 45 },
+  // Ids below resolve to gradient strings in ROTATION_SKIES (engine/rotation.js);
+  // SkyEffect checks that table first, so no new branch is needed.
+  { id: "c_sky_deepocean", name: "Deep Ocean", price: 40 },
+  { id: "c_sky_bloodmoon", name: "Blood Moon", price: 50 },
+  { id: "c_sky_mintdawn", name: "Mint Dawn", price: 35 },
+  { id: "c_sky_ash", name: "Ash Sky", price: 30 },
 ];
 
-export const EFFECTS = [{ id: "none", name: "Plain paper", price: 0 }, { id: "rain", name: "Ink rain", price: 20 }, { id: "confetti", name: "Confetti burst", price: 30 }, { id: "aurora", name: "Aurora veil", price: 40 }, { id: "embers", name: "Floating embers", price: 25 }, { id: "scanlines", name: "Scan Lines", price: 20 }, { id: "static", name: "Static", price: 20 }, { id: "petals", name: "Sakura drift", price: 35 }, { id: "fireflies", name: "Nightleaf fireflies", price: 45 }, { id: "soot", name: "Ash Ward soot", price: 30 }, { id: "bubbles", name: "Well bubbles", price: 30 }, { id: "ripple", name: "Ink ripples", price: 40 }, { id: "snow", name: "Chalk dust", price: 25 }];
+export const EFFECTS = [{ id: "none", name: "Plain paper", price: 0 }, { id: "rain", name: "Ink rain", price: 20 }, { id: "confetti", name: "Confetti burst", price: 30 }, { id: "aurora", name: "Aurora veil", price: 40 }, { id: "embers", name: "Floating embers", price: 25 }, { id: "scanlines", name: "Scan Lines", price: 20 }, { id: "static", name: "Static", price: 20 }, { id: "petals", name: "Sakura drift", price: 35 }, { id: "fireflies", name: "Nightleaf fireflies", price: 45 }, { id: "soot", name: "Ash Ward soot", price: 30 }, { id: "bubbles", name: "Well bubbles", price: 30 }, { id: "ripple", name: "Ink ripples", price: 40 }, { id: "snow", name: "Chalk dust", price: 25 },
+  // Ids below resolve to generic particle specs in engine/rotation.js
+  // (ROTATION_EFFECTS) — PageEffect checks that table first, so these need no
+  // renderer branch of their own. Enforced by `npm run verify:cosmetics`.
+  { id: "c_eff_drizzle", name: "Ink drizzle", price: 30 }, { id: "c_eff_motes", name: "Dust motes", price: 25 },
+  { id: "c_eff_spores", name: "Spore drift", price: 35 }, { id: "c_eff_emberrise", name: "Ember rise", price: 40 },
+  { id: "c_eff_glitchrain", name: "Glitch rain", price: 45 }];
 export const NAME_COLORS = [{ id: "default", name: "Default", price: 0, color: null }, { id: "pink", name: "Hot pink", price: 20, color: "#FF5DA2" }, { id: "teal", name: "Riso teal", price: 20, color: "#2FA9A0" }, { id: "gold", name: "Gold", price: 35, color: "#E8B14B" }, { id: "violet", name: "Violet", price: 35, color: "#7A4FBF" }, { id: "rainbow", name: "Holo ✦", price: 80, color: "rainbow" }, { id: "fire", name: "Fire", price: 60, color: "fire" }, { id: "ice", name: "Ice", price: 60, color: "ice" }, { id: "well", name: "Well blue", price: 25, color: "#3AA8DC" }, { id: "ember", name: "Ember", price: 25, color: "#E2551F" }];
 
 // Derived, never hand-written — every sellable name colour resolves by
@@ -616,9 +633,20 @@ export const NAME_COLOR_MAP = Object.fromEntries(
     .filter(c => c.color !== undefined || c.type === "name_color")
     .map(c => [c.id, c.color ?? null])
 );
-export const FRAMES = [{ id: "none", name: "None", price: 0 }, { id: "double", name: "Double rule", price: 25 }, { id: "dashed", name: "Dashed ink", price: 25 }, { id: "tape", name: "Washi corners", price: 40 }, { id: "glow", name: "Neon glow", price: 60 }, { id: "photo", name: "Photo Corners", price: 30 }, { id: "stamp", name: "Stamp Edge", price: 35 }, { id:"polaroid", name:"Polaroid border", price:35 }, { id:"filmstrip", name:"Film strip sprockets", price:45 }, { id:"torn", name:"Torn edge", price:30 }, { id:"riso", name:"Riso offset", price:50 }];
-export const REACTION_PACKS = [{ id: "base", name: "Ink set (splat · heart · drip)", price: 0, giftReward: "heart" }, { id: "stars", name: "Stardust pack", price: 30, giftReward: "star" }, { id: "fire", name: "Hot streak pack", price: 30, giftReward: "sparkle" }, { id: "zen", name: "Zen pack", price: 45, giftReward: "flower" }, { id: "spooky", name: "Spooky Pack", price: 30, giftReward: "treasure" }, { id: "sweet", name: "Sweet Pack", price: 30, giftReward: "heart" }];
-export const PAPERS = [{ id:"plain", name:"Plain paper", price:0 }, { id:"grid", name:"Grid guide", price:25 }, { id:"dots", name:"Dot grid", price:25 }, { id:"storyboard", name:"Storyboard · 3 panels", price:40 }, { id:"graphite", name:"Graphite texture", price:50 }, { id:"perspective", name:"Perspective guide", price:60 }, { id:"isometric", name:"Isometric grid", price:55 }];
+export const FRAMES = [{ id: "none", name: "None", price: 0 }, { id: "double", name: "Double rule", price: 25 }, { id: "dashed", name: "Dashed ink", price: 25 }, { id: "tape", name: "Washi corners", price: 40 }, { id: "glow", name: "Neon glow", price: 60 }, { id: "photo", name: "Photo Corners", price: 30 }, { id: "stamp", name: "Stamp Edge", price: 35 }, { id:"polaroid", name:"Polaroid border", price:35 }, { id:"filmstrip", name:"Film strip sprockets", price:45 }, { id:"torn", name:"Torn edge", price:30 }, { id:"riso", name:"Riso offset", price:50 },
+  // Ids below resolve to style objects in ROTATION_FRAMES (engine/rotation.js),
+  // spread into the avatar-frame lookup in art.jsx.
+  { id:"c_frame_rope", name:"Rope ring", price:40 }, { id:"c_frame_circuit", name:"Circuit trace", price:55 },
+  { id:"c_frame_brush", name:"Brushstroke", price:45 }];
+export const REACTION_PACKS = [{ id: "base", name: "Ink set (splat · heart · drip)", price: 0, giftReward: "heart" }, { id: "stars", name: "Stardust pack", price: 30, giftReward: "star" }, { id: "fire", name: "Hot streak pack", price: 30, giftReward: "sparkle" }, { id: "zen", name: "Zen pack", price: 45, giftReward: "flower" }, { id: "spooky", name: "Spooky Pack", price: 30, giftReward: "treasure" }, { id: "sweet", name: "Sweet Pack", price: 30, giftReward: "heart" },
+  // Resolves via ROTATION_REACTIONS (engine/rotation.js). Values there must be
+  // icon names <ReactionIcon> implements — raw emoji fall through to a splat.
+  { id: "c_reaction_weather", name: "Weather Pack", price: 35, giftReward: "sparkle" }];
+export const PAPERS = [{ id:"plain", name:"Plain paper", price:0 }, { id:"grid", name:"Grid guide", price:25 }, { id:"dots", name:"Dot grid", price:25 }, { id:"storyboard", name:"Storyboard · 3 panels", price:40 }, { id:"graphite", name:"Graphite texture", price:50 }, { id:"perspective", name:"Perspective guide", price:60 }, { id:"isometric", name:"Isometric grid", price:55 },
+  // Ids below resolve to CSS background strings in ROTATION_PAPERS
+  // (engine/rotation.js), applied by Easel's paper overlay.
+  { id:"c_paper_hex", name:"Hex grid", price:45 }, { id:"c_paper_ledger", name:"Ledger rule", price:35 },
+  { id:"c_paper_weave", name:"Canvas weave", price:40 }, { id:"c_paper_crumpled", name:"Crumpled", price:50 }];
 export const LILLOK_GEAR = [{ id:"none", name:"None", price:0 }, { id:"hat", name:"Tiny hat", price:25 }, { id:"glasses", name:"Round glasses", price:25 }, { id:"bowtie", name:"Bow tie", price:20 },
   { id:"crown", name:"Tiny Crown", price:60, rarity:"epic" }, { id:"scarf", name:"Cozy Scarf", price:35, rarity:"rare" },
   { id:"goggles", name:"Steam Goggles", price:50, rarity:"rare" }, { id:"monocle", name:"Monocle", price:40, rarity:"uncommon" },
@@ -659,7 +687,10 @@ export const ANIMATION_FX = [{ id:"none", name:"No FX", price:0 }, { id:"sparkle
   { id:"fx_starfield", name:"Star Field", desc:"Twinkling star overlay at night", price:280, rarity:"legendary" },
   { id:"fx_ripple", name:"Ripple Distort", desc:"Water ripple distortion effect", price:230, rarity:"epic" },
 ];
-export const CURSORS = [{ id:"default", name:"Default cursor", price:0 }, { id:"inkdrop", name:"Ink Drop", price:25 }, { id:"pencil", name:"Pencil Tip", price:20 }, { id:"brush_cross", name:"Brush Cross", price:30 }, { id:"target", name:"Target Ring", price:20 }, { id:"heart_aim", name:"Heart Aim", price:35 }, { id:"star_glow", name:"Star Glow", price:40 }, { id:"spray_nozzle", name:"Spray Nozzle", price:45 }, { id:"calligraphy", name:"Calligraphy Nib", price:50 }, { id:"neon_ring", name:"Neon Ring", price:60 }, { id:"ruler", name:"Ruler Cross", price:25 }, { id:"laser_dot", name:"Laser Dot", price:30 }];
+export const CURSORS = [{ id:"default", name:"Default cursor", price:0 }, { id:"inkdrop", name:"Ink Drop", price:25 }, { id:"pencil", name:"Pencil Tip", price:20 }, { id:"brush_cross", name:"Brush Cross", price:30 }, { id:"target", name:"Target Ring", price:20 }, { id:"heart_aim", name:"Heart Aim", price:35 }, { id:"star_glow", name:"Star Glow", price:40 }, { id:"spray_nozzle", name:"Spray Nozzle", price:45 }, { id:"calligraphy", name:"Calligraphy Nib", price:50 }, { id:"neon_ring", name:"Neon Ring", price:60 }, { id:"ruler", name:"Ruler Cross", price:25 }, { id:"laser_dot", name:"Laser Dot", price:30 },
+  // Ids below resolve to SVG data-URI cursors in ROTATION_CURSORS
+  // (engine/rotation.js), via cursorFor() in engine/cursors.js.
+  { id:"c_cursor_quill", name:"Quill", price:35 }, { id:"c_cursor_paw", name:"Paw print", price:30 }];
 export const FONT_PACKS = [{ id:"default", name:"System font", price:0, font:"inherit" }, { id:"mono", name:"Mono Ink", desc:"Monospace typewriter", price:25, font:"'Courier New',monospace" }, { id:"rounded", name:"Soft Round", desc:"Rounded sans-serif", price:30, font:"'Nunito',sans-serif" }, { id:"hand", name:"Handwritten", desc:"Loose pen script", price:35, font:"'Patrick Hand',cursive" }, { id:"pixel", name:"Pixel Bit", desc:"8-bit pixel font", price:45, font:"'Press Start 2P',cursive" }, { id:"zine", name:"Zine Bold", desc:"Chunky headline", price:30, font:"'Bebas Neue',sans-serif" }, { id:"serif", name:"Editorial Serif", desc:"Elegant classic", price:40, font:"'Playfair Display',serif" }, { id:"marker", name:"Marker Felt", desc:"Permanent marker look", price:35, font:"'Permanent Marker',cursive" }, { id:"code", name:"Fira Code", desc:"Developer coding font", price:20, font:"'Fira Code',monospace" }, { id:"vintage", name:"Vintage Ink", desc:"Rough-printed text", price:50, font:"'Abril Fatface',cursive" },
   { id:"caveat", name:"Caveat Note", desc:"Casual handwritten note", price:30, font:"'Caveat',cursive" },
   { id:"spacemono", name:"Space Mono", desc:"Retro monospace, wide-set", price:35, font:"'Space Mono',monospace" },
@@ -673,7 +704,9 @@ export const FONT_PACKS = [{ id:"default", name:"System font", price:0, font:"in
   { id:"righteous", name:"Righteous", desc:"Bold rounded display face", price:40, font:"'Righteous',cursive" },
 ];
 export const MUSIC_PACKS = [{ id:"none", name:"No music", price:0, giftReward: "heart" }, { id:"lo-fi", name:"Lo-Fi Study", price:100, giftReward: "sparkle" }, { id:"synth", name:"Synth Wave", price:120, giftReward: "star" }, { id:"rain", name:"Rain Ambience", price:80, giftReward: "flower" }, { id:"jazz", name:"Coffee Jazz", price:110, giftReward: "treasure" }, { id:"nature", name:"Forest Nature", price:90, giftReward: "flower" }, { id:"retro", name:"Retro Arcade", price:130, giftReward: "star" }, { id:"piano", name:"Piano Moods", price:95, giftReward: "sparkle" }];
-export const STICKER_PACKS = [{ id:"emoji", name:"Emoji Pack", price:0, stickers:["😎","🔥","🎨","💀","👾","✨","🌈","🍕"], giftReward:"star" }, { id:"nature", name:"Nature Pack", price:30, stickers:["🌸","🌿","🦋","🍀","🌻","🐚","🍄","🌙"], giftReward:"flower" }, { id:"food", name:"Snack Pack", price:25, stickers:["🍕","🍔","🌮","🍩","🍦","🥨","🧋","🍪"], giftReward:"heart" }, { id:"animals", name:"Animal Pack", price:35, stickers:["🐱","🐶","🦊","🐸","🐼","🐧","🦉","🐝"], giftReward:"sparkle" }, { id:"space", name:"Space Pack", price:40, stickers:["🚀","🛸","🌍","⭐","🌑","☄️","👽","🪐"], giftReward:"meteor" }, { id:"retro", name:"Retro Pack", price:30, stickers:["📟","📼","🕹️","💾","📺","📻","🎮","📸"], giftReward:"star" }, { id:"magic", name:"Magic Pack", price:45, stickers:["🔮","🪄","🧙","🐉","🦄","🧚","⚡","🌟"], giftReward:"rainbow" }, { id:"music", name:"Music Pack", price:25, stickers:["🎵","🎸","🥁","🎹","🎤","🎧","🎼","🎷"], giftReward:"sparkle" }];
+export const STICKER_PACKS = [{ id:"emoji", name:"Emoji Pack", price:0, stickers:["😎","🔥","🎨","💀","👾","✨","🌈","🍕"], giftReward:"star" }, { id:"nature", name:"Nature Pack", price:30, stickers:["🌸","🌿","🦋","🍀","🌻","🐚","🍄","🌙"], giftReward:"flower" }, { id:"food", name:"Snack Pack", price:25, stickers:["🍕","🍔","🌮","🍩","🍦","🥨","🧋","🍪"], giftReward:"heart" }, { id:"animals", name:"Animal Pack", price:35, stickers:["🐱","🐶","🦊","🐸","🐼","🐧","🦉","🐝"], giftReward:"sparkle" }, { id:"space", name:"Space Pack", price:40, stickers:["🚀","🛸","🌍","⭐","🌑","☄️","👽","🪐"], giftReward:"meteor" }, { id:"retro", name:"Retro Pack", price:30, stickers:["📟","📼","🕹️","💾","📺","📻","🎮","📸"], giftReward:"star" }, { id:"magic", name:"Magic Pack", price:45, stickers:["🔮","🪄","🧙","🐉","🦄","🧚","⚡","🌟"], giftReward:"rainbow" }, { id:"music", name:"Music Pack", price:25, stickers:["🎵","🎸","🥁","🎹","🎤","🎧","🎼","🎷"], giftReward:"sparkle" },
+  { id:"garden", name:"Garden Pack", price:30, stickers:["🌻","🐝","🍄","🌿","🐌","🦋","🌾","🪴"], giftReward:"flower" },
+  { id:"space", name:"Space Pack", price:35, stickers:["🚀","🪐","👽","🌠","🛸","☄️","🌌","🔭"], giftReward:"star" }];
 export const POST_EXPORTS = [{ id:"png", name:"PNG frames", desc:"Export frames as transparent PNGs", price:0 }, { id:"gif", name:"Animated GIF", desc:"Export as looping GIF", price:80 }, { id:"webp", name:"WebP anim", desc:"Export as animated WebP", price:50 }, { id:"spritesheet", name:"Spritesheet", desc:"All frames in one grid", price:60 }, { id:"apng", name:"APNG", desc:"Animated PNG format", price:100 }, { id:"pdf", name:"PDF flip", desc:"Export as PDF flipbook", price:120 }, { id:"mp4", name:"MP4 video", desc:"Export as MP4 (soon)", price:150, soon:true }];
 
 
@@ -924,4 +957,9 @@ export const WORLD_SKINS = [
     bumpUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png',
     markerStyle: 'beacon', starfieldDensity: 90, starfieldTint: '#e8b14b',
     atmosphereColor: '#e8b14b', backgroundColor: '#1a1206' },
+  { id: 'frostwave', name: 'Frostwave Globe', price: 80, desc: 'Pale ice and a dense cold sky.',
+    textureUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg',
+    bumpUrl: '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png',
+    atmosphereColor: '#8fd6ff', backgroundColor: '#02060f',
+    markerStyle: 'crystal', starfieldDensity: 300, starfieldTint: '#bfe6ff' },
 ];

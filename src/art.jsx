@@ -175,6 +175,23 @@ export function GlobalStyle({ T, pace = "sweep", speed = 1 }) {
   ::selection{background:${T.accent};color:${T.onAccent}}
   @keyframes lokdrift{from{transform:translateX(0)}to{transform:translateX(200vw)}}
   @keyframes loktwinkle{0%{opacity:0.2}100%{opacity:1}}
+  /* Particle keyframes used by RotationEffect's generic spec renderer. These
+     were previously declared only inside the legacy hand-written effect
+     branches below (fireflies/bubbles/snow) and inside ThemeBackdrop. The
+     generic path returns before those ever render, so any ROTATION_EFFECTS row
+     naming them animated nothing — the particles drew, then sat frozen. They
+     have to be global because the two renderers share animation names.
+     verify:cosmetics now fails if a spec names a keyframe that isn't here. */
+  @keyframes lokfly{0%,100%{transform:translate(0,0)}25%{transform:translate(6vw,-5vh)}50%{transform:translate(-4vw,-9vh)}75%{transform:translate(5vw,-4vh)}}
+  @keyframes lokbubble{0%{transform:translateY(0) scale(.5);opacity:0}15%{opacity:.6}100%{transform:translateY(-112vh) scale(1.5);opacity:0}}
+  @keyframes loksnow{0%{transform:translate(0,-6vh)}100%{transform:translate(4vw,107vh)}}
+  @keyframes lokglitchhue{0%,100%{opacity:.25;filter:hue-rotate(0deg)}50%{opacity:.9;filter:hue-rotate(180deg)}}
+  /* New permanent page effects (see ROTATION_EFFECTS in engine/rotation.js). */
+  @keyframes lokdrizzle{0%{transform:translate(0,-10vh)}100%{transform:translate(-3vw,108vh)}}
+  @keyframes lokmote{0%,100%{transform:translate(0,0)}33%{transform:translate(4vw,-3vh)}66%{transform:translate(-3vw,3vh)}}
+  @keyframes lokspore{0%{transform:translate(0,105vh) scale(.6);opacity:0}20%{opacity:.8}100%{transform:translate(7vw,-8vh) scale(1.1);opacity:0}}
+  @keyframes lokemberrise{0%{transform:translate(0,104vh) scale(1);opacity:.9}100%{transform:translate(3vw,-6vh) scale(.3);opacity:0}}
+  @keyframes lokglitchdrop{0%{transform:translate(0,-8vh)}45%{transform:translate(6px,45vh)}55%{transform:translate(-6px,55vh)}100%{transform:translate(0,106vh)}}
   @keyframes lokrain{from{transform:translateY(-20px)}to{transform:translateY(100vh)}}
   @keyframes lokember{from{transform:translateY(0) scale(1);opacity:.9}to{transform:translateY(-100vh) scale(.4);opacity:0}}
   @keyframes lokconf{0%{transform:translateY(-12px) rotate(0)}100%{transform:translateY(100vh) rotate(540deg)}}

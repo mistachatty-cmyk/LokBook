@@ -1,0 +1,118 @@
+// Coverage gate for PERMANENT cosmetics, the sibling of verify-rotation.mjs.
+//
+// verify-rotation only covers DAILY_ITEMS/WEEKLY_ITEMS, so the permanent Shop
+// catalogues had no gate at all — the exact hole that let docs/AUDIT.md
+// Finding 2 happen (95 items sold for Loks rendering nothing).
+//
+// This checks three distinct failure modes, all of which were found live:
+//   1. INERT       — a sellable id with no renderer entry anywhere.
+//   2. DEAD ANIM   — a particle spec naming a @keyframes that isn't defined
+//                    globally. The particles draw, then sit frozen. Hit
+//                    fireflies/bubbles/snow/plasma, whose keyframes were
+//                    declared inside legacy branches the generic renderer
+//                    never renders.
+//   3. FAKE ICON   — a reaction pack entry that isn't a type <ReactionIcon>
+//                    implements. It falls through to the splat SVG, so the
+//                    pack renders as three identical splats. Hit all three
+//                    rotation reaction packs.
+import { build } from "esbuild";
+import { rmSync, readFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath, pathToFileURL } from "url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const out = join(root, ".cosmetics-check.mjs");
+const entry = `
+  import * as C from "./src/constants.jsx";
+  import * as R from "./src/engine/rotation.js";
+  export { C, R };
+`;
+
+const readSrc = p => readFileSync(join(root, p), "utf8");
+
+try {
+  await build({
+    stdin: { contents: entry, resolveDir: root, sourcefile: "cos.jsx", loader: "jsx" },
+    bundle: true, format: "esm", platform: "node", outfile: out, logLevel: "silent",
+    define: {
+      "import.meta.env.VITE_SUPABASE_URL": '""',
+      "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": '""',
+      "import.meta.env.DEV": "false", "import.meta.env.PROD": "true",
+    },
+  });
+  const { C, R } = await import(pathToFileURL(out).href);
+
+  const art = readSrc("src/art.jsx");
+  const easel = readSrc("src/Easel.jsx");
+  const cursors = readSrc("src/engine/cursors.js");
+  const indexCss = readSrc("src/index.css");
+
+  // Renderer registries, resolved the same way the app resolves them.
+  const frames = R.ROTATION_FRAMES("#000", "#fff", 64);
+  const borders = R.ROTATION_BORDERS("#000", "#fff");
+
+  // A hand-written branch counts as a renderer too.
+  const hasBranch = (src, id) => src.includes(`=== "${id}"`) || src.includes(`==="${id}"`);
+
+  const problems = [];
+  const check = (label, items, resolve) => {
+    let ok = 0;
+    for (const it of items) {
+      const id = typeof it === "string" ? it : it.id;
+      if (resolve(id)) ok++;
+      else problems.push(`INERT      ${label}: "${id}" — sellable, no renderer`);
+    }
+    return ok;
+  };
+
+  let total = 0;
+  total += check("effect", C.EFFECTS, id => id === "none" || id in R.ROTATION_EFFECTS || hasBranch(art, id));
+  total += check("sky", C.SKIES, id => id === "clear" || id in R.ROTATION_SKIES || hasBranch(art, id));
+  total += check("paper", C.PAPERS, id => id === "plain" || id in R.ROTATION_PAPERS || easel.includes(`"${id}"`));
+  total += check("frame", C.FRAMES, id => id === "none" || id in frames || art.includes(`${id}:`));
+  total += check("blot_border", C.BLOT_BORDERS, id => id === "none" || id in borders || readSrc("src/theme/theme.js").includes(`${id}:`));
+  total += check("cursor", C.CURSORS, id => id === "default" || id in R.ROTATION_CURSORS || cursors.includes(`${id}:`));
+  total += check("font", C.FONT_PACKS, id => id === "default" || id in R.ROTATION_FONTS || !!C.FONT_PACKS.find(f => f.id === id)?.font);
+  total += check("name_color", C.NAME_COLORS, id => id === "default" || id in C.NAME_COLOR_MAP);
+  total += check("world_skin", C.WORLD_SKINS, id => id === "none" || !!C.WORLD_SKINS.find(s => s.id === id)?.textureUrl);
+  // Sticker packs carry their emoji inline; an empty pack is an inert pack.
+  total += check("sticker_pack", C.STICKER_PACKS, id => {
+    const p = C.STICKER_PACKS.find(s => s.id === id);
+    return (p?.stickers?.length > 0) || id in R.ROTATION_STICKERS;
+  });
+  total += check("reaction_pack", C.REACTION_PACKS, id => id in C.REACTION_SETS || id in R.ROTATION_REACTIONS);
+
+  // --- 2. every particle spec's animation must be a globally-defined keyframe.
+  // GlobalStyle (art.jsx) and index.css are the only global stylesheets; a
+  // @keyframes inside a conditional branch's <style> does not count, because the
+  // generic renderer returns before that branch ever renders.
+  const globalStyle = art.slice(art.indexOf("export function GlobalStyle"));
+  const globalKeyframes = new Set(
+    [...globalStyle.matchAll(/@keyframes\s+([\w-]+)/g), ...indexCss.matchAll(/@keyframes\s+([\w-]+)/g)]
+      .map(m => m[1])
+  );
+  for (const [id, spec] of Object.entries(R.ROTATION_EFFECTS)) {
+    if (spec.anim && !globalKeyframes.has(spec.anim))
+      problems.push(`DEAD ANIM  effect "${id}" — @keyframes ${spec.anim} is not defined globally (particles will not move)`);
+  }
+
+  // --- 3. reaction icons must be types ReactionIcon actually implements.
+  const iconFn = art.slice(art.indexOf("export function ReactionIcon"), art.indexOf("export function GlobalStyle"));
+  const iconTypes = new Set([...iconFn.matchAll(/case "([\w]+)"/g)].map(m => m[1]));
+  for (const [pack, icons] of Object.entries(R.ROTATION_REACTIONS)) {
+    for (const ic of icons) {
+      if (!iconTypes.has(ic))
+        problems.push(`FAKE ICON  reaction "${pack}" — "${ic}" is not a ReactionIcon type (renders as a generic splat)`);
+    }
+  }
+
+  console.log(`COSMETICS: ${total} sellable items checked across 11 catalogues`);
+  if (problems.length) {
+    console.error("PROBLEMS:\n  " + problems.join("\n  "));
+    process.exit(1);
+  }
+  console.log("COSMETICS OK — every sellable cosmetic resolves to a renderer, every particle animates, every reaction icon is real.");
+} catch (e) {
+  console.error("COSMETICS CHECK FAILED:", e.message);
+  process.exit(1);
+} finally { rmSync(out, { force: true }); }
