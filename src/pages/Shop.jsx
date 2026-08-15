@@ -6,7 +6,7 @@ import {
   RARITY, EFFECTS, NAME_COLORS, PAPERS, MYTHIC_ITEMS, CELEBRATIONS, ANIMATION_FX, SKIES,
   CURSORS, FONT_PACKS, STICKER_PACKS, POST_EXPORTS, FRAMES, REACTION_PACKS, AVATAR_ACCENTS,
   STUDIO_MODULES, BLOT_BORDERS, BLOT_PERSONALITIES, BLOT_IDLE_ANIMATIONS, BLOT_EXPRESSIONS, BLOT_BOUNCES, LILLOK_GEAR, LILLOK_SKINS, LILLOK_AURAS, LILLOK_PETS,
-  VOICE_PACKS, MUSIC_PACKS, WORLD_SKINS, getDailyRotation, getWeeklyRotation,
+  VOICE_PACKS, MUSIC_PACKS, WORLD_SKINS, ownsCosmetic, getDailyRotation, getWeeklyRotation,
 } from "../constants.jsx";
 import MythicPreview from "../MythicPreview.jsx";
 
@@ -94,7 +94,10 @@ export default function Shop({ccTier,say,modules=[],onBuyModule,loks,lokPass,kid
   ];
   const resetAllCosmetics=()=>{resetRows.forEach(([,,,apply])=>apply());setShowResetConfirm(false);say("All cosmetics reset to default — nothing un-owned","success");};
   const Section=({title,sub,children})=>(<section className="mt-5"><h3 className="lok-display text-base font-extrabold">{title}</h3>{sub&&<p className="text-xs opacity-60 mb-1">{sub}</p>}<div className="mt-2">{children}</div></section>);
-  const has=(cat,id)=>owned[cat]?.includes(id);const eq=(cat,id)=>cosmetics[cat]===id;
+  // ownsCosmetic tolerates both historical shapes of owned[cat] (plain ids and
+  // {id,ts} objects) — see constants.jsx. Using .includes() directly here meant
+  // anything bought from the Profile read as un-owned and was charged twice.
+  const has=(cat,id)=>ownsCosmetic(owned,cat,id);const eq=(cat,id)=>cosmetics[cat]===id;
   const buy=(cat,item)=>{if(WIP_CATEGORIES[cat]){say?.(WIP_CATEGORIES[cat],"error");return;}onBuyCosmetic(cat,item);};
   const ALL_CATS=[["featured","Featured"],["themes","Skins"],["mythic","💎 Mythic"],["effects","Effects"],["fx","FX"],["skies","Skies"],["cosmetic","Cosmetics"],["studio","Studio"],["blot","Blot Shop"],["lillok","LilLok+"],["paper","Paper"],["cursors","Cursors"],["fonts","Fonts"],["stickers","Stickers"],["export","Export"],["music","Music"]];
   // Simple view hides the categories whose effects aren't wired up yet;

@@ -78,6 +78,20 @@ const pixels = await page.evaluate(async (b64) => {
   return { distinctColours: seen.size, litSamples: lit, size: `${tmp.width}x${tmp.height}` };
 }, shot);
 
+// Re-render churn test: hand the component fresh prop identities repeatedly and
+// confirm the globe is NOT rebuilt. A rebuild creates a new <canvas>, so more
+// than one canvas ever existing means the init effect is firing on prop
+// identity — the endless "loading" cycle users saw.
+await page.waitForTimeout(7000);
+const churn = await page.evaluate(() => ({
+  canvasesEverCreated: window.__h?.canvasesSeen?.size ?? -1,
+  rendersDriven: window.__h?.renderCount?.() ?? -1,
+  canvasesNow: document.querySelectorAll('canvas').length,
+  stillReady: !/Loading globe|Timed out|Error/i.test(document.body.innerText),
+}));
+console.log('churn  :', JSON.stringify(churn));
+const stable = churn.canvasesEverCreated === 1 && churn.stillReady;
+
 const drew = pixels && pixels.distinctColours > 3 && pixels.litSamples > 20;
 console.log('=== REAL COMPONENT RESULT ===');
 console.log('status :', h?.status);
@@ -86,8 +100,9 @@ console.log('canvases:', dom.canvas);
 console.log('pixels :', JSON.stringify(pixels));
 console.log('visible text:', dom.text);
 console.log('pageerrors:', errors.length ? errors.join('\n') : 'none');
-const pass = h?.status === 'ready' && dom.canvas > 0 && drew;
-console.log(pass ? '\nPASS ✅ globe is rendering' : '\nFAIL ❌');
+const pass = h?.status === 'ready' && dom.canvas > 0 && drew && stable;
+if (!stable) console.error('FAIL: globe rebuilt on prop-identity change (loading loop)');
+console.log(pass ? '\nPASS ✅ globe renders and stays stable across re-renders' : '\nFAIL ❌');
 await page.screenshot({ path: '/tmp/world-verified.png' });
 await browser.close();
 stop();

@@ -14,16 +14,34 @@ const posts = [
   { id: 'p2', latitude: 51.5, longitude: -0.12, location_privacy: 'everyone', location_name: 'London', author: 'nib' },
 ];
 
-createRoot(document.getElementById('root')).render(
-  React.createElement(WorldMapViewer, {
-    posts,
-    userLocation: { lat: 37.77, lng: -122.42 },
+const root = createRoot(document.getElementById('root'));
+// Deliberately hand it FRESH array/function identities each render, exactly
+// like App.jsx did before memoisation. If the globe re-initialises on prop
+// identity changes, canvases get recreated and status flaps back to loading —
+// which is the reported "loads, then loads forever" bug.
+let renders = 0;
+const draw = () => {
+  renders++;
+  root.render(React.createElement(WorldMapViewer, {
+    posts: posts.map(p => ({ ...p })),            // new array + new objects
+    userLocation: { lat: 37.77, lng: -122.42 },   // new object
     theme: 'riso',
     skin: 'none',
     gyroMotion: { gamma: 0, beta: 0, alpha: 0 },
+    onPostClick: () => {},                        // new function
     onClose: () => {},
-  })
-);
+  }));
+};
+draw();
+
+// Count how many distinct <canvas> elements ever get created. A stable globe
+// creates exactly one.
+window.__h.canvasesSeen = new Set();
+const seen = () => document.querySelectorAll('canvas').forEach(c => window.__h.canvasesSeen.add(c));
+setInterval(seen, 200);
+// Re-render repeatedly once the globe is up.
+setTimeout(() => { for (let i = 0; i < 12; i++) setTimeout(draw, i * 150); }, 4000);
+window.__h.renderCount = () => renders;
 
 // Poll the rendered DOM to infer the component's status, since we can't read
 // its internal state from outside.

@@ -912,6 +912,17 @@ export const lokApi = {
   },
 };
 
+// `owned[category]` has been written in two incompatible shapes: the Shop's buy
+// handler pushed plain id strings, the Profile's pushed {id, ts} objects. Each
+// reader understood only its own shape, so anything bought in one surface read
+// as un-owned in the other — and charged the player a second time for something
+// they already had. Normalise on read so existing saves (which may hold either,
+// or a mix) keep working; writes are plain ids everywhere now. The `ts` field
+// was never read by anything, so nothing is lost by dropping it.
+export const ownedIds = (owned, cat) =>
+  (owned?.[cat] || []).map(o => (typeof o === "string" ? o : o?.id)).filter(Boolean);
+export const ownsCosmetic = (owned, cat, id) => ownedIds(owned, cat).includes(id);
+
 // Globe.gl configuration for world map visualization
 export const GLOBE_CONFIG = {
   tileLayer: 'USGS',
@@ -924,6 +935,9 @@ export const GLOBE_CONFIG = {
   defaultGlobeRadius: 100,
   autoRotate: true,
   autoRotateSpeed: 0.5,
+  // How far the slippy-map tile engine will keep fetching detail as you zoom.
+  // 13 is a good ceiling for street-level without hammering the tile servers.
+  tileMaxLevel: 13,
 };
 
 // Purchasable World globe skins. "none" (the default, free) follows the
