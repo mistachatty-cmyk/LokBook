@@ -6,6 +6,14 @@ import { ROTATION_FRAMES, ROTATION_EFFECTS, ROTATION_SKIES } from "./engine/rota
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// Full-screen ambience (page effects, ink weather) sat at z-60, which is ABOVE
+// nav (39), ads (40), the FAB (42) and every modal (50) — none of which the
+// documented hierarchy in App.jsx accounts for. Two of these can be on screen
+// at once (an equipped effect plus Ink Weather), so opening a modal put one or
+// two full-screen fixed layers on top of it. Ambience belongs above page
+// content but under anything you interact with.
+export const LOK_Z_EFFECT = 45;
+
 export function FramedAvatar({ src, size = 64, frame = "none", accent = "none", ink = "#23306B", acc = "#FF5DA2", animated = false }) {
   const fs = {
     none: { border: `3px solid ${ink}` },
@@ -82,7 +90,7 @@ export function SkyEffect({ sky, paper }) {
 // this one generic pass, so adding an effect is a table entry, not a branch.
 function RotationEffect({ spec }) {
   const { count, size, color, anim, dur: [base, jit], round, glow, hollow, blur, alpha = 0.75 } = spec;
-  return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }}>
+  return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: LOK_Z_EFFECT }}>
     {Array.from({ length: count }).map((_, i) => {
       const isRainbow = color === "rainbow";
       return (<div key={i} className={round ? "absolute rounded-full" : "absolute"} style={{
@@ -99,47 +107,47 @@ function RotationEffect({ spec }) {
 
 export function PageEffect({ effect }) {
   if (ROTATION_EFFECTS[effect]) return <RotationEffect spec={ROTATION_EFFECTS[effect]} />;
-  if (effect === "rain") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }}>{Array.from({ length: 30 }).map((_, i) => (<div key={i} className="absolute" style={{ left: `${(i * 37) % 100}%`, top: -20, width: 2, height: 60, background: "rgba(47,169,160,.4)", animation: reduceMotion ? "none" : `lokrain ${0.7 + (i % 5) * 0.12}s linear infinite`, animationDelay: `${(i % 7) * 0.1}s` }} />))}</div>);
-  if (effect === "confetti") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }}>{Array.from({ length: 40 }).map((_, i) => { const cs = ["#FF5DA2", "#2FA9A0", "#E8B14B", "#7A4FBF", "#5E8BFF"]; return (<div key={i} className="absolute" style={{ left: `${(i * 27) % 100}%`, top: -12, width: 7, height: 11, background: cs[i % 5], animation: reduceMotion ? "none" : `lokconf ${3.5 + (i % 5) * 0.6}s linear infinite`, animationDelay: `${(i % 8) * 0.35}s`, borderRadius: 2 }} />); })}</div>);
-  if (effect === "aurora") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }}><div className="absolute inset-x-0 top-0" style={{ height: "55%", background: "linear-gradient(180deg, rgba(47,169,160,.28), rgba(122,79,191,.18) 50%, transparent)", filter: "blur(28px)", animation: reduceMotion ? "none" : "lokaurora 9s ease-in-out infinite alternate", mixBlendMode: "screen" }} /></div>);
-  if (effect === "embers") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }}>{Array.from({ length: 24 }).map((_, i) => (<div key={i} className="absolute rounded-full" style={{ left: `${(i * 41) % 100}%`, bottom: -10, width: 5, height: 5, background: i % 2 ? "#FF8A5C" : "#FF5DA2", animation: reduceMotion ? "none" : `lokember ${3 + (i % 4)}s ease-in infinite`, animationDelay: `${(i % 6) * 0.4}s` }} />))}</div>);
-  if (effect === "scanlines") return (<div className="pointer-events-none fixed inset-0" style={{ zIndex: 60, background: "repeating-linear-gradient(0deg, rgba(35,48,107,.07) 0 2px, transparent 2px 4px)", animation: reduceMotion ? "none" : "lokscan 9s linear infinite" }} />);
-  if (effect === "static") return (<div className="pointer-events-none fixed inset-0" style={{ zIndex: 60, opacity: 0.06, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E")`, animation: reduceMotion ? "none" : "lokstatic .45s steps(3) infinite" }} />);
+  if (effect === "rain") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: LOK_Z_EFFECT }}>{Array.from({ length: 30 }).map((_, i) => (<div key={i} className="absolute" style={{ left: `${(i * 37) % 100}%`, top: -20, width: 2, height: 60, background: "rgba(47,169,160,.4)", animation: reduceMotion ? "none" : `lokrain ${0.7 + (i % 5) * 0.12}s linear infinite`, animationDelay: `${(i % 7) * 0.1}s` }} />))}</div>);
+  if (effect === "confetti") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: LOK_Z_EFFECT }}>{Array.from({ length: 40 }).map((_, i) => { const cs = ["#FF5DA2", "#2FA9A0", "#E8B14B", "#7A4FBF", "#5E8BFF"]; return (<div key={i} className="absolute" style={{ left: `${(i * 27) % 100}%`, top: -12, width: 7, height: 11, background: cs[i % 5], animation: reduceMotion ? "none" : `lokconf ${3.5 + (i % 5) * 0.6}s linear infinite`, animationDelay: `${(i % 8) * 0.35}s`, borderRadius: 2 }} />); })}</div>);
+  if (effect === "aurora") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: LOK_Z_EFFECT }}><div className="absolute inset-x-0 top-0" style={{ height: "55%", background: "linear-gradient(180deg, rgba(47,169,160,.28), rgba(122,79,191,.18) 50%, transparent)", filter: "blur(28px)", animation: reduceMotion ? "none" : "lokaurora 9s ease-in-out infinite alternate", mixBlendMode: "screen" }} /></div>);
+  if (effect === "embers") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: LOK_Z_EFFECT }}>{Array.from({ length: 24 }).map((_, i) => (<div key={i} className="absolute rounded-full" style={{ left: `${(i * 41) % 100}%`, bottom: -10, width: 5, height: 5, background: i % 2 ? "#FF8A5C" : "#FF5DA2", animation: reduceMotion ? "none" : `lokember ${3 + (i % 4)}s ease-in infinite`, animationDelay: `${(i % 6) * 0.4}s` }} />))}</div>);
+  if (effect === "scanlines") return (<div className="pointer-events-none fixed inset-0" style={{ zIndex: LOK_Z_EFFECT, background: "repeating-linear-gradient(0deg, rgba(35,48,107,.07) 0 2px, transparent 2px 4px)", animation: reduceMotion ? "none" : "lokscan 9s linear infinite" }} />);
+  if (effect === "static") return (<div className="pointer-events-none fixed inset-0" style={{ zIndex: LOK_Z_EFFECT, opacity: 0.06, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E")`, animation: reduceMotion ? "none" : "lokstatic .45s steps(3) infinite" }} />);
 
   // ---- Ward effects ----------------------------------------------------
   // Same shape as the originals above (fixed overlay, zIndex 60, no pointer
   // events, motion killed under prefers-reduced-motion). Keyframes are
   // declared inline per effect so nothing new lands in the global stylesheet.
-  if (effect === "petals") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }} aria-hidden="true">
+  if (effect === "petals") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: LOK_Z_EFFECT }} aria-hidden="true">
     <style>{`@keyframes lokpetal{0%{transform:translate(0,-8vh) rotate(0deg)}100%{transform:translate(9vw,108vh) rotate(420deg)}}@keyframes lokpetalsway{0%,100%{margin-left:-14px}50%{margin-left:14px}}`}</style>
     {Array.from({ length: 22 }).map((_, i) => (<div key={i} style={{ position: "absolute", left: `${(i * 4.7) % 100}%`, top: 0, animation: reduceMotion ? "none" : `lokpetalsway ${3 + (i % 4)}s ease-in-out infinite`, animationDelay: `-${i * 0.4}s` }}>
       <div style={{ width: 8 + (i % 3) * 3, height: 6 + (i % 3) * 2, background: i % 3 ? "#FF7B9C" : "#FFC2D1", borderRadius: "60% 10% 60% 10%", opacity: 0.75, animation: reduceMotion ? "none" : `lokpetal ${11 + (i % 6) * 3}s linear infinite`, animationDelay: `-${i * 1.1}s` }} />
     </div>))}
   </div>);
 
-  if (effect === "fireflies") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }} aria-hidden="true">
+  if (effect === "fireflies") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: LOK_Z_EFFECT }} aria-hidden="true">
     <style>{`@keyframes lokfly{0%,100%{transform:translate(0,0)}25%{transform:translate(6vw,-5vh)}50%{transform:translate(-4vw,-9vh)}75%{transform:translate(5vw,-4vh)}}@keyframes lokglowpulse{0%,100%{opacity:.15;box-shadow:0 0 3px 1px rgba(180,255,140,.4)}50%{opacity:.95;box-shadow:0 0 10px 3px rgba(180,255,140,.8)}}`}</style>
     {Array.from({ length: 16 }).map((_, i) => (<div key={i} style={{ position: "absolute", left: `${(i * 6.3 + 5) % 96}%`, top: `${(i * 11) % 88}%`, animation: reduceMotion ? "none" : `lokfly ${18 + (i % 5) * 6}s ease-in-out infinite`, animationDelay: `-${i * 1.9}s` }}>
       <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#DFFFA8", animation: reduceMotion ? "none" : `lokglowpulse ${2.2 + (i % 4) * 0.8}s ease-in-out infinite`, animationDelay: `-${i * 0.7}s` }} />
     </div>))}
   </div>);
 
-  if (effect === "soot") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }} aria-hidden="true">
+  if (effect === "soot") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: LOK_Z_EFFECT }} aria-hidden="true">
     <style>{`@keyframes loksoot{0%{transform:translate(0,-6vh) rotate(0deg);opacity:0}12%{opacity:.55}100%{transform:translate(-7vw,107vh) rotate(280deg);opacity:0}}`}</style>
     {Array.from({ length: 26 }).map((_, i) => (<div key={i} style={{ position: "absolute", left: `${(i * 3.9 + 2) % 100}%`, top: 0, width: 2 + (i % 3), height: 2 + (i % 3), background: i % 4 === 0 ? "#E2551F" : "#5A5348", borderRadius: i % 3 ? "50%" : 1, animation: reduceMotion ? "none" : `loksoot ${13 + (i % 7) * 3}s linear infinite`, animationDelay: `-${i * 1.2}s` }} />))}
   </div>);
 
-  if (effect === "bubbles") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }} aria-hidden="true">
+  if (effect === "bubbles") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: LOK_Z_EFFECT }} aria-hidden="true">
     <style>{`@keyframes lokbubble{0%{transform:translateY(0) scale(.5);opacity:0}15%{opacity:.6}100%{transform:translateY(-112vh) scale(1.5);opacity:0}}`}</style>
     {Array.from({ length: 18 }).map((_, i) => (<div key={i} style={{ position: "absolute", left: `${(i * 5.7 + 3) % 98}%`, bottom: "-8vh", width: 6 + (i % 5) * 4, height: 6 + (i % 5) * 4, borderRadius: "50%", border: "1.5px solid rgba(58,168,220,.55)", background: "rgba(58,168,220,.12)", animation: reduceMotion ? "none" : `lokbubble ${12 + (i % 6) * 4}s linear infinite`, animationDelay: `-${i * 1.6}s` }} />))}
   </div>);
 
-  if (effect === "ripple") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }} aria-hidden="true">
+  if (effect === "ripple") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: LOK_Z_EFFECT }} aria-hidden="true">
     <style>{`@keyframes lokripple{0%{transform:scale(.2);opacity:.55}100%{transform:scale(2.6);opacity:0}}`}</style>
     {[[18, 24], [72, 38], [40, 68], [84, 78], [10, 84]].map(([l, t], i) => (<div key={i} style={{ position: "absolute", left: `${l}%`, top: `${t}%`, width: "26vmin", height: "26vmin", marginLeft: "-13vmin", marginTop: "-13vmin", borderRadius: "50%", border: `2px solid ${i % 2 ? ART.teal : ART.pink}`, animation: reduceMotion ? "none" : `lokripple ${5 + i * 1.4}s ease-out infinite`, animationDelay: `-${i * 1.7}s` }} />))}
   </div>);
 
-  if (effect === "snow") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 60 }} aria-hidden="true">
+  if (effect === "snow") return (<div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: LOK_Z_EFFECT }} aria-hidden="true">
     <style>{`@keyframes loksnow{0%{transform:translate(0,-6vh)}100%{transform:translate(4vw,107vh)}}@keyframes loksnowsway{0%,100%{margin-left:-10px}50%{margin-left:10px}}`}</style>
     {Array.from({ length: 30 }).map((_, i) => (<div key={i} style={{ position: "absolute", left: `${(i * 3.4) % 100}%`, top: 0, animation: reduceMotion ? "none" : `loksnowsway ${4 + (i % 5)}s ease-in-out infinite`, animationDelay: `-${i * 0.3}s` }}>
       <div style={{ width: 2 + (i % 3), height: 2 + (i % 3), borderRadius: "50%", background: "rgba(255,255,255,.85)", boxShadow: "0 0 3px rgba(255,255,255,.6)", opacity: 0.7, animation: reduceMotion ? "none" : `loksnow ${14 + (i % 8) * 3}s linear infinite`, animationDelay: `-${i * 0.9}s` }} />

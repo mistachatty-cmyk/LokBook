@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { GLOBE_CONFIG, WORLD_SKINS } from '../constants.jsx';
 import { THEMES } from '../theme/theme.js';
 
@@ -162,6 +163,9 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   // null = the stylised skin texture (default). Anything else streams real
   // slippy-map tiles at increasing detail as you zoom in.
   const [tileSource, setTileSource] = useState(null);
+  // Border frame around the whole view: hairline -> glow -> off. Themed, so it
+  // recolours whenever the app theme changes.
+  const [frameMode, setFrameMode] = useState('line'); // 'line' | 'glow' | 'off'
 
   const T = THEMES[theme] || THEMES.riso;
   const skinDef = WORLD_SKINS.find(s => s.id === skin) || WORLD_SKINS[0];
@@ -392,8 +396,30 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     });
   }, [gyroMotion, globeReady]);
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50 }}>
+  // Portalled to <body>. The app root carries `filter` (Night Shift) and
+  // `animation` (quake) at times, and either one makes that element the
+  // containing block for position:fixed descendants — which traps this modal
+  // inside the page instead of the viewport. Rendering into body sidesteps
+  // every ancestor stacking context, transform and filter.
+  return createPortal((
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 95,
+    }}>
+      {/* Border frame. Must be its own overlay rather than an inset shadow on
+          the wrapper: the backdrop and the globe canvas are both inset:0
+          children with their own backgrounds, so they paint straight over any
+          shadow drawn on the parent. Themed off T.accent, so it recolours with
+          every theme change. */}
+      {frameMode !== 'off' && (
+        <div aria-hidden="true" style={{
+          position: 'absolute', inset: 0, zIndex: 4, pointerEvents: 'none',
+          border: `${frameMode === 'glow' ? 3 : 2}px solid ${T.accent}`,
+          boxShadow: frameMode === 'glow'
+            ? `inset 0 0 30px 8px ${T.accent}66, 0 0 24px 4px ${T.accent}88`
+            : 'none',
+          transition: 'box-shadow .35s ease, border-color .35s ease',
+        }} />
+      )}
       {/* Backdrop — a generated starfield instead of a flat fill, so the
           "you're in a simulated space" feel is present the instant World
           opens, through the loading spinner and any error/retry state, not
@@ -476,22 +502,35 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       {/* Controls overlay */}
       <div style={{
         position: 'absolute',
-        top: 20,
+        top: 'calc(20px + env(safe-area-inset-top))',
         left: 20,
         right: 20,
-        zIndex: 2,
+        zIndex: 3,
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
       }}>
-        <h2 style={{ margin: 0, color: '#fff', fontSize: 24, fontWeight: 700 }}>🌍 World Map</h2>
+        <h2 style={{ margin: 0, color: T.paper, fontSize: 24, fontWeight: 700, textShadow: `2px 2px 0 ${T.accent}` }}>🌍 World Map</h2>
+        <button
+          onClick={() => setFrameMode(m => (m === 'line' ? 'glow' : m === 'glow' ? 'off' : 'line'))}
+          aria-label={`Border: ${frameMode}. Tap to change.`}
+          style={{
+            marginLeft: 'auto', marginRight: 8,
+            background: frameMode === 'off' ? 'transparent' : T.accent,
+            color: frameMode === 'off' ? T.paper : T.onAccent,
+            border: `2px solid ${T.accent}`, borderRadius: 8,
+            padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          {frameMode === 'line' ? '▢ Line' : frameMode === 'glow' ? '✧ Glow' : '▢ Off'}
+        </button>
         <button
           onClick={onClose}
           style={{
-            background: 'rgba(255,255,255,0.1)',
-            border: '2px solid #fff',
+            background: T.card,
+            border: `2px solid ${T.ink}`,
             borderRadius: 8,
-            color: '#fff',
+            color: T.ink,
             padding: '8px 16px',
             fontSize: 14,
             fontWeight: 600,
@@ -509,12 +548,12 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           bottom: 20,
           left: 20,
           right: 20,
-          background: 'rgba(20,20,30,0.95)',
-          border: '2px solid #ec4899',
+          background: T.card,
+          border: `2px solid ${T.accent}`,
           borderRadius: 12,
           padding: 16,
           zIndex: 2,
-          color: '#fff',
+          color: T.ink,
         }}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
             📍 {selectedPost.location_name || 'Unknown location'}
@@ -533,14 +572,14 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       {/* Location privacy indicator */}
       <div style={{
         position: 'absolute',
-        top: 80,
+        top: 'calc(80px + env(safe-area-inset-top))',
         left: 20,
-        background: 'rgba(255,255,255,0.1)',
-        border: '1px solid rgba(255,255,255,0.2)',
+        background: T.card,
+        border: `2px solid ${T.ink}`,
         borderRadius: 8,
         padding: '8px 12px',
-        color: '#fff',
-        fontSize: 12,
+        color: T.ink,
+        fontSize: 12, fontWeight: 700,
         zIndex: 2,
       }}>
         🔒 Privacy: Everyone
@@ -552,7 +591,9 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           engine is what finally makes it real. */}
       {status === 'ready' && (
         <div style={{
-          position: 'absolute', bottom: selectedPost ? 130 : 20, left: 20, right: 20,
+          position: 'absolute',
+          bottom: `calc(${selectedPost ? 130 : 20}px + env(safe-area-inset-bottom))`,
+          left: 20, right: 20,
           zIndex: 2, display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4,
         }}>
           {[{ id: null, name: '✨ Skin' }, ...GLOBE_CONFIG.tileLayerOptions.map(o => ({ id: o.id, name: o.name }))]
@@ -579,5 +620,5 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         </div>
       )}
     </div>
-  );
+  ), document.body);
 }
