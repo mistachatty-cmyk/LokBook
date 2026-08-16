@@ -1081,7 +1081,14 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
           {soundQueue.some(i=>i.kind==="spotify"&&slPlaying===i.id)&&(()=>{const it=soundQueue.find(i=>i.id===slPlaying);const m=it&&it.url.match(/spotify\.com\/(track|album|playlist)\/([\w]+)/);return m?<iframe title="soundlab-sp" style={{width:"100%",height:80,border:0,borderRadius:12,marginTop:8}} src={`https://open.spotify.com/embed/${m[1]}/${m[2]}`} allow="autoplay; encrypted-media"/>:null;})()}
         </div>)}
         <div className="p-3 rounded-2xl" style={{border:`2px solid ${T.shadow}`,background:T.paper}}>
-          {devMode&&<div className="p-3 rounded-2xl mb-2" style={{border:`2px dashed ${T.shadow}`,background:T.paper,opacity:0.85}}>
+          {/* Not gated on devMode. It used to be, which was circular: the only
+              ways into devMode were a hidden 7-tap on the About paragraph, or
+              the `dev mode` code — typed into this box. The box even listed
+              that code as a chip, so its own advertised entry point was dead by
+              construction. Code entry IS the way into the cheat system, so it
+              cannot sit behind something a cheat grants. The 🔩 Dev Flags panel
+              below stays gated; that one is real debug surface. */}
+          <div className="p-3 rounded-2xl mb-2" style={{border:`2px dashed ${T.shadow}`,background:T.paper,opacity:0.85}}>
           <div className="font-bold text-sm">🫧 BadBleep Box</div>
           <div className="text-[10px] opacity-50 mt-0.5">tap a code below or type to search</div>
           <div className="mt-2 flex gap-1.5 mb-2">
@@ -1094,7 +1101,7 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
               <div className="text-[8px] opacity-60">{desc}</div>
             </button>:null;})}
           </div>
-        </div>}
+        </div>
           <div className="font-bold text-sm">About</div>
           <div className="text-xs opacity-70 mt-0.5 leading-snug select-none" onClick={e=>{versionTap();devTap.current++;clearTimeout(devTimer.current);devTimer.current=setTimeout(()=>devTap.current=0,1200);if(devTap.current>=7){devTap.current=0;setDevMode(d=>!d);say(devMode?"Dev mode off":"Dev mode on");}}} style={{cursor:"default"}}>LokBook + Lok N Slide · <span style={{fontWeight:700}}>alpha v1.2</span> · Your gallery and LilLok save automatically on this device. Lok Juniors mode is in the Shop.</div>
         </div>

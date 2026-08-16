@@ -20,6 +20,7 @@
     "verify:strokes": "node scripts/verify-strokes.mjs",
     "verify:lok": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-lok.mjs",
     "verify:easel": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-easel.mjs",
+    "verify:bleep": "vite build && node scripts/verify-bleep.mjs",
     "db:migrate": "supabase db push",
     "build:steam": "vite build --config vite.config.steam.js"
   },
