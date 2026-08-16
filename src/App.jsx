@@ -24,7 +24,7 @@ import {
   PX_PER_FRAME, TIERS, FORMATS, KID_PROMPTS, INTERVENTIONS,
   MODES, FRONT_NAMES, EFFECTS, NAME_COLORS, FRAMES, REACTION_PACKS, AVATAR_ACCENTS, PAPERS, LILLOK_GEAR,
   SKIES, ANIMATION_FX, CURSORS, FONT_PACKS, MUSIC_PACKS, STICKER_PACKS, POST_EXPORTS, LILLOK_SKINS, LILLOK_AURAS, LILLOK_PETS, VOICE_PACKS, STUDIO_MODULES, BLENDS, ownedIds, ownsCosmetic,
-  RARITY, MYTHIC_ITEMS, CELEBRATIONS, getDailyRotation, getWeeklyRotation, fromDbPost, hasModule,
+  RARITY, MYTHIC_ITEMS, CELEBRATIONS, getDailyRotation, getWeeklyRotation, fromDbPost, FRAMELESS_COLS, lokApi, hasModule,
   OFFLINE_BONUS_HOURS, OFFLINE_BONUS_LOKS, BLOT_IDLE_ANIMATIONS, BLOT_EXPRESSIONS, BLOT_BOUNCES,
 } from "./constants.jsx";
 import { paperBase, drawBounce, drawBloom, drawNight, renderSequence, renderDoodle, renderAvatar, traceShape } from "./engine/draw.jsx";
@@ -194,7 +194,7 @@ function Onboard({onDone,onName,defaultName="",canInstall=false,onInstallClick})
 
 const GUEST_REMINDER_OPTIONS=[3,7,14,30];
 const ALL_MOODS=["","calm","wild","moody","playful","dreamy","chaos","cozy","spooky"];
-function Feed({posts,bookmarks,following,feedMode,setFeedMode,myHandle="",onFeatureOpen,cosmetics={},daily,streak,dailyClaimed,flipOfDay,onLine,onClaimDaily,onOpen,onVote,onLok,onBookmark,say,moodFilter,setMoodFilter,moodTags,reportedPosts,onReport,onEcho,onArtist,flair="",onPullRefresh,music,feedAds=false,onAdCta,onLocationClick}){
+function Feed({posts,bookmarks,following,feedMode,setFeedMode,myHandle="",onFeatureOpen,cosmetics={},daily,streak,dailyClaimed,flipOfDay,onLine,onClaimDaily,onOpen,onVote,onLok,onBookmark,say,moodFilter,setMoodFilter,moodTags,reportedPosts,onReport,onEcho,onArtist,flair="",onPullRefresh,music,feedAds=false,onAdCta,onLocationClick,onNeedFrames}){
   const T=useT();const[active,setActive]=useState(0);const cardRefs=useRef([]);
   const[pullY,setPullY]=useState(0);const[refreshing,setRefreshing]=useState(false);const pullStart=useRef(null);
   const PULL_THRESHOLD=70;
@@ -215,8 +215,13 @@ function Feed({posts,bookmarks,following,feedMode,setFeedMode,myHandle="",onFeat
     clearTimeout(searchTimer.current);
     searchTimer.current=setTimeout(async()=>{
       try{
+        // Explicit select. Without one PostgREST returns every column, which
+        // includes `frames` — a base64 pixel payload of ~16.8KB per frame —
+        // so each debounced keystroke was pulling megabytes to render a list
+        // of titles and authors. FRAMELESS_COLS is the metadata a card needs
+        // before it is on screen; frames arrive later, per post, on demand.
         const f=`or=(title.ilike.*${encodeURIComponent(q)}*,author.ilike.*${encodeURIComponent(q)}*)`;
-        const res=await fetch(`${SUPA_URL}/rest/v1/lok_posts?${f}&order=created_at.desc&limit=20`,{headers:{apikey:SUPA_KEY,Authorization:`Bearer ${SUPA_KEY}`}});
+        const res=await fetch(`${SUPA_URL}/rest/v1/lok_posts?select=${FRAMELESS_COLS}&${f}&order=created_at.desc&limit=20`,{headers:{apikey:SUPA_KEY,Authorization:`Bearer ${SUPA_KEY}`}});
         const data=await res.json();
         if(!Array.isArray(data))return;
         const remote=data.map(fromDbPost).filter(Boolean);
@@ -234,14 +239,32 @@ function Feed({posts,bookmarks,following,feedMode,setFeedMode,myHandle="",onFeat
   const base=(feedMode==="following"?posts.filter(p=>following.includes(p.author||"moss.ink")):posts).filter(p=>!hidden.has(p.id));
   const list=moodFilter==="all"?base:base.filter(p=>(moodTags[p.id]||"")===moodFilter);
   const moodEmojis={calm:"🌊",wild:"🔥",moody:"🌙",playful:"🎈",dreamy:"✨",chaos:"🌀",cozy:"☕",spooky:"👻",_clear:"✕"};
+  const listRef=useRef(list); listRef.current=list;
   const streakCol=streak>=30?"#E8B14B":streak>=7?T.accent:streak>=3?T.alt:T.ink;
+  // One observer, two jobs, two thresholds. 0.55 is "this is the card you're
+  // looking at" and drives `active` as it always has. The 0.01 rung is new: it
+  // fires as soon as any part of a card enters the viewport (plus 600px of
+  // rootMargin, so the fetch starts before it's actually visible) and asks for
+  // that post's frames. Feed queries no longer return `frames` at all, so this
+  // is what puts pixels on screen — a card with none renders the "Rendering…"
+  // placeholder FeedCard has always had for that case.
   useEffect(()=>{
     const io=new IntersectionObserver(entries=>{
-      entries.forEach(e=>{if(e.isIntersecting&&e.intersectionRatio>0.55){const idx=Number(e.target.dataset.idx);setActive(idx);if(Math.random()<0.22&&onLine)onLine("feed_scroll");}});
-    },{threshold:[0.55]});
+      entries.forEach(e=>{
+        if(!e.isIntersecting)return;
+        const idx=Number(e.target.dataset.idx);
+        if(e.intersectionRatio>0.55){setActive(idx);if(Math.random()<0.22&&onLine)onLine("feed_scroll");}
+        // Read through a ref, not the captured array: `list` is rebuilt every
+        // render, and putting it in the deps below would tear down and
+        // recreate the observer continuously — the same identity trap that
+        // caused World's infinite reload (see CLAUDE.md).
+        const post=listRef.current[idx];
+        if(post&&post.remote&&!(post.frames&&post.frames.length))onNeedFrames?.(post.id);
+      });
+    },{threshold:[0.01,0.55],rootMargin:"600px 0px"});
     cardRefs.current.forEach(el=>el&&io.observe(el));
     return()=>io.disconnect();
-  },[list.length,feedMode,moodFilter]);
+  },[list.length,feedMode,moodFilter,onNeedFrames]);
   return(<div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
     {(pullY>0||refreshing)&&<div className="flex items-center justify-center overflow-hidden" style={{height:refreshing?36:pullY,transition:refreshing?"height .2s ease":"none"}}><span className="text-xs font-bold" style={{opacity:Math.min(1,(refreshing?1:pullY)/PULL_THRESHOLD),color:T.accent}}>{refreshing?"✨ Fetching new pieces…":pullY>PULL_THRESHOLD?"Release for new pieces ↓":"Pull down for new pieces"}</span></div>}
     <div className="relative mt-3"><input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search posts &amp; artists…" aria-label="Search feed" className="w-full px-3 py-2 rounded-xl text-sm font-bold" style={{border:`3px solid ${T.ink}`,background:T.card,color:T.ink,outline:"none"}}/>{searchQ&&<button onClick={()=>{setSearchQ("");setSearchResults(null);}} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold" style={{color:T.accent}}>✕</button>}</div>
@@ -1378,7 +1401,10 @@ export default function LokApp(){
     if(save?.comebackActive&&gap>=OFFLINE_BONUS_HOURS*60*60*1000){setLoks(l=>l+1000);setTotalEarned(t=>t+1000);setComebackActive(false);setLastComebackAward(Date.now());const style=save.comebackStyle||"confetti";setComebackCelebration(style);setTimeout(()=>{setComebackCelebration(null);say("Take a break! +25 Loks — click the bubble","success");},4500);}
     setDaily(loadedDaily);const savedQ=save?.quests&&save.quests.day===todayKey?save.quests:{day:todayKey,items:makeQuests()};setQuests(savedQ);
     const userPosts=(savedGallery||[]).map(p=>({...p,voted:false,viewed:false}));setPosts([...userPosts,...seed]);if(!save||!save.onboarded)setShowOnboard(true);
-    (async()=>{try{const{data,error}=await supabase.from("lok_posts").select("id,title,frames,pace_ms,mode,style,author,votes,views").order("votes",{ascending:false}).limit(6);if(!error&&data){const dbPosts=data.map(fromDbPost).filter(Boolean).map(p=>({...p,voted:false,viewed:false}));setPosts(ps=>{const existing=new Set(ps.map(x=>x.id));return[...ps,...dbPosts.filter(dp=>!existing.has(dp.id))];});}}catch{}})();
+    // Metadata for more posts costs far less than pixels for six: this used to
+    // select `frames` and pull the full base64 payload of every post on every
+    // single app open. Frames now arrive per card, when the card is seen.
+    (async()=>{try{const{data,error}=await supabase.from("lok_posts").select(FRAMELESS_COLS).order("votes",{ascending:false}).limit(24);if(!error&&data){const dbPosts=data.map(fromDbPost).filter(Boolean).map(p=>({...p,voted:false,viewed:false}));setPosts(ps=>{const existing=new Set(ps.map(x=>x.id));return[...ps,...dbPosts.filter(dp=>!existing.has(dp.id))];});}}catch{}})();
     seed.forEach((s,i)=>{if(!s._pendingDraw)return;setTimeout(()=>{const frames=renderSequence(s._pendingDraw,s._pendingN);const paceMs=[110,150,130][i];setPosts(ps=>ps.map(p=>p.id===s.id?{...p,frames,paceMs}:p));},i*80+50);});
     if(window.steamworks?.isAvailable)checkAchievements({posts:userPosts.length,streak:daily.streak||0,founder,votes:questsCompleted,totalSpent,mythicOwned:mythicOwned.length});
     applyLogo(appLogo);
@@ -1612,6 +1638,41 @@ export default function LokApp(){
     if(c.fx==="chest5"){const newChests=Array.from({length:5},()=>({id:`c${Date.now()}-${Math.random()}`,type:["common","uncommon","rare","epic","legendary","mythic"][Math.floor(Math.random()*6)]}));setChests(prev=>[...prev,...newChests]);hap([50,30,50,30,50]);say("🎁 +5 chests","success");}
   },[say,hap,blip,pushNotif,ownedThemes,VOICE_PACKS,CELEBRATIONS,celebrationStyle]);
   const patchPost=(id,patch)=>setPosts(ps=>ps.map(p=>(p.id===id?{...p,...patch}:p)));
+
+  // Frames arrive per post, once, when its card comes into view. Feed and
+  // search queries deliberately omit the `frames` column (FRAMELESS_COLS) —
+  // it holds base64 data URLs at roughly 16.8KB per frame, so selecting it
+  // for a list meant dragging every post's full pixel payload across the wire
+  // before anything was on screen.
+  //
+  // Requests are coalesced: the observer fires once per card and many cards
+  // enter view together during a scroll, so ids collect for a frame and go up
+  // as one `id=in.(…)` query. `requested` prevents a second round trip for a
+  // post already in flight or already loaded (lokApi.fetchFrames keeps its own
+  // session cache, including negative entries for deleted posts).
+  const frameQueue=useRef(new Set());const frameTimer=useRef(null);const framesRequested=useRef(new Set());
+  const needFrames=useCallback(id=>{
+    if(!id||framesRequested.current.has(id))return;
+    framesRequested.current.add(id);frameQueue.current.add(id);
+    clearTimeout(frameTimer.current);
+    frameTimer.current=setTimeout(async()=>{
+      const ids=[...frameQueue.current];frameQueue.current.clear();
+      if(!ids.length)return;
+      try{
+        const rows=await lokApi.fetchFrames(ids);
+        setPosts(ps=>ps.map(p=>{const hit=rows.find(r=>r.id===p.id);return hit&&hit.frames.length?{...p,frames:hit.frames}:p;}));
+      }catch{
+        // Let a failed batch be retried the next time those cards are seen.
+        ids.forEach(i=>framesRequested.current.delete(i));
+      }
+    },80);
+  },[]);
+  // The viewer is the one place a frameless post is unacceptable — the feed
+  // can show a placeholder card, but an opened flip with nothing in it is just
+  // broken. The 600px prefetch margin means this is almost always already
+  // loaded; this covers the paths that reach the viewer without scrolling to
+  // the card first (deep link, remix, Flip of the Day, profile).
+  useEffect(()=>{const p=openIdx!==null?posts[openIdx]:null;if(p&&p.remote&&!(p.frames&&p.frames.length))needFrames(p.id);},[openIdx,posts,needFrames]);
   // Pull an existing post back into Studio for real edits. Publishing while
   // editingPostId is set updates that post in place instead of making a copy.
   const editInStudio=useCallback(post=>{
@@ -1686,7 +1747,7 @@ export default function LokApp(){
             bundle. The fallback is deliberately quiet: these load in a frame or
             two on any real connection and a spinner would only flash. */}
         <Suspense fallback={<div className="py-10 text-center text-sm opacity-50">Loading…</div>}>
-          {tab==="feed"&&<Feed posts={posts} bookmarks={bookmarks} following={following} feedMode={feedMode} setFeedMode={setFeedMode} cosmetics={cosmetics} daily={daily} streak={daily.streak} dailyClaimed={daily.claimed} flipOfDay={flipOfDay} onLine={showLine} onClaimDaily={()=>{if(daily.claimed)return;const wk=daily.streak%7===0&&daily.streak>0?20:0;const mo=daily.streak%30===0&&daily.streak>0?100:0;const bonus=10+Math.min(daily.streak,7)*5+wk+mo;setDaily(d=>({...d,claimed:true}));addLoks(bonus);gainXp(20);feedLilLok(15,"creation");blip("E5");hap([30,20,60]);say(`Day ${daily.streak} claimed · +${bonus} Loks`,"success");}} onOpen={id=>setOpenIdx(posts.findIndex(p=>p.id===id))} onVote={id=>{const p=posts.find(x=>x.id===id);if(p.voted)return;patchPost(id,{voted:true,votes:p.votes+1});addLoks(5);gainXp(5);questTick("vote");blip("C5");hap([30]);say("Vote stamped · +5 Loks","success");if(id.startsWith("seed")){addLoks(5);pushNotif("Your flip got a vote · +5 Loks (creator)","success");}else{pushNotif("You voted · creator notified","success");}}} onLok={name=>{setFollowing(f=>{const has=f.includes(name);blip("G5");hap([20,10,20]);if(has){say(`Un-Lok'd ${name}`);return f.filter(x=>x!==name);}questTick("lok");say(`Lok'd ${name}`);return[...f,name];});}} onBookmark={id=>{setBookmarks(b=>b.includes(id)?b.filter(x=>x!==id):[...b,id]);blip("A4");hap([20]);say(bookmarks.includes(id)?"Bookmark removed":"Lok'd in to bookmarks");}} say={say} moodFilter={moodFilter} setMoodFilter={setMoodFilter} moodTags={moodTags} reportedPosts={reportedPosts} onReport={id=>{setReportedPosts(r=>[...r,id]);patchPost(id,{hidden:true});say("Post hidden")}} onEcho={post=>{setPosts(ps=>[{id:"echo-"+Date.now(),title:"↻ "+post.title,frames:post.frames,paceMs:post.paceMs||160,mode:post.mode||"A",style:post.style||"bold",loop:post.loop,from:"studio",author:profile.name,votes:0,voted:false,viewed:false,views:0,reactions:{splat:0,heart:0,drip:0}},...ps]);addLoks(2);say("Echoed! +2 Loks");}} onArtist={setArtistView} myHandle={profile.name} onFeatureOpen={pc=>{setPosts(ps=>{if(ps.some(x=>x.id===pc.id))return ps;return [...ps,pc];});setTimeout(()=>setOpenIdx(i=>{const idx=posts.findIndex(x=>x.id===pc.id);return idx>=0?idx:posts.length;}),0);}} flair={flair} onPullRefresh={()=>{const now=Date.now();if(now-lastPullRef.current<15000){say("Still fresh — try again in a bit");return;}lastPullRef.current=now;dropBotPosts(2,true);say("New pieces from the wards ✨","success");}} music={music} feedAds={ads.feedNative} onAdCta={()=>setTab("shop")} onLocationClick={()=>setShowWorldMap(true)}/>}
+          {tab==="feed"&&<Feed posts={posts} bookmarks={bookmarks} following={following} feedMode={feedMode} setFeedMode={setFeedMode} cosmetics={cosmetics} daily={daily} streak={daily.streak} dailyClaimed={daily.claimed} flipOfDay={flipOfDay} onLine={showLine} onClaimDaily={()=>{if(daily.claimed)return;const wk=daily.streak%7===0&&daily.streak>0?20:0;const mo=daily.streak%30===0&&daily.streak>0?100:0;const bonus=10+Math.min(daily.streak,7)*5+wk+mo;setDaily(d=>({...d,claimed:true}));addLoks(bonus);gainXp(20);feedLilLok(15,"creation");blip("E5");hap([30,20,60]);say(`Day ${daily.streak} claimed · +${bonus} Loks`,"success");}} onOpen={id=>setOpenIdx(posts.findIndex(p=>p.id===id))} onVote={id=>{const p=posts.find(x=>x.id===id);if(p.voted)return;patchPost(id,{voted:true,votes:p.votes+1});addLoks(5);gainXp(5);questTick("vote");blip("C5");hap([30]);say("Vote stamped · +5 Loks","success");if(id.startsWith("seed")){addLoks(5);pushNotif("Your flip got a vote · +5 Loks (creator)","success");}else{pushNotif("You voted · creator notified","success");}}} onLok={name=>{setFollowing(f=>{const has=f.includes(name);blip("G5");hap([20,10,20]);if(has){say(`Un-Lok'd ${name}`);return f.filter(x=>x!==name);}questTick("lok");say(`Lok'd ${name}`);return[...f,name];});}} onBookmark={id=>{setBookmarks(b=>b.includes(id)?b.filter(x=>x!==id):[...b,id]);blip("A4");hap([20]);say(bookmarks.includes(id)?"Bookmark removed":"Lok'd in to bookmarks");}} say={say} moodFilter={moodFilter} setMoodFilter={setMoodFilter} moodTags={moodTags} reportedPosts={reportedPosts} onReport={id=>{setReportedPosts(r=>[...r,id]);patchPost(id,{hidden:true});say("Post hidden")}} onEcho={post=>{setPosts(ps=>[{id:"echo-"+Date.now(),title:"↻ "+post.title,frames:post.frames,paceMs:post.paceMs||160,mode:post.mode||"A",style:post.style||"bold",loop:post.loop,from:"studio",author:profile.name,votes:0,voted:false,viewed:false,views:0,reactions:{splat:0,heart:0,drip:0}},...ps]);addLoks(2);say("Echoed! +2 Loks");}} onArtist={setArtistView} myHandle={profile.name} onFeatureOpen={pc=>{setPosts(ps=>{if(ps.some(x=>x.id===pc.id))return ps;return [...ps,pc];});setTimeout(()=>setOpenIdx(i=>{const idx=posts.findIndex(x=>x.id===pc.id);return idx>=0?idx:posts.length;}),0);}} flair={flair} onPullRefresh={()=>{const now=Date.now();if(now-lastPullRef.current<15000){say("Still fresh — try again in a bit");return;}lastPullRef.current=now;dropBotPosts(2,true);say("New pieces from the wards ✨","success");}} music={music} feedAds={ads.feedNative} onAdCta={()=>setTab("shop")} onLocationClick={()=>setShowWorldMap(true)} onNeedFrames={needFrames}/>}
           {tab==="gallery"&&<Profile posts={posts} profile={profile} setProfile={setProfile} wins={wins} lokPass={lokPass} kids={kids} cosmetics={cosmetics} owned={owned} onBuyCosmetic={(cat,item)=>{if(ownsCosmetic(owned,cat,item.id)){setCosmetics(c=>({...c,[cat]:item.id}));say(`Equipped ${item.name}`);}else spend(item.price,()=>{setOwned(o=>({...o,[cat]:[...ownedIds(o,cat),item.id]}));setCosmetics(c=>({...c,[cat]:item.id}));},`${item.name} unlocked`);}} level={level} xp={xp} quests={quests} following={following} lokdInCount={bookmarks.length} bookmarks={bookmarks} notifications={notifications} notifUnread={notifUnread} loks={loks} totalEarned={totalEarned} questsCompleted={questsCompleted} canInstall={!!installEvt} onInstall={async()=>{if(installEvt){installEvt.prompt();try{const r=await installEvt.userChoice;if(r.outcome==="accepted")say("Lok added to your home screen!","success");}catch{}setInstallEvt(null);}else{say("Open your browser menu → Install app / Add to Home Screen");}}} onClearNotifs={()=>setNotifUnread(0)} onOpen={id=>setOpenIdx(posts.findIndex(p=>p.id===id))} onDelete={id=>setPosts(ps=>ps.filter(p=>p.id!==id))} onRename={(id,title)=>patchPost(id,{title})} say={say} onCheat={onCheat} pace={pace} setPace={setPace} speed={speed} setSpeed={setSpeed} soundLab={soundLab} onUnlockSoundLab={()=>setSoundLab(true)} soundQueue={soundQueue} setSoundQueue={setSoundQueue} founder={founder} onFounderJoin={async(handle,email)=>{await founderSignup(handle,email,{loks,wins,xp,profile,questsCompleted,totalEarned,gallerySize:posts.filter(p=>!p.id?.startsWith("seed")).length,lillok:{ink:lillok.ink,bond:lillok.bond,name:lillok.name}});setFounder(true);pushNotif("Founder status secured on LokServices 🏆","success");}} animatedToken={animatedToken} focusMode={focusMode} setFocusMode={setFocusMode} showSettings={showSettings} setShowSettings={setShowSettings} featureFlags={featureFlags} onSetFlag={(k,v)=>{const newFlags={...featureFlags,[k]:v};setFeatureFlags(newFlags);store.set("lok:flags",newFlags);}} onRequestGyroPermission={()=>gyro.requestAndAttach(true)} gyroPermissionGranted={gyro.permissionGranted} gyroMotion={gyroMotion} weatherOverride={weatherOverride} onSetWeather={id=>{setWeatherOverride(id);setWeatherOverrideLocal(id);}} hapticGrammar={hapticGrammar} setHapticGrammar={setHapticGrammar} fourthWall={fourthWall} setFourthWall={setFourthWall} garden={garden} setGarden={setGarden} wordTwister={wordTwister} setWordTwister={setWordTwister} flair={flair} timeMachineIdx={timeMachineIdx} setTimeMachineIdx={setTimeMachineIdx} heatmapData={heatmapData} sessionPin={sessionPin} setSessionPin={setSessionPin} pinInput={pinInput} setPinInput={setPinInput} verified={verified} setVerified={setVerified} devTap={devTap} devTimer={devTimer} devMode={devMode} setDevMode={setDevMode} appLogo={appLogo} setAppLogo={setAppLogo} setPinUnlocked={setPinUnlocked} setLoks={setLoks} setTotalEarned={setTotalEarned} legacyStudio={legacyStudio} setLegacyStudio={setLegacyStudio} viewingArtist={viewingArtist} onBackToMyGallery={()=>setViewingArtist(null)} onOpenMusic={()=>setShowMusic(true)} onOpenRoadmap={()=>setShowRoadmap(true)} onOpenWorldMap={()=>setShowWorldMap(true)} onOpenMail={()=>setShowMail(true)} mailUnreadCount={mail.filter(x=>!x.opened).length} tutorialProgress={tutorialProgress} onStartTutorial={id=>{setActiveTutorialId(id);const saved=tutorialProgress[id];setStudioFrames(saved?.frames||[]);setStudioFrameDurations(saved?.frameDurations||[]);setStudioTitle(saved?.title||TUTORIAL_PROJECTS.find(t=>t.id===id)?.title||"");setTab("studio");}} onMintGuestPass={mintGuestPassCode} onRedeemGuestPass={redeemGuestPassCode}/>}
           {tab==="studio"&&<>{activeTutorialId&&(()=>{const t=TUTORIAL_PROJECTS.find(x=>x.id===activeTutorialId);return t?(<div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold mb-1.5" style={{border:`2px solid ${T.accent}`,background:T.card,color:T.ink}}><span>{t.icon} Tutorial: {t.title}</span><button onClick={()=>setActiveTutorialId(null)} className="ml-auto lok-btn text-[10px] font-bold underline opacity-70">exit tutorial</button></div>):null;})()}<div className="mb-1">
         <div className="flex items-center gap-1.5">

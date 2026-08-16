@@ -20,7 +20,12 @@ const esc = s => String(s ?? "")
 
 async function fetchPost(id) {
   if (!SUPABASE_URL || !SUPABASE_KEY) return null;
-  const url = `${SUPABASE_URL}/rest/v1/lok_posts?id=eq.${encodeURIComponent(id)}&select=id,title,author,frames,votes&limit=1`;
+  // No `frames`. This route only ever used them to test whether frames[0] was
+  // an http URL — and it never is, because frames are stored as base64 data
+  // URLs. So every crawler hit was pulling an entire flip's pixel payload
+  // (~16.8KB per frame, times however many frames) out of Postgres purely to
+  // discard it one line later.
+  const url = `${SUPABASE_URL}/rest/v1/lok_posts?id=eq.${encodeURIComponent(id)}&select=id,title,author,votes&limit=1`;
   try {
     const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
     if (!r.ok) return null;
@@ -38,11 +43,11 @@ export default async function handler(req, res) {
   const desc = post
     ? `A hand-drawn flipbook animation${post.votes ? ` with ${post.votes} votes` : ""}. Draw your own on LokBook.`
     : "A home for tiny hand-drawn animations.";
-  // Frames are stored as data URLs. Those are far too large for an og:image and
-  // many scrapers reject them outright, so fall back to the app icon rather than
-  // emitting a broken tag.
-  const firstFrame = Array.isArray(post?.frames) ? post.frames[0] : null;
-  const image = firstFrame && /^https?:\/\//.test(firstFrame) ? firstFrame : `${site}/icon.svg`;
+  // Frames are stored as data URLs, which are far too large for an og:image and
+  // are rejected outright by many scrapers — so this always resolved to the app
+  // icon anyway. Emitting it directly costs nothing and fetches nothing. When
+  // posts grow a real `preview_url` column this becomes a one-line change.
+  const image = `${site}/icon.svg`;
   const canonical = `${site}/flip/${encodeURIComponent(id)}`;
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");

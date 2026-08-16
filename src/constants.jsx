@@ -760,6 +760,20 @@ export async function hashPin(pin) {
 }
 
 
+// Every column fromDbPost reads EXCEPT `frames`.
+//
+// `frames` is a jsonb array of base64 data URLs — a measured ~16.8KB per
+// frame. A `select=*` feed or search query therefore drags a full pixel
+// payload per post across the wire before anything is even on screen, which
+// was the single largest source of Supabase egress in the app. Every list
+// query uses this instead; frames are fetched per post, once, when its card
+// actually becomes visible (fetchFrames below).
+//
+// fromDbPost already defaults `frames` to [], and FeedCard already renders a
+// "Rendering…" placeholder for a post with no frames, so a frameless row is a
+// shape both sides have always handled — no reader needed changing.
+export const FRAMELESS_COLS = "id,title,author,frame_durations,pace_ms,mode,style,loop,votes,views,reactions,origin,created_at,music_id,latitude,longitude,location_name,location_privacy";
+
 export const fromDbPost = r => ({ id: r.id, title: r.title, author: r.author, frames: r.frames || [], frameDurations: r.frame_durations || undefined, paceMs: r.pace_ms || 160, mode: r.mode || "A", style: r.style || "bold", loop: !!r.loop, votes: r.votes || 0, views: r.views || 0, reactions: { humhah: 0, bomhogwah: 0, splat: 0, heart: 0, drip: 0, ...(r.reactions||{}) }, echoedAt: null, echoCount: 0, echoParent: null, echoExpiresAt: null, from: r.origin || "studio", createdAt: r.created_at, musicId: r.music_id || undefined, latitude: r.latitude || undefined, longitude: r.longitude || undefined, location_name: r.location_name || undefined, location_privacy: r.location_privacy || "everyone", remote: true, voted: false, viewed: false });
 
 export const GAME_MANUAL_PAGES = [
@@ -785,6 +799,11 @@ export const GAME_MANUAL_PAGES = [
   { title:"Tips & Tricks", icon:"💡", content:"Double-tap the version number in Settings to unlock Sound Lab. Use the search in your gallery. Earn Loks by drawing, voting, and streaks. Long press in the Easel for quick actions. Frame pacing controls how fast the feed scrolls." },
   { title:".lok files", icon:"📦", content:"Every flip can be saved as a .lok file — LokBook's own animation format. It's a real zip archive, so it opens anywhere (even in a plain file browser you'll see a manifest and a preview image), but it also packs your full animation at roughly a tenth the size of a normal image stack. .lok is open source — anyone can build tools that read or write it. Look for Export as .lok in a flip's menu." },
 ];
+
+// Frames already pulled this session, keyed by post id. Deliberately in
+// memory only: a full flip is hundreds of KB and localStorage's ~5MB budget
+// is already what the gallery quota errors are about.
+const FRAME_CACHE = new Map();
 
 export const lokApi = {
   async signup(handle, pin, blob) {
@@ -823,8 +842,25 @@ export const lokApi = {
   async publishPost(dbPost) {
     try { const r = await fetch(`${SUPA_URL}/rest/v1/lok_posts`, { method: "POST", headers: { ...getHeaders(), Prefer: "resolution=merge-duplicates" }, body: JSON.stringify(dbPost) }); return r.ok; } catch { return false; }
   },
+  /**
+   * Frames for specific posts, fetched on demand. Results are cached for the
+   * session, so scrolling a card back into view costs nothing.
+   */
+  async fetchFrames(ids) {
+    const want = [...new Set(ids)].filter(id => id && !FRAME_CACHE.has(id));
+    if (want.length) {
+      try {
+        const list = want.map(encodeURIComponent).join(",");
+        const r = await fetch(`${SUPA_URL}/rest/v1/lok_posts?select=id,frames&id=in.(${list})`, { headers: getHeaders() });
+        if (r.ok) for (const row of await r.json()) FRAME_CACHE.set(row.id, row.frames || []);
+      } catch {}
+      // Negative-cache misses too, or a deleted post retries forever.
+      for (const id of want) if (!FRAME_CACHE.has(id)) FRAME_CACHE.set(id, []);
+    }
+    return ids.map(id => ({ id, frames: FRAME_CACHE.get(id) || [] }));
+  },
   async fetchPosts(limit = 60, before = null, search = null, author = null) {
-    let url = `${SUPA_URL}/rest/v1/lok_posts?select=*&order=created_at.desc&limit=${limit}`;
+    let url = `${SUPA_URL}/rest/v1/lok_posts?select=${FRAMELESS_COLS}&order=created_at.desc&limit=${limit}`;
     if (before) url += `&created_at.lt.${encodeURIComponent(before)}`;
     if (search) url += `&or=(title.ilike.*${encodeURIComponent(search)}*,author.ilike.*${encodeURIComponent(search)}*)`;
     if (author) url += `&author.eq.${encodeURIComponent(author)}`;

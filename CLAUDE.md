@@ -18,6 +18,7 @@ npm run verify:export      # drives the real app: draw → capture → click .lo
 npm run verify:bleep       # the BadBleep code box is reachable from Settings on a fresh profile, and Dev Flags stays hidden
 npm run verify:header      # measures real header button geometry at 5 widths — no overlap, no oval squeeze, overflow scrolls instead of clipping
 npm run verify:quiet       # an idle signed-in tab makes no repeat local saves and no duplicate auth_saves uploads
+npm run verify:payload     # stubs PostgREST: list queries must not ask for `frames`, and lazy-loaded frames must still reach the DOM
 ```
 
 ## Working practices
@@ -32,6 +33,7 @@ Every one of these was paid for by a real bug in this codebase. They are not gen
 - **Saved-user-data changes are additive, and readers tolerate old shapes.** `owned[cat]` was written in two incompatible shapes by two buy handlers and silently double-charged people. `.lok` deliberately did not bump its version for a purely additive payload, because the shipped reader hard-throws on unknown versions.
 - **Never ship a sellable or toggleable thing without a gate proving it resolves to something real.** `docs/AUDIT.md` Finding 2: 95 items took Loks and rendered nothing. That is what `verify:rotation` and `verify:cosmetics` exist to prevent.
 - **Gate the wiring, not just the parts.** `verify:strokes`, `verify:lok` and `verify:easel` were all green while vector capture was completely inert: nothing called `getStrokes()` and `exportLok` never passed `meta.strokes`, so every `.lok` a user could produce was stroke-less. Each piece worked perfectly in isolation, which is exactly why no unit-level gate could see it. If a feature has a user-facing entry point, one gate has to start from that entry point (`verify:export` does).
+- **A gate that cannot reach its subject passes vacuously.** `verify:payload` first tried to measure real Supabase responses; sandboxed Chromium cannot reach `supabase.co` at all (`ERR_CONNECTION_RESET`, and passing `HTTPS_PROXY` doesn't help), so it observed zero responses and reported OK. Stubbing PostgREST via `page.route` made it deterministic, offline, and able to fail. If a gate depends on a network the CI box may not have, stub it.
 - **Report honestly.** Say which claims are verified, which are unverified, and what needs hardware. Do not describe something as confirmed when only the build passed.
 
 Run `build`, `smoke`, `verify:rotation`, `verify:cosmetics` before any commit that touches cosmetics/rotation. Run `verify:world` after touching `WorldMapViewer.jsx`, `globe.gl`, or `three`. **None of these substitute for the others** — each was added after a specific class of bug shipped silently past the others (see docs/AUDIT.md, Finding 2, for the origin story).
