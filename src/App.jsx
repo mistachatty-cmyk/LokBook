@@ -1618,21 +1618,32 @@ export default function LokApp(){
     <div className={`min-h-screen w-full lok-motion-${featureFlags.lokMotion||"subtle"} ${featureFlags.compactUi ? "lok-compact" : ""}`} style={{background:T.paper,color:T.ink,fontFamily:resolveFont(fontPack),...(isUnlocked("night_shift",level)&&nightShiftAmount()>0.02?{filter:`brightness(${1-nightShiftAmount()*0.16}) saturate(${1-nightShiftAmount()*0.22}) hue-rotate(${-nightShiftAmount()*8}deg)`,transition:"filter 4s linear"}:{}),animation:effect==="quake"&&!reduceMotion?"lokquake 6s infinite":"none"}}>
       <GlobalStyle T={T} pace={pace} speed={speed}/><ThemeBackdrop themeId={uiTheme} pace={pace}/><SkyEffect sky={sky} paper={T.paper}/><PageEffect effect={effect}/>{/* Ink Weather (roadmap, LV2): a second, unbought effect layer the day picks for you */}
       {isUnlocked("ink_weather",level)&&inkWeatherToday()!=="none"&&inkWeatherToday()!==effect&&<PageEffect effect={inkWeatherToday()}/>}
-      {!focusMode && <header className="sticky top-0 z-30 flex items-center justify-between px-4 py-3" style={{background:T.paper,borderBottom:`3px solid ${T.ink}`}}>
-        <button onClick={()=>setTab("feed")} aria-label="Go to feed" className="lok-btn lok-display text-2xl font-extrabold tracking-tight select-none" style={{background:"transparent",border:"none",padding:0,whiteSpace:"nowrap",textShadow:`3px 2px 0 ${T.accent}`}}>
+      {!focusMode && <header className="sticky top-0 z-30 flex items-center justify-between px-4 py-3" style={{background:T.paper,borderBottom:`3px solid ${T.ink}`,gap:8}}>
+        <button onClick={()=>setTab("feed")} aria-label="Go to feed" className="lok-btn lok-display text-2xl font-extrabold tracking-tight select-none shrink-0" style={{background:"transparent",border:"none",padding:0,whiteSpace:"nowrap",textShadow:`3px 2px 0 ${T.accent}`}}>
           Lok{kids?" Juniors":tab==="battle"?" N Slide":"Book"}
         </button>
-        <div className="flex items-center gap-2">
-          {kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.alt,color:onColor(T.alt,T)}}>SAFE</span>}
-          {lokPass&&!kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.accent,color:T.onAccent}}>PASS</span>}
-          <button onClick={()=>setShowMusic(true)} aria-label="Open music player" className="lok-btn w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold" style={{border:`2.5px solid ${T.ink}`,background:music.playing?T.accent:T.card,color:music.playing?T.onAccent:T.ink}}>♪</button>
-          <button onClick={()=>setShowRewards(true)} aria-label="Free rewards — watch an ad" title="Free rewards" className="lok-btn w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold" style={{border:`2.5px solid ${T.ink}`,background:isActive(doubleLoksUntil)?T.accent:T.card,color:isActive(doubleLoksUntil)?T.onAccent:T.ink}}>🎁</button>
-          <button onClick={()=>setSound(s=>!s)} aria-label={sound?"Mute sound":"Enable sound"} className="lok-btn w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold" style={{border:`2.5px solid ${T.ink}`,background:sound?T.ink:T.card,color:sound?T.paper:T.ink}}>{sound?"🔔":"🔕"}</button>
-          <div className="relative flex flex-col items-center">
+        {/* Right-hand action cluster used to be a bare flex row with no
+            shrink-0 and no overflow handling: on any phone-width screen its
+            items (SAFE/PASS chip, 3 icon buttons, the level block, the Loks
+            pill — 300px+ combined) genuinely don't fit the ~340px available,
+            so flex's default shrink squashed the fixed-size circular buttons
+            until their icons and labels collided. shrink-0 on every item stops
+            that; the overflow-x-auto row (same hidden-scrollbar pattern used
+            for the bot-persona/layers carousels elsewhere in this file) is
+            what actually absorbs any remaining width instead of clipping or
+            overlapping. Icon buttons and gaps are a touch smaller on phone so
+            the scroll is rarely needed in practice. */}
+        <div className="flex items-center overflow-x-auto" style={{gap:vp.tier==="phone"?6:8,scrollbarWidth:"none"}}>
+          {kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold shrink-0" style={{background:T.alt,color:onColor(T.alt,T)}}>SAFE</span>}
+          {lokPass&&!kids&&<span className="lok-display px-2 py-0.5 rounded-md text-xs font-extrabold shrink-0" style={{background:T.accent,color:T.onAccent}}>PASS</span>}
+          <button onClick={()=>setShowMusic(true)} aria-label="Open music player" className="lok-btn shrink-0 rounded-full flex items-center justify-center text-lg font-bold" style={{width:vp.tier==="phone"?40:44,height:vp.tier==="phone"?40:44,border:`2.5px solid ${T.ink}`,background:music.playing?T.accent:T.card,color:music.playing?T.onAccent:T.ink}}>♪</button>
+          <button onClick={()=>setShowRewards(true)} aria-label="Free rewards — watch an ad" title="Free rewards" className="lok-btn shrink-0 rounded-full flex items-center justify-center text-lg font-bold" style={{width:vp.tier==="phone"?40:44,height:vp.tier==="phone"?40:44,border:`2.5px solid ${T.ink}`,background:isActive(doubleLoksUntil)?T.accent:T.card,color:isActive(doubleLoksUntil)?T.onAccent:T.ink}}>🎁</button>
+          <button onClick={()=>setSound(s=>!s)} aria-label={sound?"Mute sound":"Enable sound"} className="lok-btn shrink-0 rounded-full flex items-center justify-center text-sm font-bold" style={{width:vp.tier==="phone"?40:44,height:vp.tier==="phone"?40:44,border:`2.5px solid ${T.ink}`,background:sound?T.ink:T.card,color:sound?T.paper:T.ink}}>{sound?"🔔":"🔕"}</button>
+          <div className="relative shrink-0 flex flex-col items-center">
             <button onClick={()=>setShowRoadmap(true)} className="lok-btn lok-display px-2 py-0.5 rounded-md text-xs font-extrabold" style={{background:T.ink,color:T.paper}} aria-label={`Level ${level} - click to open roadmap`}>Lv {level}{verified&&<span style={{color:"#E8B14B",marginLeft:2}}>✦</span>}</button>
-            <span className="text-[9px] font-bold opacity-60" style={{color:T.ink,marginTop:2}}>Click me!</span>
+            {vp.tier!=="phone"&&<span className="text-[9px] font-bold opacity-60" style={{color:T.ink,marginTop:2}}>Click me!</span>}
           </div>
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full font-bold" style={{border:`2.5px solid ${T.ink}`,background:T.card}} aria-label={`${loks} Loks`}>
+          <div className="shrink-0 flex items-center gap-2 px-3 py-1 rounded-full font-bold" style={{border:`2.5px solid ${T.ink}`,background:T.card}} aria-label={`${loks} Loks`}>
             <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><circle cx="11" cy="11" r="8" fill={T.accent}/><circle cx="9" cy="9" r="8" fill="none" stroke={T.ink} strokeWidth="2.4"/><path d="M7 5.5 V12.5 H12" fill="none" stroke={T.ink} strokeWidth="2.4" strokeLinecap="round"/></svg>
             {loks}
           </div>
