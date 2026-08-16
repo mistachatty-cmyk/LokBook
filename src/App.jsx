@@ -630,7 +630,18 @@ function NewStudioUI({ownedTiers,ccTier,onPublish,say,kids,dailyPrompt,animFx,mo
     }catch(e){console.warn("tween",e);say("Couldn't build that motion","error");}
   };
   const exportGif=async()=>{if(frames.length<2)return;say("Encoding GIF…");try{const canvases=await Promise.all(frames.map((src,i)=>new Promise((res,rej)=>{const img=new Image();img.onload=()=>{const c=document.createElement("canvas");c.width=W;c.height=H;const ctx=c.getContext("2d");paperBase(ctx,i);ctx.drawImage(img,0,0);c.userDelay=Math.round((frameDurations[i]||paceMs)/10);res(c);};img.onerror=rej;img.src=src;})));const blob=encodeGIF(canvases,{delay:Math.round(paceMs/10),loop:0});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(title.trim()||"flip")+".gif";a.click();URL.revokeObjectURL(url);say(`GIF exported · ${(blob.size/1024).toFixed(1)}KB`,"success");}catch(e){console.warn("exportGif",e);say("GIF export failed — try fewer/smaller pages","error");}};
-  const exportLok=async()=>{if(frames.length<2)return;try{const blob=await encodeLok(frames,{title:title.trim()||"Untitled flip",paceMs:frameDurations,loop:true});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(title.trim()||"flip")+".lok";a.click();URL.revokeObjectURL(a.href);say(`.lok exported · ${(blob.size/1024).toFixed(1)}KB`,"success");}catch(e){console.warn("exportLok",e);say("Export failed","error");}};
+  // Vector strokes ride along with the raster frames. getStrokes() (not
+  // takeStrokes()) so exporting twice still produces the same file — draining
+  // the log would silently make the second .lok stroke-less.
+  //
+  // This is the whole session's log, not a per-frame split, and that is
+  // deliberate: Easel never clears between captures, so frame N is the
+  // cumulative drawing and the ordered log reconstructs every frame in turn.
+  // Timeline edits (reverse, delete, tween) do desync it from the raster
+  // frames, which is acceptable because the raster payload stays canonical —
+  // strokes are supplementary, and a reader that doesn't understand them is
+  // unaffected.
+  const exportLok=async()=>{if(frames.length<2)return;try{const strokes=easel.current?.getStrokes?.()||[];const blob=await encodeLok(frames,{title:title.trim()||"Untitled flip",paceMs:frameDurations,loop:true,strokes});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(title.trim()||"flip")+".lok";a.click();URL.revokeObjectURL(a.href);say(`.lok exported · ${(blob.size/1024).toFixed(1)}KB${strokes.length?` · ${strokes.length} vector strokes`:""}`,"success");}catch(e){console.warn("exportLok",e);say("Export failed","error");}};
   return(<div className="mt-4">
     <div className="flex items-center justify-between">
       <div><h2 className="lok-display text-xl font-extrabold flex items-center gap-2">Studio{ccTier&&<span className="text-xs px-1.5 py-0.5 rounded" style={{background:T.accent,color:T.onAccent}}>PRO</span>}</h2><p className="text-xs opacity-70 mt-0.5">Draw · capture · animate · publish</p></div>

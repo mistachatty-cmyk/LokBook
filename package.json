@@ -22,6 +22,7 @@
     "verify:easel": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-easel.mjs",
     "verify:bleep": "vite build && node scripts/verify-bleep.mjs",
     "verify:header": "vite build && node scripts/verify-header.mjs",
+    "verify:export": "vite build && node scripts/verify-export.mjs",
     "db:migrate": "supabase db push",
     "build:steam": "vite build --config vite.config.steam.js"
   },
