@@ -1,6 +1,8 @@
 // LokFlip (.lok) — see docs/LOK_FORMAT.md for the full spec.
 // encodeLok(frames, meta) -> Blob      frames: HTMLCanvasElement[] | ImageData[]
-// decodeLok(blob)         -> Promise<{ meta, frames: string[] /* data URLs */ }>
+// decodeLok(blob)         -> Promise<{ meta, frames: string[] /* data URLs */, strokes }>
+
+import { encodeStrokes, decodeStrokes } from "./strokeCodec.js";
 
 // ---------- CRC32 (standard IEEE 802.3 polynomial table) ----------
 const CRC_TABLE = (() => {
@@ -283,6 +285,9 @@ async function normalizeFrame(src) {
 
 // ---------- public API ----------
 export async function encodeLok(framesIn, meta = {}) {
+  // meta.strokes (optional): vector stroke log from Studio. Stored as an extra
+  // ZIP entry rather than changing anything about the raster payload — see the
+  // backward-compatibility note on `version` below.
   if (!framesIn.length) throw new Error("encodeLok: no frames");
   const frames = await Promise.all(framesIn.map(normalizeFrame));
   const w = frames[0].width, h = frames[0].height;
@@ -301,17 +306,34 @@ export async function encodeLok(framesIn, meta = {}) {
     title: meta.title || "", createdAt: new Date().toISOString(),
   };
 
+  // Optional vector stroke payload. NOTE: `version` deliberately stays 1.
+  // The raster semantics this reader implements are completely unchanged, and
+  // the existing decoder hard-throws on any version but 1 — bumping it would
+  // make every previously-shipped build reject these files for a feature it
+  // doesn't need. Strokes are advertised by additive manifest keys instead, so
+  // an old reader still gets preview.png + data.lokflip and simply ignores
+  // what it doesn't recognise. That is exactly the graceful degradation the
+  // format doc promises.
+  let strokeBytes = null;
+  if (meta.strokes?.length) {
+    strokeBytes = encodeStrokes(meta.strokes, { width: w, height: h });
+    manifest.strokeFormat = "lokvec1";
+    manifest.strokeCount = meta.strokes.length;
+  }
+
   // preview.png: frame 0, full quality, standalone — the universal-compatibility fallback
   const previewCanvas = frames[0] instanceof ImageData ? imageDataToCanvas(frames[0]) : frames[0];
   const previewBlob = await new Promise(res => previewCanvas.toBlob(res, "image/png"));
   const previewBytes = new Uint8Array(await previewBlob.arrayBuffer());
 
   const enc = new TextEncoder();
-  return zipWrite([
+  const entries = [
     { name: "manifest.json", data: enc.encode(JSON.stringify(manifest)) },
     { name: "preview.png", data: previewBytes },
     { name: "data.lokflip", data: compressed },
-  ]);
+  ];
+  if (strokeBytes) entries.push({ name: "strokes.lokvec", data: strokeBytes });
+  return zipWrite(entries);
 }
 
 export async function decodeLok(blob) {
@@ -339,7 +361,16 @@ export async function decodeLok(blob) {
     return canvas.toDataURL("image/png");
   });
 
-  return { meta, frames };
+  // Strokes are optional and additive: a file without them decodes exactly as
+  // before, and a malformed payload must never take down a perfectly good
+  // raster flip.
+  let strokes = null;
+  if (files["strokes.lokvec"]) {
+    try { strokes = decodeStrokes(files["strokes.lokvec"]).strokes; }
+    catch (e) { console.warn(".lok: stroke payload unreadable, ignoring —", e.message); }
+  }
+
+  return { meta, frames, strokes };
 }
 
 function imageDataToCanvas(imgData) {

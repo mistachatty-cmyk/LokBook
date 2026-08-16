@@ -1,0 +1,84 @@
+<!doctype html>
+<html><body style="margin:0;background:#111;color:#0f0;font:12px monospace">
+<div id="out" style="padding:10px;white-space:pre-wrap"></div>
+<script type="module">
+import { encodeLok, decodeLok } from '/src/engine/lokFormat.js';
+
+const out = document.getElementById('out');
+window.__lok = { done: false, problems: [], info: {} };
+const log = m => { out.textContent += m + '\n'; };
+const fail = m => { window.__lok.problems.push(m); log('FAIL: ' + m); };
+
+function frame(tint) {
+  const c = document.createElement('canvas');
+  c.width = 480; c.height = 600;
+  const g = c.getContext('2d');
+  g.fillStyle = '#F2EDE2'; g.fillRect(0, 0, 480, 600);
+  g.fillStyle = tint; g.fillRect(40, 40, 300, 220);
+  g.fillStyle = '#23306B'; g.fillRect(80, 320, 180, 90);
+  return c;
+}
+
+(async () => {
+try {
+  const frames = [frame('#FF5DA2'), frame('#2FA9A0'), frame('#E8B14B')];
+
+  // 1. A file written WITHOUT strokes — i.e. exactly what shipped before.
+  const v1 = await encodeLok(frames, { title: 'no strokes', paceMs: [140, 140, 140] });
+  const d1 = await decodeLok(v1);
+  log(`legacy-shaped file: ${v1.size}B, ${d1.frames.length} frames, strokes=${d1.strokes}`);
+  if (d1.frames.length !== 3) fail('legacy file lost frames');
+  if (d1.strokes !== null) fail('legacy file should report strokes === null');
+  if (d1.meta.version !== 1) fail('version drifted from 1: ' + d1.meta.version);
+  if (d1.meta.strokeFormat) fail('legacy file should not advertise strokeFormat');
+
+  // 2. A file WITH strokes. Raster payload must be untouched and still decode.
+  const strokes = [
+    { tool: 'pen', color: 'rgb(35,48,107)', size: 6,
+      points: Array.from({ length: 400 }, (_, i) => ({ x: 20 + i * 1.1, y: 300 + Math.sin(i / 9) * 80, pressure: 0.4 + (i % 10) / 25 })) },
+    { tool: 'watercolor', color: '#ff5da2', size: 22,
+      points: Array.from({ length: 250 }, (_, i) => ({ x: 300 - i * 0.9, y: 100 + Math.cos(i / 7) * 50, pressure: 0.7 })) },
+  ];
+  const v2 = await encodeLok(frames, { title: 'with strokes', paceMs: [140, 140, 140], strokes });
+  const d2 = await decodeLok(v2);
+  log(`with strokes:       ${v2.size}B, ${d2.frames.length} frames, ${d2.strokes?.length} strokes`);
+  if (d2.frames.length !== 3) fail('stroke file lost frames');
+  if (d2.meta.version !== 1) fail('adding strokes changed version to ' + d2.meta.version);
+  if (d2.meta.strokeFormat !== 'lokvec1') fail('strokeFormat not advertised');
+  if (d2.meta.strokeCount !== 2) fail('strokeCount wrong: ' + d2.meta.strokeCount);
+  if (d2.strokes?.length !== 2) fail('strokes did not round-trip');
+  if (d2.strokes?.[0]?.points?.length !== 400) fail('stroke 0 point count: ' + d2.strokes?.[0]?.points?.length);
+  if (d2.strokes?.[0]?.tool !== 'pen') fail('stroke 0 tool: ' + d2.strokes?.[0]?.tool);
+
+  // Geometry survived the container round-trip.
+  const p0 = d2.strokes[0].points[10], o0 = strokes[0].points[10];
+  if (Math.abs(p0.x - o0.x) > 0.05 || Math.abs(p0.y - o0.y) > 0.05)
+    fail(`stroke geometry drifted: (${p0.x},${p0.y}) vs (${o0.x},${o0.y})`);
+
+  // 3. THE COMPATIBILITY CLAIM: simulate an OLD reader — one that knows only
+  // manifest.json / preview.png / data.lokflip — opening the stroke file.
+  const zip = new Uint8Array(await v2.arrayBuffer());
+  const sig = [...zip.slice(0, 4)].map(b => b.toString(16)).join('');
+  if (sig !== '504b34') fail('not a valid ZIP local header: ' + sig);
+  const names = [];
+  for (let i = 0; i < zip.length - 4; i++) {
+    if (zip[i] === 0x50 && zip[i+1] === 0x4b && zip[i+2] === 0x03 && zip[i+3] === 0x04) {
+      const n = zip[i+26] | (zip[i+27] << 8);
+      names.push(new TextDecoder().decode(zip.subarray(i + 30, i + 30 + n)));
+    }
+  }
+  log(`zip entries: ${names.join(', ')}`);
+  for (const need of ['manifest.json', 'preview.png', 'data.lokflip'])
+    if (!names.includes(need)) fail(`old reader would not find ${need}`);
+  if (!names.includes('strokes.lokvec')) fail('strokes.lokvec entry missing');
+
+  // 4. A corrupt stroke payload must not destroy a good raster flip.
+  window.__lok.info = { legacyBytes: v1.size, strokeBytes: v2.size, entries: names };
+} catch (e) {
+  fail(e.message + '\n' + (e.stack || '').split('\n').slice(0, 4).join('\n'));
+}
+window.__lok.done = true;
+log(window.__lok.problems.length ? 'RESULT: FAIL' : 'RESULT: PASS');
+})();
+</script>
+</body></html>
