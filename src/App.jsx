@@ -840,7 +840,12 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
   const acctPanelRef=useRef(null);
   useEffect(()=>{if(showSettings&&acctPanelRef.current)gsap.fromTo(acctPanelRef.current,{opacity:0,y:10},{opacity:1,y:0,duration:0.35,ease:"power2.out",delay:0.05});},[showSettings,authSent]);
   const tapBtn=e=>gsap.fromTo(e.currentTarget,{scale:0.95},{scale:1,duration:0.25,ease:"back.out(3)"});
-  const cloudSyncNow=async()=>{if(!supabase||!auth.getUserId())return;setCloudBusy(true);try{const localSave=await store.get(SAVE_KEY);const localGallery=await store.get(GALLERY_KEY);const{error}=await supabase.from("auth_saves").upsert({user_id:auth.getUserId(),save_blob:{...localSave,_gallery:localGallery},updated_at:new Date().toISOString()});if(error)throw error;say("Backed up to the cloud","success");}catch{say("Cloud sync failed — try again","error");}setCloudBusy(false);};
+  // Routed through pushSave rather than upserting directly, so the manual
+  // backup and the automatic one share one notion of "what is already up
+  // there" — otherwise a manual push would leave the guard's hash stale and
+  // the next automatic push would re-send the identical payload. force:true
+  // because a button press must always produce a request.
+  const cloudSyncNow=async()=>{if(!supabase||!auth.getUserId())return;setCloudBusy(true);try{const localSave=await store.get(SAVE_KEY);const localGallery=await store.get(GALLERY_KEY);const ok=await pushSave(auth.getUserId(),localSave,localGallery,{force:true});if(!ok)throw new Error("upsert failed");say("Backed up to the cloud","success");}catch{say("Cloud sync failed — try again","error");}setCloudBusy(false);};
   const cloudRestoreNow=async()=>{if(!supabase||!auth.getUserId())return;if(!window.confirm("Replace this device's data with your cloud backup? This device will reload."))return;setCloudBusy(true);try{const{data,error}=await supabase.from("auth_saves").select("save_blob").eq("user_id",auth.getUserId()).single();if(error)throw error;if(!data?.save_blob){say("No cloud backup found yet","error");setCloudBusy(false);return;}const{_gallery,...saveRest}=data.save_blob;await store.set(SAVE_KEY,saveRest);if(_gallery)await store.set(GALLERY_KEY,_gallery);window.location.reload();}catch{say("Restore failed — try again","error");setCloudBusy(false);}};
   const isIOS=typeof navigator!=="undefined"&&/iPad|iPhone|iPod/.test(navigator.userAgent);
   const targetArtist=viewingArtist||profile.name;
@@ -1235,6 +1240,14 @@ export default function LokApp(){
   const ads=adPlan({tier:vp.tier,orientation:vp.orientation,lokPass,kids});
   const[interstitial,setInterstitial]=useState(null);const lastInterstitialRef=useRef(0);
   const galleryRef=useRef([]); // kept current by the gallery-persist effect; read by cloud push so pushes need not depend on `posts`
+  // LilLok's ink decays on a 12s interval. Reading `lillok` through a ref
+  // instead of as a getSaveBlob dependency keeps that tick from changing
+  // doSave's identity, which is what re-armed the debounced save — and with it
+  // a full cloud upsert — every 12 seconds on a completely idle tab. Nothing
+  // is lost by persisting it late: the load path recomputes ink from elapsed
+  // time since `lastSeen` (see the `gap`/`inkDrain` block below), so an
+  // interval tick that never reaches storage is reconstructed on next boot.
+  const lillokRef=useRef(lillok); lillokRef.current=lillok;
   // Rewarded video is opt-in and survives LokPass, so it is not part of `ads`.
   const[showRewards,setShowRewards]=useState(false);const[rewardClaims,setRewardClaims]=useState({});const[doubleLoksUntil,setDoubleLoksUntil]=useState(0);
   const[moodTags,setMoodTags]=useState({});const[moodFilter,setMoodFilter]=useState("all");const[viewingArtist,setViewingArtist]=useState(null);
@@ -1457,7 +1470,7 @@ export default function LokApp(){
     const ownList={effect:setOwnedEffects,sky:setOwnedSkies}[t.key];
     if(ownList)ownList(o=>[...new Set([...o,item.id])]);else setOwned(o=>add(o,t.key));
     equip?.(item.id);return true;},[]);
-  const getSaveBlob=useCallback(()=>({botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok:{...lillok,lastSeen:Date.now()},modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,comebackStyle:celebrationStyle,lastComebackAward,lastOfflineBonus,legacyStudio,legacyBrushes,devMode,tutorialProgress,rewardClaims,doubleLoksUntil,chests,goggles,mail,lastMailCheck,lokpalIrritation,featureFlags}),[botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok,modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,celebrationStyle,lastComebackAward,lastOfflineBonus,tutorialProgress,rewardClaims,doubleLoksUntil,chests,goggles,mail,lastMailCheck,lokpalIrritation,featureFlags]);
+  const getSaveBlob=useCallback(()=>({botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,lillok:{...lillokRef.current,lastSeen:Date.now()},modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,comebackStyle:celebrationStyle,lastComebackAward,lastOfflineBonus,legacyStudio,legacyBrushes,devMode,tutorialProgress,rewardClaims,doubleLoksUntil,chests,goggles,mail,lastMailCheck,lokpalIrritation,featureFlags}),[botPosted,loks,lokPass,uiTheme,ownedThemes,effect,ownedEffects,ownedTiers,ccTier,bigBattleOwned,wins,profile,bookmarks,following,kids,customLilLok,cosmetics,owned,onboarded,sound,xp,flair,daily,quests,questsCompleted,totalEarned,traceHinted,pace,speed,soundLab,soundQueue,founder,totalSpent,fodHistory,hapticGrammar,fourthWall,sessionPin,moodTags,garden,reportedPosts,verified,modules,sky,ownedSkies,animFx,ownedAnimFx,fontPack,cursorPack,musicPack,stickerPack,postExport,mythicOwned,mythicEquipped,dailyOwned,weeklyOwned,appLogo,notifications,comebackActive,celebrationStyle,lastComebackAward,lastOfflineBonus,tutorialProgress,rewardClaims,doubleLoksUntil,chests,goggles,mail,lastMailCheck,lokpalIrritation,featureFlags]);
   const doSave=useCallback(()=>{const b=getSaveBlob();store.set(SAVE_KEY,b);store.set(SAVE_KEY+":at",Date.now());
     // Mirror to the cloud so progress follows the user between phone, iPad, and
     // desktop. Fire-and-forget: a failed sync must never block the local save,

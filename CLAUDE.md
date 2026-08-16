@@ -17,6 +17,7 @@ npm run verify:lok         # drives real encodeLok/decodeLok in Chromium — pro
 npm run verify:export      # drives the real app: draw → capture → click .lok → reads the downloaded file, asserts it carries decodable strokes
 npm run verify:bleep       # the BadBleep code box is reachable from Settings on a fresh profile, and Dev Flags stays hidden
 npm run verify:header      # measures real header button geometry at 5 widths — no overlap, no oval squeeze, overflow scrolls instead of clipping
+npm run verify:quiet       # an idle signed-in tab makes no repeat local saves and no duplicate auth_saves uploads
 ```
 
 ## Working practices

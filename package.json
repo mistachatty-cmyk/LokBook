@@ -23,6 +23,7 @@
     "verify:bleep": "vite build && node scripts/verify-bleep.mjs",
     "verify:header": "vite build && node scripts/verify-header.mjs",
     "verify:export": "vite build && node scripts/verify-export.mjs",
+    "verify:quiet": "vite build && node scripts/verify-quiet.mjs",
     "db:migrate": "supabase db push",
     "build:steam": "vite build --config vite.config.steam.js"
   },
