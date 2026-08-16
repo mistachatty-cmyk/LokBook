@@ -1,0 +1,101 @@
+<!doctype html>
+<html><body style="margin:0;background:#111;color:#0f0;font:12px monospace">
+<div id="out" style="padding:8px;white-space:pre-wrap"></div>
+<div id="root" style="width:480px;height:600px"></div>
+<script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import Easel from '/src/Easel.jsx';
+import { encodeStrokes, decodeStrokes } from '/src/engine/strokeCodec.js';
+
+const out = document.getElementById('out');
+window.__e = { done: false, problems: [], info: {} };
+const log = m => { out.textContent += m + '\n'; };
+const fail = m => { window.__e.problems.push(m); log('FAIL: ' + m); };
+
+(async () => {
+try {
+  const ref = React.createRef();
+  createRoot(document.getElementById('root')).render(
+    React.createElement(Easel, { ref, say: () => {} })
+  );
+  await new Promise(r => setTimeout(r, 1200));
+
+  if (!ref.current) throw new Error('Easel did not mount');
+  for (const m of ['getStrokes', 'clearStrokes', 'composite'])
+    if (typeof ref.current[m] !== 'function') fail(`imperative handle missing ${m}()`);
+
+  if (ref.current.getStrokes().length !== 0) fail('stroke log should start empty');
+
+  // Find the drawing surface and drive a real pointer stroke through it.
+  const surface = document.querySelector('[aria-label="Drawing canvas"]');
+  if (!surface) throw new Error('drawing surface not found');
+  // Coordinates must be computed against the SAME element Easel's pos() uses
+  // (its wrapper, which carries aspectRatio 4/5), not the inner absolute
+  // surface — otherwise the harness and the component disagree about the
+  // mapping and every captured point lands outside the canvas.
+  const wrap = surface.parentElement;
+  wrap.style.width = '480px'; wrap.style.height = '600px';
+  await new Promise(r2 => setTimeout(r2, 200));
+  const r = wrap.getBoundingClientRect();
+  log(`wrapper ${Math.round(r.width)}x${Math.round(r.height)}`);
+  if (r.width < 50 || r.height < 50) fail(`drawing wrapper has no usable size (${r.width}x${r.height})`);
+
+  const pe = (type, x, y, extra = {}) => {
+    const ev = new PointerEvent(type, {
+      pointerId: 1, pointerType: 'pen', isPrimary: true, bubbles: true, cancelable: true,
+      clientX: r.left + x, clientY: r.top + y, pressure: 0.6, buttons: type === 'pointerup' ? 0 : 1,
+      ...extra,
+    });
+    surface.dispatchEvent(ev);
+  };
+
+  const drawStroke = (x0, y0, n) => {
+    pe('pointerdown', x0, y0);
+    for (let i = 1; i <= n; i++) pe('pointermove', x0 + i * 2, y0 + Math.sin(i / 4) * 12);
+    pe('pointerup', x0 + n * 2, y0);
+  };
+
+  drawStroke(30, 60, 40);
+  await new Promise(r2 => setTimeout(r2, 120));
+  drawStroke(30, 140, 25);
+  await new Promise(r2 => setTimeout(r2, 120));
+
+  const strokes = ref.current.getStrokes();
+  log(`captured ${strokes.length} strokes: ${strokes.map(s => s.points.length + 'pts').join(', ')}`);
+  if (strokes.length !== 2) fail(`expected 2 strokes, got ${strokes.length}`);
+  if (strokes[0] && strokes[0].points.length < 10) fail(`stroke 0 only ${strokes[0].points.length} points — capture is dropping samples`);
+  for (const s of strokes) {
+    if (!s.tool) fail('stroke missing tool');
+    if (!s.color) fail('stroke missing color');
+    if (!(s.size > 0)) fail('stroke missing size');
+    if (s.points.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y))) fail('non-finite coordinate captured');
+  }
+
+  // The captured shape must survive the codec end to end.
+  if (strokes.length) {
+    const bin = encodeStrokes(strokes, { width: 480, height: 600 });
+    const back = decodeStrokes(bin).strokes;
+    if (back.length !== strokes.length) fail('codec lost strokes captured from a real Easel');
+    const a = strokes[0].points[5], b = back[0].points[5];
+    log(`sample pt: captured (${a.x.toFixed(2)}, ${a.y.toFixed(2)}) -> decoded (${b.x.toFixed(2)}, ${b.y.toFixed(2)})`);
+    if (Math.abs(a.x - b.x) > 0.05 || Math.abs(a.y - b.y) > 0.05) fail('captured geometry drifted through codec');
+    log(`codec: ${bin.length}B for ${strokes.reduce((n, s) => n + s.points.length, 0)} captured points`);
+  }
+
+  // Rendering must still work — capture is additive, not a replacement.
+  const img = ref.current.composite();
+  if (typeof img !== 'string' || !img.startsWith('data:image')) fail('composite() no longer returns an image');
+
+  ref.current.clearStrokes();
+  if (ref.current.getStrokes().length !== 0) fail('clearStrokes() did not empty the log');
+
+  window.__e.info = { strokes: strokes.length };
+} catch (e) {
+  fail(e.message + '\n' + (e.stack || '').split('\n').slice(0, 4).join('\n'));
+}
+window.__e.done = true;
+log(window.__e.problems.length ? 'RESULT: FAIL' : 'RESULT: PASS');
+})();
+</script>
+</body></html>
