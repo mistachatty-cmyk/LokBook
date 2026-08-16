@@ -34,17 +34,23 @@ try {
   // (its wrapper, which carries aspectRatio 4/5), not the inner absolute
   // surface — otherwise the harness and the component disagree about the
   // mapping and every captured point lands outside the canvas.
-  const wrap = surface.parentElement;
+  // NOT surface.parentElement — there is a pan/zoom transform div between the
+  // surface and wrapRef, and pos() measures wrapRef.
+  const wrap = surface.closest('.rounded-2xl');
+  if (!wrap) throw new Error('wrapRef element not found');
   wrap.style.width = '480px'; wrap.style.height = '600px';
   await new Promise(r2 => setTimeout(r2, 200));
   const r = wrap.getBoundingClientRect();
   log(`wrapper ${Math.round(r.width)}x${Math.round(r.height)}`);
   if (r.width < 50 || r.height < 50) fail(`drawing wrapper has no usable size (${r.width}x${r.height})`);
 
+  // Re-measure per event: logging to #out grows the page and shifts the
+  // wrapper, so a rect captured once goes stale and every coordinate drifts.
   const pe = (type, x, y, extra = {}) => {
+    const rr = wrap.getBoundingClientRect();
     const ev = new PointerEvent(type, {
       pointerId: 1, pointerType: 'pen', isPrimary: true, bubbles: true, cancelable: true,
-      clientX: r.left + x, clientY: r.top + y, pressure: 0.6, buttons: type === 'pointerup' ? 0 : 1,
+      clientX: rr.left + x, clientY: rr.top + y, pressure: 0.6, buttons: type === 'pointerup' ? 0 : 1,
       ...extra,
     });
     surface.dispatchEvent(ev);
@@ -87,8 +93,50 @@ try {
   const img = ref.current.composite();
   if (typeof img !== 'string' || !img.startsWith('data:image')) fail('composite() no longer returns an image');
 
+  // The stroke must start at the pointerdown position, not one sample later.
+  if (strokes[0]) {
+    const first = strokes[0].points[0];
+    if (Math.abs(first.x - 30) > 2 || Math.abs(first.y - 60) > 2)
+      fail(`stroke does not start at pointerdown (got ${first.x.toFixed(1)},${first.y.toFixed(1)}, expected ~30,60)`);
+  }
+
   ref.current.clearStrokes();
   if (ref.current.getStrokes().length !== 0) fail('clearStrokes() did not empty the log');
+
+  // A tap draws a visible dab, so it must be recorded.
+  pe('pointerdown', 200, 200); pe('pointerup', 200, 200);
+  await new Promise(r2 => setTimeout(r2, 80));
+  if (ref.current.getStrokes().length !== 1) fail(`a tap recorded ${ref.current.getStrokes().length} strokes, expected 1`);
+  ref.current.clearStrokes();
+
+  // Undo must roll the vector log back with the pixels, or the exported record
+  // disagrees with the rasterised frame.
+  drawStroke(60, 300, 20);
+  await new Promise(r2 => setTimeout(r2, 80));
+  const beforeUndo = ref.current.getStrokes().length;
+  const undoBtn = [...document.querySelectorAll('button')].find(b => /undo/i.test(b.getAttribute('aria-label') || b.textContent || ''));
+  if (!undoBtn) { log('note: no undo button found, skipping undo assertion'); }
+  else {
+    undoBtn.click();
+    await new Promise(r2 => setTimeout(r2, 120));
+    const afterUndo = ref.current.getStrokes().length;
+    log(`undo: ${beforeUndo} -> ${afterUndo} strokes`);
+    if (afterUndo >= beforeUndo) fail(`undo left the stroke in the log (${beforeUndo} -> ${afterUndo}) — vector record disagrees with pixels`);
+  }
+
+  // takeStrokes() drains, so each frame gets only its own strokes.
+  ref.current.clearStrokes();
+  drawStroke(80, 400, 12);
+  await new Promise(r2 => setTimeout(r2, 80));
+  const taken = ref.current.takeStrokes();
+  if (taken.length !== 1) fail(`takeStrokes() returned ${taken.length}, expected 1`);
+  if (ref.current.getStrokes().length !== 0) fail('takeStrokes() did not drain the log');
+
+  // clearAll() must drop the vector log — it backs "Clear all pages".
+  drawStroke(100, 450, 10);
+  await new Promise(r2 => setTimeout(r2, 80));
+  ref.current.clearAll();
+  if (ref.current.getStrokes().length !== 0) fail('clearAll() left strokes in the log — the next flip would export them');
 
   window.__e.info = { strokes: strokes.length };
 } catch (e) {

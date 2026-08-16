@@ -113,9 +113,13 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const capturePts=useRef([]);         // points of the stroke in progress
   const captureMeta=useRef(null);      // {tool,color,size,layer} snapshot at pointer-down
   useImperativeHandle(ref,()=>({
-    // Vector record of this page's strokes, for encodeLok's optional
-    // `strokes` payload. Returns a copy; callers must not mutate the log.
+    // Vector record of strokes drawn since the last drain, for encodeLok's
+    // optional `strokes` payload. Peek with getStrokes(); use takeStrokes() at
+    // each frame capture so strokes are attributed to the frame they belong
+    // to — the log is otherwise session-wide and would flatten every page's
+    // strokes together with no frame attribution.
     getStrokes(){return strokeLog.current.map(s=>({...s,points:s.points.slice()}));},
+    takeStrokes(){const out=strokeLog.current.map(s=>({...s,points:s.points.slice()}));strokeLog.current=[];return out;},
     clearStrokes(){strokeLog.current=[];},
     composite(pageNum=null,{bloom=false}={}){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;const ctx=tmp.getContext("2d");paperBase(ctx,pageNum);layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv&&l.visible){ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=l.blend;ctx.drawImage(cv,0,0);}});ctx.globalAlpha=1;ctx.globalCompositeOperation="source-over";
       // Stickers bake in here so every existing caller (capture, battle,
@@ -130,11 +134,11 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
       // thumbnail nobody scrutinizes closely.
       return toImg(bloom?applyBloom(tmp):tmp);},
     blankFrame(){const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;paperBase(tmp.getContext("2d"),null);return toImg(tmp);},
-    clearAll(){layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv)cv.getContext("2d").clearRect(0,0,W,H);});undoStack.current=[];redoStack.current=[];},
+    clearAll(){layers.forEach(l=>{const cv=canvases.current.get(l.id);if(cv)cv.getContext("2d").clearRect(0,0,W,H);});undoStack.current=[];redoStack.current=[];strokeLog.current=[];},
     async restoreFromImage(dataUrl){if(!dataUrl)return;const cv=canvases.current.get(layers[0].id);if(!cv)return;const img=new Image();await new Promise(res=>{img.onload=res;img.onerror=res;img.src=dataUrl;});cv.getContext("2d",{willReadFrequently:true}).drawImage(img,0,0,W,H);},
   }));
   const pos=e=>{const r=wrapRef.current.getBoundingClientRect();const vx=e.clientX-r.left,vy=e.clientY-r.top;return[(vx-pan.x)*W/(r.width*zoom),(vy-pan.y)*H/(r.height*zoom)];};
-  const pushUndo=()=>{const cv=canvases.current.get(active);if(!cv)return;if(undoStack.current.length>29)undoStack.current.shift();undoStack.current.push({id:active,snap:cv.getContext("2d").getImageData(0,0,W,H)});redoStack.current=[];};
+  const pushUndo=()=>{const cv=canvases.current.get(active);if(!cv)return;if(undoStack.current.length>29)undoStack.current.shift();undoStack.current.push({id:active,strokeLen:strokeLog.current.length,snap:cv.getContext("2d").getImageData(0,0,W,H)});redoStack.current=[];};
   const pct=n=>pointerRef.current;const effectiveSize=(pOff=1)=>{const p=pct().pressure;return size*(0.3+p*0.7)*pOff;};
   const dynMul=(e,cx,cy)=>{if(!dynamics)return 1;if(e.pointerType==="pen"&&typeof e.pressure==="number"&&e.pressure>0)return 0.4+Math.min(e.pressure,1)*0.9;const now=e.timeStamp||performance.now();let mul=1;if(lastMoveXY.current){const dt=Math.max(now-lastMoveT.current,1);const dist=Math.hypot(cx-lastMoveXY.current[0],cy-lastMoveXY.current[1]);const speed=dist/dt;mul=Math.max(0.55,Math.min(1.2,1.2-speed*2.4));}lastMoveT.current=now;lastMoveXY.current=[cx,cy];return mul;};
   const applyTransform=fn=>{const cv=canvases.current.get(active);if(!cv)return;pushUndo();const ctx=cv.getContext("2d");const snap=ctx.getImageData(0,0,W,H);const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;tmp.getContext("2d").putImageData(snap,0,0);ctx.clearRect(0,0,W,H);ctx.save();ctx.translate(W/2,H/2);fn(ctx);ctx.drawImage(tmp,-W/2,-H/2);ctx.restore();};
@@ -235,7 +239,10 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
     if(hit){e.currentTarget.setPointerCapture(e.pointerId);stickerDrag.current={id:hit.sticker.id,mode:hit.handle,start:p0,orig:{...hit.sticker}};setSelectedSticker(hit.sticker.id);return;}
     if(selectedSticker)setSelectedSticker(null);
     const cv=canvases.current.get(active);if(!cv||!activeLayer?.visible)return;e.currentTarget.setPointerCapture(e.pointerId);
-    capturePts.current=[];captureMeta.current={tool,color,size,layer:active};
+    // Seed with the pointerdown sample: move() alone made every stroke start
+    // one sample late, and a tap recorded nothing at all despite drawing a dab.
+    capturePts.current=[{x:p0[0],y:p0[1],pressure:e.pointerType==="pen"&&e.pressure>0?e.pressure:0.5}];
+    captureMeta.current={tool,color,size,layer:active};
     const mul=dynMul(e,p0[0],p0[1]);const pressure=e.pointerType==="pen"&&e.pressure>0?e.pressure:mul;pointerRef.current={pressure,tiltX:e.tiltX||0,tiltY:e.tiltY||0,twist:e.twist||0,pointerType:e.pointerType||"mouse"};strokePoints.current=[[...p0,pressure]];if(tool==="eyedrop"){eyedrop(...p0);return;}if(tool==="transform"){transformDrag.current={startClient:[e.clientX,e.clientY],startCanvas:p0};return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}if(tool==="clone"){if(!clonePt){setClonePt(p0);return;}const[ox,oy]=clonePt;const[cx,cy]=p0;const src=cv.getContext("2d").getImageData(Math.floor(ox),Math.floor(oy),48,60);cv.getContext("2d").putImageData(src,Math.floor(cx)-24,Math.floor(cy)-30);setClonePt(null);return;}if(tool==="shape"){setAnchorPt(p0);drawing.current=true;return;}if(tool==="gradient"){setAnchorPt(p0);drawing.current=true;return;}drawing.current=true;onStroke&&onStroke();stamp(cv.getContext("2d"),...p0,true);};
   // Animation FX overlay — ported from the previous easel so ANIMATION_FX
   // purchases keep working after the component swap.
@@ -254,11 +261,15 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
       if(captureMeta.current)capturePts.current.push({x:q[0],y:q[1],pressure:pointerRef.current.pressure});
       stamp(ctx,q[0],q[1],false);});};
   const up=e=>{if(stickerDrag.current){stickerDrag.current=null;try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}return;}if(tool==="transform"){const cv=canvases.current.get(active);if(cv)cv.style.transform="";if(transformDrag.current&&e){const p1=pos(e);const[sx,sy]=transformDrag.current.startCanvas;const dx=p1[0]-sx,dy=p1[1]-sy;if(Math.abs(dx)>0.5||Math.abs(dy)>0.5)commitTranslate(dx,dy);}transformDrag.current=null;return;}drawing.current=false;strokePoints.current=[];
-    if(captureMeta.current&&capturePts.current.length>1){strokeLog.current.push({...captureMeta.current,points:capturePts.current});if(strokeLog.current.length>4000)strokeLog.current.shift();}
+    if(captureMeta.current&&capturePts.current.length>0){strokeLog.current.push({...captureMeta.current,points:capturePts.current});if(strokeLog.current.length>4000)strokeLog.current.shift();}
     captureMeta.current=null;capturePts.current=[];
     if(tool==="shape"&&anchorPt){const cv=canvases.current.get(active);if(cv){const ctx=cv.getContext("2d");const[ax,ay]=anchorPt;const[sx,sy]=lastPts.current[0]||[ax,ay];const x=Math.min(ax,sx),y=Math.min(ay,sy),w=Math.abs(sx-ax),h=Math.abs(sy-ay);ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;if(shapeMode==="ellipse")ctx.beginPath(),ctx.ellipse(x+w/2,y+h/2,w/2,h/2,0,0,Math.PI*2),ctx.fill();else ctx.fillRect(x,y,w,h);ctx.globalAlpha=1;}setAnchorPt(null);}if(tool==="gradient"&&anchorPt){const cv=canvases.current.get(active);if(cv){const ctx=cv.getContext("2d");const[ax,ay]=anchorPt;const[sx,sy]=lastPts.current[0]||[ax,ay];const g=ctx.createLinearGradient(ax,ay,sx,sy);g.addColorStop(0,color);g.addColorStop(0.5,color);g.addColorStop(1,T.paper);ctx.globalCompositeOperation="source-over";ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}setAnchorPt(null);}lastPts.current=[];midPts.current=[];try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
-  const undo=()=>{const u=undoStack.current.pop();if(!u)return;const cv=canvases.current.get(u.id);if(cv){redoStack.current.push({id:u.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(u.snap,0,0);}};
-  const redo=()=>{const r=redoStack.current.pop();if(!r)return;const cv=canvases.current.get(r.id);if(cv){undoStack.current.push({id:r.id,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(r.snap,0,0);}};
+  const undo=()=>{const u=undoStack.current.pop();if(!u)return;const cv=canvases.current.get(u.id);if(cv){redoStack.current.push({id:u.id,strokeLen:strokeLog.current.length,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(u.snap,0,0);}
+    // Roll the vector log back with the pixels. Without this an undone stroke
+    // stayed in the log and still exported, so the .lokvec record and the
+    // rasterised frame disagreed about what had been drawn.
+    if(typeof u.strokeLen==="number"&&u.strokeLen<strokeLog.current.length)strokeLog.current.length=u.strokeLen;};
+  const redo=()=>{const r=redoStack.current.pop();if(!r)return;const cv=canvases.current.get(r.id);if(cv){undoStack.current.push({id:r.id,strokeLen:strokeLog.current.length,snap:cv.getContext("2d").getImageData(0,0,W,H)});cv.getContext("2d").putImageData(r.snap,0,0);}};
   const addLayer=()=>{if(layers.length>=maxLayers)return;const id=++idRef.current;setLayers(ls=>[...ls,{id,visible:true,opacity:1,blend:"source-over"}]);setActive(id);};
   const removeLayer=id=>{if(layers.length<=1)return;canvases.current.delete(id);setLayers(ls=>{const next=ls.filter(l=>l.id!==id);if(active===id)setActive(next[next.length-1].id);return next;});};
   const patchLayer=(id,p)=>setLayers(ls=>ls.map(l=>(l.id===id?{...l,...p}:l)));

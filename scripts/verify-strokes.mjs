@@ -94,10 +94,32 @@ try {
   if (ratio < 10) problems.push(`compression only ${ratio.toFixed(2)}x vs JSON`);
 
   // Corrupt payloads must fail loudly, not decode into wrong geometry.
-  let threwOnTruncation = false;
-  try { C.decodeStrokes(bin.slice(0, Math.floor(bin.length / 2))); }
-  catch { threwOnTruncation = true; }
-  if (!threwOnTruncation) problems.push("truncated payload decoded without error — corruption would pass silently");
+  // Cut at EVERY length, not one arbitrary midpoint: the original single
+  // half-length cut happened to land on a varint boundary and so missed that
+  // fixed-width reads had no bounds checks at all (a payload short by one byte
+  // decoded "fine" with NaN pressure).
+  let survived = [];
+  for (let cut = 1; cut < bin.length; cut++) {
+    try { C.decodeStrokes(bin.slice(0, cut)); survived.push(cut); } catch { /* expected */ }
+  }
+  if (survived.length) problems.push(`${survived.length} truncation lengths decoded without error (e.g. ${survived.slice(0, 5).join(", ")}) — corruption passes silently`);
+
+  // Coordinates outside the canvas must survive. Pointer capture keeps
+  // delivering events after the pointer leaves the canvas, and clamping them
+  // turned a stroke sweeping off-canvas into a flat run along the edge.
+  const off = [{ tool: "pen", color: "#000000", size: 4, points: [
+    { x: -60, y: -40, pressure: 0.5 }, { x: 240, y: 300, pressure: 0.5 }, { x: 540, y: 660, pressure: 0.5 },
+  ]}];
+  const offBack = C.decodeStrokes(C.encodeStrokes(off, { width: W, height: H })).strokes[0].points;
+  for (let k = 0; k < off[0].points.length; k++) {
+    if (Math.abs(offBack[k].x - off[0].points[k].x) > 0.05 || Math.abs(offBack[k].y - off[0].points[k].y) > 0.05)
+      problems.push(`off-canvas point ${k} clamped: (${offBack[k].x.toFixed(1)},${offBack[k].y.toFixed(1)}) != (${off[0].points[k].x},${off[0].points[k].y})`);
+  }
+
+  // A single-point stroke (a tap) must round-trip — it draws a visible dab.
+  const tap = [{ tool: "pen", color: "#123456", size: 8, points: [{ x: 100, y: 200, pressure: 0.9 }] }];
+  const tapBack = C.decodeStrokes(C.encodeStrokes(tap, { width: W, height: H })).strokes;
+  if (tapBack.length !== 1 || tapBack[0].points.length !== 1) problems.push("single-point tap stroke did not round-trip");
 
   let threwOnBadMagic = false;
   const bad = bin.slice(); bad[0] ^= 0xff;

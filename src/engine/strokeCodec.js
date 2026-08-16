@@ -34,7 +34,10 @@
 // structure, the output is already a compact ArrayBuffer, and a serialisation
 // library would add weight without shrinking anything meaningful.
 
-const MAGIC = 0x314b564c; // "LKV1" read as LE u32
+// Byte sequence 'L','K','V','1' in little-endian order. Was 0x314b564c,
+// which serialises to "LVK1" — the constant and the documented spec
+// disagreed, so anything written against the spec would have been rejected.
+const MAGIC = 0x31564b4c;
 
 // ---- varint / zigzag ------------------------------------------------------
 
@@ -67,9 +70,13 @@ class ByteWriter {
 
 class ByteReader {
   constructor(bytes) { this.b = bytes; this.i = 0; }
-  u8() { return this.b[this.i++]; }
-  u16() { const v = this.b[this.i] | (this.b[this.i + 1] << 8); this.i += 2; return v; }
-  u32() { let v = 0; for (let k = 0; k < 4; k++) v |= this.b[this.i + k] << (k * 8); this.i += 4; return v >>> 0; }
+  // Every read is bounds-checked. Without this a truncated payload decoded
+  // "successfully" into silently wrong geometry — a clipped final byte yielded
+  // NaN pressure, and a cut stroke header yielded size 0.
+  _need(n) { if (this.i + n > this.b.length) throw new Error("lokvec: truncated payload"); }
+  u8() { this._need(1); return this.b[this.i++]; }
+  u16() { this._need(2); const v = this.b[this.i] | (this.b[this.i + 1] << 8); this.i += 2; return v; }
+  u32() { this._need(4); let v = 0; for (let k = 0; k < 4; k++) v |= this.b[this.i + k] << (k * 8); this.i += 4; return v >>> 0; }
   varint() {
     let shift = 0, out = 0, byte;
     do {
@@ -81,7 +88,7 @@ class ByteReader {
     } while (byte & 0x80);
     return out >>> 0;
   }
-  bytes(n) { const s = this.b.subarray(this.i, this.i + n); this.i += n; return s; }
+  bytes(n) { this._need(n); const s = this.b.subarray(this.i, this.i + n); this.i += n; return s; }
 }
 
 // ---- colour helpers -------------------------------------------------------
@@ -101,11 +108,22 @@ const toHex = (r, g, b) => "#" + [r, g, b].map(v => v.toString(16).padStart(2, "
 // ---- quantisation ---------------------------------------------------------
 
 const Q_MAX = 65535;
-export const quantize = (v, extent) => Math.max(0, Math.min(Q_MAX, Math.round((v / extent) * Q_MAX)));
-export const dequantize = (q, extent) => (q / Q_MAX) * extent;
+// The grid spans 25% beyond the canvas on every side. Pointer capture keeps
+// delivering events after the pointer leaves the canvas, so strokes routinely
+// carry out-of-bounds coordinates; quantising over exactly 0..extent clamped
+// them and a stroke sweeping off-canvas decoded as a flat run along the edge.
+// Costs 1.5x precision (0.011px on a 480px axis), which is still far below
+// anything a hand can express.
+const Q_MARGIN = 0.25;
+const qRange = extent => extent * (1 + 2 * Q_MARGIN);
+const qOrigin = extent => -extent * Q_MARGIN;
+
+export const quantize = (v, extent) =>
+  Math.max(0, Math.min(Q_MAX, Math.round(((v - qOrigin(extent)) / qRange(extent)) * Q_MAX)));
+export const dequantize = (q, extent) => qOrigin(extent) + (q / Q_MAX) * qRange(extent);
 
 /** Worst-case positional error introduced by quantisation, in canvas px. */
-export const quantStep = extent => extent / Q_MAX;
+export const quantStep = extent => qRange(extent) / Q_MAX;
 
 // ---- encode / decode ------------------------------------------------------
 

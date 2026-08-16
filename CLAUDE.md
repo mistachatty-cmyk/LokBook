@@ -11,7 +11,23 @@ npm run smoke              # renders the app shell headlessly, catches import/re
 npm run verify:rotation    # every sellable DAILY/WEEKLY rotation item resolves to a renderer
 npm run verify:cosmetics   # every sellable PERMANENT cosmetic resolves to a renderer (effects/skies/papers/frames/borders/cursors/fonts/stickers/reactions/world skins)
 npm run verify:world       # builds, then drives the real WorldMapViewer in headless Chromium — asserts the globe actually renders pixels and survives re-renders without rebuilding
+npm run verify:easel       # mounts the real Easel, dispatches real PointerEvents, asserts vector strokes are captured and the raster path still renders
+npm run verify:strokes     # .lokvec codec round-trip: fidelity, packing efficiency, rejection of corrupt payloads
+npm run verify:lok         # drives real encodeLok/decodeLok in Chromium — proves stroke data stays additive and legacy readers keep working
 ```
+
+## Working practices
+
+Every one of these was paid for by a real bug in this codebase. They are not general advice.
+
+- **A green build and smoke test do not mean a feature works.** World was 100% broken on every device — a `TypeError` on every open — while `build` and `smoke` both passed for weeks. `smoke` only renders the app shell. If a feature has a runtime surface, drive the real component in a real browser and assert on what it produced.
+- **Prove a gate can fail before trusting it.** The first `verify:strokes` was decorative: its tolerance derived from the codec's own constant, so breaking the codec loosened the tolerance too, and its size threshold still passed with delta-encoding deleted. Sabotage each new gate, confirm a non-zero exit, then revert.
+- **Reproduce before theorising.** Rounds were lost to plausible-sounding theories about the globe (CDN, connection, WebGL). Ten minutes of headless reproduction produced the actual exception, which was neither.
+- **Check what is actually deployed before believing a bug report.** Production has repeatedly sat several commits behind, and one screenshot predated its own fix by 90 seconds. Confirm the live commit SHA first; give the user an immutable deployment URL, never a branch alias that drifts.
+- **Surface real errors in the UI.** Generic "check your connection" copy actively misdirected debugging while a plain `TypeError` sat in `console.error` — unreadable on a phone, which is where it failed. Show `err.name: err.message`, make it selectable/copyable.
+- **Saved-user-data changes are additive, and readers tolerate old shapes.** `owned[cat]` was written in two incompatible shapes by two buy handlers and silently double-charged people. `.lok` deliberately did not bump its version for a purely additive payload, because the shipped reader hard-throws on unknown versions.
+- **Never ship a sellable or toggleable thing without a gate proving it resolves to something real.** `docs/AUDIT.md` Finding 2: 95 items took Loks and rendered nothing. That is what `verify:rotation` and `verify:cosmetics` exist to prevent.
+- **Report honestly.** Say which claims are verified, which are unverified, and what needs hardware. Do not describe something as confirmed when only the build passed.
 
 Run `build`, `smoke`, `verify:rotation`, `verify:cosmetics` before any commit that touches cosmetics/rotation. Run `verify:world` after touching `WorldMapViewer.jsx`, `globe.gl`, or `three`. **None of these substitute for the others** — each was added after a specific class of bug shipped silently past the others (see docs/AUDIT.md, Finding 2, for the origin story).
 
