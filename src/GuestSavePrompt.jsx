@@ -7,7 +7,7 @@ const REMINDER_OPTIONS = [3, 7, 14, 30];
 // after they publish (reason="publish") or once their local save has aged
 // past their reminder window (reason="expiry"). Dismissing never blocks —
 // the whole point is guests keep working with nothing lost either way.
-export default function GuestSavePrompt({ reason = "publish", guestDays = 7, onSignIn, onMint, onSetDays, onClose }) {
+export default function GuestSavePrompt({ reason = "publish", guestDays = 7, onSignIn, onMint, onSetDays, onClose, onWaitlist, joinedWaitlist = false }) {
   const T = useT();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -62,6 +62,12 @@ export default function GuestSavePrompt({ reason = "publish", guestDays = 7, onS
         <div className="mt-3 flex flex-col gap-2">
           <button onClick={() => setMode("signin")} className="lok-btn lok-display w-full py-2.5 rounded-xl font-extrabold" style={{ background: T.accent, color: T.onAccent, border: `2.5px solid ${T.ink}` }}>Sign in</button>
           <button onClick={() => setMode("pass")} className="lok-btn lok-display w-full py-2.5 rounded-xl font-extrabold" style={{ background: T.card, color: T.ink, border: `2.5px solid ${T.ink}` }}>👻 Get a Guest Pass</button>
+          {/* Third door: neither of the above commits to anything cloud-side,
+              which is the honest offer while the backend isn't launched. Hidden
+              once they've joined so it stops being a nag. */}
+          {onWaitlist && !joinedWaitlist && (
+            <button onClick={onWaitlist} className="lok-btn text-xs font-bold underline opacity-70 pt-0.5">🔖 Just tell me when it launches</button>
+          )}
         </div>
       )}
 

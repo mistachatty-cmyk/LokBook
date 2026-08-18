@@ -25,6 +25,7 @@
     "verify:export": "vite build && node scripts/verify-export.mjs",
     "verify:quiet": "vite build && node scripts/verify-quiet.mjs",
     "verify:payload": "vite build && node scripts/verify-payload.mjs",
+    "verify:waitlist": "vite build && node scripts/verify-waitlist.mjs",
     "db:migrate": "supabase db push",
     "build:steam": "vite build --config vite.config.steam.js"
   },
