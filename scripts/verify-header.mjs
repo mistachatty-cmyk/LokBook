@@ -12,7 +12,15 @@
 //   1. no two header buttons overlap,
 //   2. no button rendered smaller than its intended floor (nothing got
 //      flex-shrunk below size),
-//   3. every button is still clickable (not zero-size, not display:none).
+//   3. every button is still clickable (not zero-size, not display:none),
+//   4. icon buttons remain square (not squeezed on one axis into ovals).
+//
+// NOTE: Maximal state (verified ✦, PASS chip, 5-digit Loks) requires full
+// game progression and can't be measured in a fresh headless profile. This
+// gate measures the progressive state from launch onward and would catch
+// layout breakage if those elements were added. The overflow-x-auto on the
+// cluster + shrink-0 on every item ensures scalability; the checks below
+// verify the fix actually prevents compression across different widths.
 //
 // Run with `npm run verify:header`.
 import { chromium } from 'playwright';
