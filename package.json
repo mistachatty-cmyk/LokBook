@@ -15,6 +15,7 @@
     "gen-icons": "node scripts/steam-icons.mjs",
     "smoke": "node scripts/smoke.mjs",
     "verify:rotation": "node scripts/verify-rotation.mjs",
+    "verify:weather": "node scripts/verify-weather.mjs",
     "verify:world": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-world.mjs",
     "verify:cosmetics": "node scripts/verify-cosmetics.mjs",
     "verify:strokes": "node scripts/verify-strokes.mjs",
