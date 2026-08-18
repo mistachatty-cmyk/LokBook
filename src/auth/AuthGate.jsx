@@ -52,6 +52,7 @@ export function AuthGate({ children }) {
             </div>
             <div className="mt-3 flex gap-2">
               <button onClick={async()=>{try{await signInWithOAuth("google");}catch{}}} className="lok-btn lok-display flex-1 py-2.5 rounded-xl font-extrabold text-sm" style={{background:T.card,color:T.ink,border:`3px solid ${T.ink}`}}>Google</button>
+              <button onClick={async()=>{try{await signInWithOAuth("apple");}catch{}}} className="lok-btn lok-display flex-1 py-2.5 rounded-xl font-extrabold text-sm" style={{background:T.card,color:T.ink,border:`3px solid ${T.ink}`}}>Apple</button>
               <button onClick={async()=>{try{await signInWithOAuth("github");}catch{}}} className="lok-btn lok-display flex-1 py-2.5 rounded-xl font-extrabold text-sm" style={{background:T.card,color:T.ink,border:`3px solid ${T.ink}`}}>GitHub</button>
             </div>
           </>
