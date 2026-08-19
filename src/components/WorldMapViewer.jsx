@@ -143,6 +143,22 @@ function buildMarkerMesh(THREE, kind, style, color) {
 const BUILDING_UNITS_PER_LEVEL = 0.09;
 const DEFAULT_BUILDING_LEVELS = 3;
 
+// Eye height for Street View mode, at the same deliberately-exaggerated
+// scale as buildings — a person is roughly 0.6 storeys tall.
+const EYE_HEIGHT_UNITS = BUILDING_UNITS_PER_LEVEL * 0.6;
+
+// Orthonormal (up, north, east) tangent basis at a point on the globe
+// surface — the same construction buildBuildingGeometry uses per-building,
+// factored out here since Street View needs it standalone (for the
+// camera's own position) rather than per-footprint.
+function localTangentBasis(THREE, point) {
+  const up = point.clone().normalize();
+  const seed = Math.abs(up.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+  const east = new THREE.Vector3().crossVectors(seed, up).normalize();
+  const north = new THREE.Vector3().crossVectors(up, east).normalize();
+  return { up, north, east };
+}
+
 // A building's OSM `levels`/`height` tags, normalised to a level count.
 function levelsForBuilding(tags = {}) {
   const lv = parseFloat(tags['building:levels']);
@@ -198,7 +214,7 @@ function buildBuildingGeometry(THREE, globe, footprint, tags) {
 // A purchasable skin (see WORLD_SKINS in constants.jsx) overrides the
 // theme-derived look with its own fixed texture, atmosphere tint, marker
 // shape, and starfield density/tint.
-export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso', skin = 'none', gyroMotion = { gamma: 0, beta: 0, alpha: 0 }, onPostClick, onClose, devMode = false, onLocationOverride, onGlobeReady }) {
+export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso', skin = 'none', gyroMotion = { gamma: 0, beta: 0, alpha: 0 }, onPostClick, onClose, devMode = false, onLocationOverride, onGlobeReady, onThreeReady }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
   const [selectedPost, setSelectedPost] = useState(null);
@@ -233,6 +249,10 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   const tapResetTimerRef = useRef(null);
   useEffect(() => () => clearTimeout(tapResetTimerRef.current), []);
   const handleGlobeTap = useCallback(() => {
+    // A look-around drag in Street View shouldn't accidentally count toward
+    // triple-tap-to-hide — streetViewOnRef is declared further down (same
+    // component scope, read here only at call time, well after mount).
+    if (streetViewOnRef.current) return;
     tapCountRef.current += 1;
     clearTimeout(tapResetTimerRef.current);
     tapResetTimerRef.current = setTimeout(() => { tapCountRef.current = 0; }, 500);
@@ -251,6 +271,8 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   // passes this.
   const onGlobeReadyRef = useRef(onGlobeReady);
   useEffect(() => { onGlobeReadyRef.current = onGlobeReady; }, [onGlobeReady]);
+  const onThreeReadyRef = useRef(onThreeReady);
+  useEffect(() => { onThreeReadyRef.current = onThreeReady; }, [onThreeReady]);
 
   // 3D building extrusions — on by default now that it's a headline feature
   // rather than a hidden extra; still a real, visible toggle (🏢 in the
@@ -280,26 +302,38 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     setBuildingsCount(0);
   }, []);
 
-  const loadBuildings = useCallback(async () => {
+  // `overrideLatLng` lets Street View (where the camera hack below leaves
+  // globe.pointOfView()'s notion of "altitude" meaningless — target isn't
+  // the globe centre any more) request buildings for an exact spot
+  // directly, skipping the altitude gate entirely since standing at
+  // street level always qualifies.
+  const loadBuildings = useCallback(async (overrideLatLng) => {
     const globe = globeRef.current, THREE = threeRef.current;
     if (!globe || !THREE) return;
-    const pov = globe.pointOfView();
-    // Real building footprints are only meaningful once you're at
-    // street-level altitude — fetching them for a screen-filling chunk of
-    // continent would be both useless (you couldn't see individual
-    // buildings anyway) and a good way to get an Overpass query timeout.
-    if (!pov || pov.altitude > 0.35) {
-      setBuildingsError('Zoom in closer first — buildings only load at street-level altitude.');
-      return;
+    let lat, lng, spanDeg;
+    if (overrideLatLng) {
+      ({ lat, lng } = overrideLatLng);
+      spanDeg = 0.0025; // tightest span — you're standing right there
+    } else {
+      const pov = globe.pointOfView();
+      // Real building footprints are only meaningful once you're at
+      // street-level altitude — fetching them for a screen-filling chunk of
+      // continent would be both useless (you couldn't see individual
+      // buildings anyway) and a good way to get an Overpass query timeout.
+      if (!pov || pov.altitude > 0.35) {
+        setBuildingsError('Zoom in closer first — buildings only load at street-level altitude.');
+        return;
+      }
+      lat = pov.lat; lng = pov.lng;
+      // Bbox sized off current altitude, capped small — this is a public,
+      // shared Overpass instance, not infrastructure LokBook controls.
+      spanDeg = Math.min(0.01, Math.max(0.0025, pov.altitude * 0.02));
     }
     const myReqId = ++buildingsReqIdRef.current;
     setBuildingsError('');
     setBuildingsLoading(true);
-    // Bbox sized off current altitude, capped small — this is a public,
-    // shared Overpass instance, not infrastructure LokBook controls.
-    const spanDeg = Math.min(0.01, Math.max(0.0025, pov.altitude * 0.02));
-    const south = pov.lat - spanDeg, north = pov.lat + spanDeg;
-    const west = pov.lng - spanDeg, east = pov.lng + spanDeg;
+    const south = lat - spanDeg, north = lat + spanDeg;
+    const west = lng - spanDeg, east = lng + spanDeg;
     try {
       // Same-origin proxy (api/buildings.js), not overpass-api.de directly:
       // its response carries no Access-Control-Allow-Origin header at all
@@ -422,6 +456,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     Promise.all([import('globe.gl'), import('three')]).then(([{ default: Globe }, THREE]) => {
       if (cancelled) return;
       threeRef.current = THREE;
+      onThreeReadyRef.current?.(THREE);
       const themeSettings = {
         backgroundColor: skinDef.backgroundColor || '#000011',
         atmosphereColor: skinDef.atmosphereColor || T.accent,
@@ -550,6 +585,13 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         window.removeEventListener('resize', handleResize);
         clearTimeout(buildingsDebounce);
         if (controls) controls.removeEventListener('end', onControlsSettled);
+        // A theme/skin/tile change tears down and rebuilds the whole scene
+        // (Effect 1's own deps) — if Street View was active, its camera hack
+        // (disabled controls, retargeted at a ground point) belongs to the
+        // globe instance being destroyed, not the fresh one about to replace
+        // it. Drop back to normal orbit mode so the UI doesn't show Street
+        // View controls pointed at nothing.
+        if (streetViewOnRef.current) setStreetViewOn(false);
         cancelAnimationFrame(pulseFrameRef.current);
         userMarkerMeshesRef.current = [];
         disposablesRef.current.forEach(d => { try { d.dispose?.(); } catch {} });
@@ -637,18 +679,22 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     flyTimeoutRef.current = setTimeout(() => setFlying(false), DURATION);
   }, [userLocation]);
 
-  // Explicit camera-angle control. Drag-to-rotate already lets someone tilt
-  // freely (OrbitControls' polar angle is unrestricted), but that's an easy
-  // gesture to miss entirely — this makes "change your viewing angle" a
-  // single discoverable tap through three presets, from looking straight
-  // down at the globe to a near-horizon street-level view. Pure spherical
-  // math around the existing OrbitControls target; no new camera mode.
+  // Repositions the camera to approach the globe from a different arc —
+  // NOT a look-angle tilt. Correction: this was previously labelled with a
+  // "Street level" preset implying it lets you look toward the horizon;
+  // it doesn't. Checked the actual geometry (OrbitControls always points
+  // the camera at `target`, which stays the globe's centre here) and the
+  // look direction is exactly antiparallel to the camera's own local "up"
+  // at every preset — always straight down at whatever's directly below,
+  // just from a different point on the sphere. For an actual horizon-level
+  // view, see Street View mode below, which re-targets the camera at a
+  // point near the ground instead of the planet's centre.
   const tiltIndexRef = useRef(0);
-  const [tiltLabel, setTiltLabel] = useState('Top-down');
+  const [tiltLabel, setTiltLabel] = useState('Overhead');
   const TILT_PRESETS = [
-    { deg: 15, label: 'Top-down' },
+    { deg: 15, label: 'Overhead' },
     { deg: 55, label: 'Angled' },
-    { deg: 82, label: 'Street level' },
+    { deg: 82, label: 'Low arc' },
   ];
   const cycleTilt = useCallback(() => {
     const globe = globeRef.current, THREE = threeRef.current;
@@ -667,6 +713,181 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     controls.update();
     setTiltLabel(preset.label);
   }, []);
+
+  // Street View: stand at a fixed point near the ground and look freely
+  // around, including up at buildings — the actual ask, and a genuinely
+  // different camera mode from "orbit the whole planet," not a relabelled
+  // version of it.
+  //
+  // OrbitControls always computes camera.position from `target + spherical
+  // offset` and then does `camera.lookAt(target)` on every update() call
+  // (verified by reading node_modules/three's OrbitControls source directly
+  // rather than assuming) — so there is no way to hold the camera fixed and
+  // freely vary its look direction while `target` stays at the globe's
+  // centre. The fix is to stop treating `target` as the globe centre at all
+  // while in this mode: keep the camera position fixed at a point just
+  // above the ground (`svEyePosRef`), and on every drag, move `target` to
+  // (eyePos + currentLookDirection). OrbitControls' own update() then
+  // re-derives its internal spherical state from (position - target) =
+  // -lookDirection, recomputes position = target + offset = eyePos
+  // (unchanged) and calls lookAt(target) = looking along lookDirection —
+  // exactly what's wanted, and stable under repeated update() calls (three-
+  // globe's own render loop calls it every frame) since the round-trip is
+  // idempotent when no new drag delta is being fed in. `controls.enabled =
+  // false` stops OrbitControls' own pointer listeners from also trying to
+  // orbit the globe centre at the same time as our drag handler runs.
+  const [streetViewOn, setStreetViewOn] = useState(false);
+  const svEyePosRef = useRef(null);
+  const svUpRef = useRef(null);
+  const svNorthRef = useRef(null);
+  const svEastRef = useRef(null);
+  const svYawRef = useRef(0);
+  const svPitchRef = useRef(0);
+  const svExitPovRef = useRef(null);
+  const svDraggingRef = useRef(false);
+  const svLastPtrRef = useRef({ x: 0, y: 0 });
+
+  const applyStreetViewLook = useCallback(() => {
+    const globe = globeRef.current;
+    if (!globe || !svEyePosRef.current) return;
+    const camera = globe.camera?.(), controls = globe.controls?.();
+    if (!camera || !controls) return;
+    const north = svNorthRef.current, east = svEastRef.current, up = svUpRef.current;
+    const horiz = north.clone().multiplyScalar(Math.cos(svYawRef.current))
+      .add(east.clone().multiplyScalar(Math.sin(svYawRef.current)));
+    const lookDir = horiz.multiplyScalar(Math.cos(svPitchRef.current))
+      .add(up.clone().multiplyScalar(Math.sin(svPitchRef.current)));
+    camera.position.copy(svEyePosRef.current);
+    camera.up.copy(up);
+    controls.target.copy(svEyePosRef.current).add(lookDir);
+    controls.update();
+  }, []);
+
+  // OrbitControls.update() clamps the camera-to-target OFFSET length to
+  // [minDistance, maxDistance] on every single call, unconditionally —
+  // verified by reading the same update() implementation cited above. The
+  // street-view trick above deliberately makes that offset tiny (the unit
+  // lookDir vector, length 1), since target sits right next to the camera
+  // — but the globe's normal 101.5–800 clamp range was silently inflating
+  // that length-1 offset back up to 101.5 every frame, dragging the camera
+  // ~100 units away from the eye point it was supposed to be pinned to.
+  // First attempt at this feature shipped with that bug; caught by
+  // verify-streetview.mjs actually reading the resulting camera distance
+  // instead of trusting the code by inspection. Fixed by relaxing the
+  // clamp for the duration of street view and restoring the globe's normal
+  // range on exit.
+  const svPrevDistanceRef = useRef(null);
+
+  const enterStreetView = useCallback(() => {
+    const globe = globeRef.current, THREE = threeRef.current;
+    if (!globe || !THREE) return;
+    const pov = globe.pointOfView();
+    if (!pov) return;
+    const controls = globe.controls();
+    const R = globe.getGlobeRadius ? globe.getGlobeRadius() : 100;
+    const c = globe.getCoords(pov.lat, pov.lng, 0);
+    const groundPoint = new THREE.Vector3(c.x, c.y, c.z).normalize().multiplyScalar(R);
+    const { up, north, east } = localTangentBasis(THREE, groundPoint);
+    svUpRef.current = up;
+    svNorthRef.current = north;
+    svEastRef.current = east;
+    svEyePosRef.current = groundPoint.clone().add(up.clone().multiplyScalar(EYE_HEIGHT_UNITS));
+    svYawRef.current = 0;
+    svPitchRef.current = 0;
+    svExitPovRef.current = { lat: pov.lat, lng: pov.lng };
+    setRotating(false);
+    if (controls) {
+      svPrevDistanceRef.current = { min: controls.minDistance, max: controls.maxDistance };
+      controls.minDistance = 0.01;
+      controls.maxDistance = 10;
+      controls.enabled = false;
+    }
+    applyStreetViewLook();
+    setStreetViewOn(true);
+    loadBuildingsRef.current?.({ lat: pov.lat, lng: pov.lng });
+  }, [applyStreetViewLook]);
+
+  const exitStreetView = useCallback(() => {
+    const globe = globeRef.current;
+    if (!globe) return;
+    const controls = globe.controls();
+    if (controls) {
+      controls.enabled = true;
+      controls.target.set(0, 0, 0);
+      if (svPrevDistanceRef.current) {
+        controls.minDistance = svPrevDistanceRef.current.min;
+        controls.maxDistance = svPrevDistanceRef.current.max;
+        svPrevDistanceRef.current = null;
+      }
+    }
+    setStreetViewOn(false);
+    if (svExitPovRef.current) {
+      globe.pointOfView({ lat: svExitPovRef.current.lat, lng: svExitPovRef.current.lng, altitude: 0.3 }, 700);
+    }
+  }, []);
+
+  // Walk forward/back along the current horizontal look direction (yaw
+  // only — pitch doesn't affect where your feet go). Re-projects onto the
+  // sphere surface after each step (a straight tangent-plane offset drifts
+  // very slightly above the true curvature) and recomputes the local basis
+  // at the new spot, then reloads buildings for wherever you've walked to.
+  const stepStreetView = useCallback((dir) => {
+    const globe = globeRef.current, THREE = threeRef.current;
+    if (!globe || !THREE || !svUpRef.current) return;
+    const STEP = 0.1;
+    const R = globe.getGlobeRadius ? globe.getGlobeRadius() : 100;
+    const horiz = svNorthRef.current.clone().multiplyScalar(Math.cos(svYawRef.current))
+      .add(svEastRef.current.clone().multiplyScalar(Math.sin(svYawRef.current)));
+    const oldGround = svEyePosRef.current.clone().sub(svUpRef.current.clone().multiplyScalar(EYE_HEIGHT_UNITS));
+    const newGround = oldGround.add(horiz.multiplyScalar(STEP * dir)).normalize().multiplyScalar(R);
+    const { up, north, east } = localTangentBasis(THREE, newGround);
+    svUpRef.current = up;
+    svNorthRef.current = north;
+    svEastRef.current = east;
+    svEyePosRef.current = newGround.clone().add(up.clone().multiplyScalar(EYE_HEIGHT_UNITS));
+    applyStreetViewLook();
+    const geo = globe.toGeoCoords(newGround);
+    if (geo) loadBuildingsRef.current?.({ lat: geo.lat, lng: geo.lng });
+  }, [applyStreetViewLook]);
+
+  // Drag-to-look, mouse and touch alike (pointer events unify both). Only
+  // attached while Street View is actually on.
+  useEffect(() => {
+    if (!streetViewOn) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const SENS = 0.006;
+    const MAX_PITCH = Math.PI / 2 - 0.05;
+    const onDown = e => {
+      svDraggingRef.current = true;
+      svLastPtrRef.current = { x: e.clientX, y: e.clientY };
+      try { el.setPointerCapture(e.pointerId); } catch {}
+    };
+    const onMove = e => {
+      if (!svDraggingRef.current) return;
+      const dx = e.clientX - svLastPtrRef.current.x, dy = e.clientY - svLastPtrRef.current.y;
+      svLastPtrRef.current = { x: e.clientX, y: e.clientY };
+      svYawRef.current -= dx * SENS;
+      svPitchRef.current = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, svPitchRef.current - dy * SENS));
+      applyStreetViewLook();
+    };
+    const onUp = e => {
+      svDraggingRef.current = false;
+      try { el.releasePointerCapture(e.pointerId); } catch {}
+    };
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onUp);
+    };
+  }, [streetViewOn, applyStreetViewLook]);
+  const streetViewOnRef = useRef(streetViewOn);
+  useEffect(() => { streetViewOnRef.current = streetViewOn; }, [streetViewOn]);
 
   useEffect(() => {
     if (!globeRef.current || !globeReady) return;
@@ -906,92 +1127,157 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         border: '1px solid rgba(255,255,255,0.35)',
         borderRadius: 999,
         boxShadow: '0 8px 32px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.35)',
-        opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+        // Street View's exit control must always be reachable — triple-tap
+        // or the 👁 toggle hiding the UI can never strand someone standing
+        // at ground level with no way back out.
+        opacity: (uiVisible || streetViewOn) ? 1 : 0.12, pointerEvents: (uiVisible || streetViewOn) ? 'auto' : 'none',
         transition: 'opacity .35s ease',
       }}>
-        <button
-          className="lok-glass-btn"
-          onClick={flyToMe}
-          disabled={!userLocation || flying}
-          aria-label="Fly to my location"
-          title={userLocation ? 'Fly to me' : 'Location unavailable'}
-          style={{
-            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-            background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
-            color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: userLocation ? 'pointer' : 'default', opacity: userLocation ? 1 : 0.35,
-          }}
-        >
-          {flying ? '⏳' : '🎯'}
-        </button>
-        <button
-          className="lok-glass-btn"
-          onClick={() => setRotating(r => !r)}
-          aria-label={rotating && !flying ? 'Pause globe rotation' : 'Resume globe rotation'}
-          title={rotating && !flying ? 'Pause rotation' : 'Resume rotation'}
-          style={{
-            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-            background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
-            color: '#fff', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-          }}
-        >
-          {rotating && !flying ? '⏸' : '▶'}
-        </button>
-        <input
-          type="range" min="0" max="3" step="0.1" value={rotateSpeed}
-          onChange={e => setRotateSpeed(+e.target.value)}
-          aria-label="Globe rotation speed"
-          style={{ width: 70, flexShrink: 0, accentColor: '#fff' }}
-        />
-        <button
-          className="lok-glass-btn"
-          onClick={cycleTilt}
-          aria-label={`Camera angle: ${tiltLabel}. Tap to change.`}
-          title={`View angle: ${tiltLabel} — tap to cycle`}
-          style={{
-            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-            background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
-            color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-          }}
-        >
-          📐
-        </button>
-        <button
-          className="lok-glass-btn"
-          onClick={() => setBuildingsOn(v => !v)}
-          disabled={buildingsLoading}
-          aria-pressed={buildingsOn}
-          aria-label={buildingsOn ? 'Hide 3D buildings' : 'Show 3D buildings (experimental)'}
-          title={buildingsOn ? 'Hide 3D buildings' : 'Show 3D buildings — loads for wherever you\'re currently looking'}
-          style={{
-            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-            background: buildingsOn ? 'rgba(255,255,255,.34)' : 'rgba(255,255,255,.16)',
-            border: '1px solid rgba(255,255,255,.5)',
-            color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-          }}
-        >
-          {buildingsLoading ? '⏳' : '🏢'}
-        </button>
-        {buildingsOn && (
+        {streetViewOn ? (<>
           <button
             className="lok-glass-btn"
-            onClick={loadBuildings}
-            disabled={buildingsLoading}
-            aria-label="Reload buildings for the current view"
-            title="Reload buildings here"
+            onClick={exitStreetView}
+            aria-label="Exit Street View"
+            title="Exit Street View"
             style={{
-              width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
-              color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(255,120,120,.35)', border: '1px solid rgba(255,255,255,.5)',
+              color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
             }}
           >
-            ↻
+            🚪
           </button>
-        )}
+          <button
+            className="lok-glass-btn"
+            onClick={() => stepStreetView(-1)}
+            aria-label="Step back"
+            title="Step back"
+            style={{
+              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+              color: '#fff', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            ◀
+          </button>
+          <button
+            className="lok-glass-btn"
+            onClick={() => stepStreetView(1)}
+            aria-label="Step forward"
+            title="Step forward"
+            style={{
+              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+              color: '#fff', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            ▶
+          </button>
+          <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, opacity: 0.85, paddingRight: 4 }}>
+            drag to look around
+          </span>
+        </>) : (<>
+          <button
+            className="lok-glass-btn"
+            onClick={flyToMe}
+            disabled={!userLocation || flying}
+            aria-label="Fly to my location"
+            title={userLocation ? 'Fly to me' : 'Location unavailable'}
+            style={{
+              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+              color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: userLocation ? 'pointer' : 'default', opacity: userLocation ? 1 : 0.35,
+            }}
+          >
+            {flying ? '⏳' : '🎯'}
+          </button>
+          <button
+            className="lok-glass-btn"
+            onClick={() => setRotating(r => !r)}
+            aria-label={rotating && !flying ? 'Pause globe rotation' : 'Resume globe rotation'}
+            title={rotating && !flying ? 'Pause rotation' : 'Resume rotation'}
+            style={{
+              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+              color: '#fff', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            {rotating && !flying ? '⏸' : '▶'}
+          </button>
+          <input
+            type="range" min="0" max="3" step="0.1" value={rotateSpeed}
+            onChange={e => setRotateSpeed(+e.target.value)}
+            aria-label="Globe rotation speed"
+            style={{ width: 70, flexShrink: 0, accentColor: '#fff' }}
+          />
+          <button
+            className="lok-glass-btn"
+            onClick={cycleTilt}
+            aria-label={`Camera angle: ${tiltLabel}. Tap to change.`}
+            title={`View angle: ${tiltLabel} — tap to cycle`}
+            style={{
+              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+              color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            📐
+          </button>
+          <button
+            className="lok-glass-btn"
+            onClick={() => setBuildingsOn(v => !v)}
+            disabled={buildingsLoading}
+            aria-pressed={buildingsOn}
+            aria-label={buildingsOn ? 'Hide 3D buildings' : 'Show 3D buildings (experimental)'}
+            title={buildingsOn ? 'Hide 3D buildings' : 'Show 3D buildings — loads for wherever you\'re currently looking'}
+            style={{
+              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+              background: buildingsOn ? 'rgba(255,255,255,.34)' : 'rgba(255,255,255,.16)',
+              border: '1px solid rgba(255,255,255,.5)',
+              color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            {buildingsLoading ? '⏳' : '🏢'}
+          </button>
+          {buildingsOn && (
+            <button
+              className="lok-glass-btn"
+              onClick={loadBuildings}
+              disabled={buildingsLoading}
+              aria-label="Reload buildings for the current view"
+              title="Reload buildings here"
+              style={{
+                width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+                color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              ↻
+            </button>
+          )}
+          <button
+            className="lok-glass-btn"
+            onClick={enterStreetView}
+            aria-label="Enter Street View — look around and up at buildings from ground level"
+            title="Street View"
+            style={{
+              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+              color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            🚶
+          </button>
+        </>)}
       </div>
 
       {/* Buildings status — count / loading / error feedback for the

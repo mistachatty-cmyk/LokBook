@@ -31,6 +31,7 @@ const draw = () => {
     onPostClick: () => {},                        // new function
     onClose: () => {},
     onGlobeReady: g => { window.__globe = g; },
+    onThreeReady: THREE => { window.__THREE = THREE; },
   }));
 };
 draw();
