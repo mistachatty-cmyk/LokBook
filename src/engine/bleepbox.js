@@ -22,11 +22,15 @@ const CODES = {
   "i3e195": { fx: "vibemode" },    // cycle celebration style
   "y468tj": { fx: "devmode" },     // unlock all dev options/debugging
   "2cr2oi": { fx: "tokens10k" },   // grant 10,000 Loks
-  "10vspvk": { fx: "chestrain" },  // add 10 random chests for testing
-  "p3wyw4": { fx: "chestspree" },  // add 18 chests (3 per rarity) for testing
-  "r6q49f": { fx: "chestview" },   // toggle chest viewer
-  "1cii4i8": { fx: "chest1" },     // add 1 chest
-  "1cii4ic": { fx: "chest5" },     // add 5 chests
+  // The 5 chest codes below previously had hashes with no known plaintext
+  // anywhere in the codebase or docs — effectively dead codes nobody could
+  // type. Replaced with fresh hashes for documented plaintext (see
+  // docs/.bleepbox.md) so they're actually reachable again.
+  "ebi4gl": { fx: "chestrain" },   // add 10 random chests for testing
+  "hqr2d0": { fx: "chestspree" },  // add 18 chests (3 per rarity) for testing
+  "ebku92": { fx: "chestview" },   // toggle chest viewer
+  "pnznb9": { fx: "chest1" },      // add 1 chest
+  "ebamur": { fx: "chest5" },      // add 5 chests
 };
 
 export function resolveCheat(input) {
