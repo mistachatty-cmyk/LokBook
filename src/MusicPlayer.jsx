@@ -257,6 +257,19 @@ export function useMusic({ userId } = {}) {
     setList(l => l.map(t => t.id === id ? { ...t, global: !t.global } : t));
   }, []);
 
+  // Set/replace a single track's cover art directly from the queue, not just
+  // during playlist creation — putCover overwrites any existing image for
+  // that id, same store the playlist-creation cover step already writes to.
+  const setTrackCover = useCallback(async (id, file) => {
+    if (!file) return;
+    const ok = await putCover(id, file);
+    if (ok) setList(l => l.map(t => t.id === id ? { ...t, hasCover: true } : t));
+  }, []);
+
+  const toggleFavorite = useCallback(id => {
+    setList(l => l.map(t => t.id === id ? { ...t, favorite: !t.favorite } : t));
+  }, []);
+
   // LokCloud backup — a LokPass perk, and only ever runs when the user taps
   // the button. Never triggered on add, on a timer, or on sign-in, so a free
   // user or a LokPass holder who never taps it costs nothing. Uploads every
@@ -311,7 +324,7 @@ export function useMusic({ userId } = {}) {
 
   const fileTracks = list.filter(t => t.kind === "file");
   const cloudBackedCount = fileTracks.filter(t => t.cloudBackedUp).length;
-  return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, toggleGlobal, playable, allPlayable, playlists, activePlaylist, createPlaylist, renamePlaylist, deletePlaylist, toggleInPlaylist, playPlaylist, clearActivePlaylist, mediaRef, analyserRef, ensureAnalyser, currentIsVideo, gains, setTrackGain, sleepAt, sleepRemainingMs, setSleepMinutes, cancelSleep, backupAllToCloud, cloudBusy, cloudBackedCount, cloudTotalCount: fileTracks.length };
+  return { list, setList, prefs, setPrefs, idx, playing, current, next, err, playAt, toggle, skip, addUrl, addFiles, remove, toggleGlobal, setTrackCover, toggleFavorite, playable, allPlayable, playlists, activePlaylist, createPlaylist, renamePlaylist, deletePlaylist, toggleInPlaylist, playPlaylist, clearActivePlaylist, mediaRef, analyserRef, ensureAnalyser, currentIsVideo, gains, setTrackGain, sleepAt, sleepRemainingMs, setSleepMinutes, cancelSleep, backupAllToCloud, cloudBusy, cloudBackedCount, cloudTotalCount: fileTracks.length };
 }
 
 export const VISUALIZER_STYLES = [
@@ -577,6 +590,8 @@ export function MusicSheet({ music, onClose, say, devMode = false, lokPass = fal
   const [newName, setNewName] = useState("");
   const [picked, setPicked] = useState(() => new Set());
   const [gainOpenId, setGainOpenId] = useState(null);
+  const queueCoverRef = useRef(null);
+  const [queueCoverTarget, setQueueCoverTarget] = useState(null);
   const [coverStep, setCoverStep] = useState(false);
   const [coverMode, setCoverMode] = useState("single");
   const [perCovers, setPerCovers] = useState(() => new Map());
@@ -781,6 +796,8 @@ export function MusicSheet({ music, onClose, say, devMode = false, lokPass = fal
               <button onClick={() => music.playAt(i)} aria-label={`Play ${t.title}`} className="lok-btn shrink-0 w-8 h-8 rounded-full font-bold" style={{ border: `2px solid ${T.ink}`, background: T.card }}>{i === idx && playing ? "❚❚" : "▶"}</button>
               {t.hasCover && <CoverThumb trackId={t.id} />}
               <div className="min-w-0 flex-1"><div className="font-bold text-sm truncate">{t.title}{t.global && <span className="ml-1.5 text-[9px] font-extrabold uppercase align-middle" style={{ color: T.accent }}>GLOBAL</span>}</div><div className="text-[10px] opacity-50">{t.src === "idb" ? "on device · offline ready" : "link"}</div></div>
+              <button onClick={() => music.toggleFavorite(t.id)} aria-pressed={!!t.favorite} aria-label={`${t.favorite ? "Unfavorite" : "Favorite"} ${t.title}`} className="lok-btn shrink-0 text-sm px-1">{t.favorite ? "❤️" : "🤍"}</button>
+              {t.kind === "file" && <button onClick={() => { setQueueCoverTarget(t.id); queueCoverRef.current?.click(); }} aria-label={`${t.hasCover ? "Change" : "Add"} cover image for ${t.title}`} title={t.hasCover ? "Change cover" : "Add cover"} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-extrabold" style={{ border: `2px solid ${T.ink}`, background: T.card, color: T.ink }}>🖼️</button>}
               <button onClick={() => setGainOpenId(o => o === t.id ? null : t.id)} aria-expanded={gainOpenId === t.id} aria-label={`Volume for ${t.title}`} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-extrabold" style={{ border: `2px solid ${T.ink}`, background: (gains[t.id] ?? 1) !== 1 ? T.accent : T.card, color: (gains[t.id] ?? 1) !== 1 ? T.onAccent : T.ink }}>🔊</button>
               {devMode && <button onClick={() => music.toggleGlobal(t.id)} aria-pressed={!!t.global} aria-label={`${t.global ? "Unset" : "Set"} ${t.title} as global`} className="lok-btn shrink-0 px-2 py-1 rounded-full text-[10px] font-extrabold" style={{ border: `2px solid ${T.ink}`, background: t.global ? T.accent : T.card, color: t.global ? T.onAccent : T.ink }}>{t.global ? "★" : "☆"}</button>}
               <button onClick={() => music.remove(t.id)} aria-label={`Remove ${t.title}`} className="lok-btn shrink-0 text-xs font-bold opacity-60 px-1.5">✕</button>
@@ -794,6 +811,8 @@ export function MusicSheet({ music, onClose, say, devMode = false, lokPass = fal
             )}
           </div>
         ))}
+        <input ref={queueCoverRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden aria-hidden="true"
+          onChange={async e => { const f = e.target.files?.[0]; e.target.value = ""; if (f && queueCoverTarget) await music.setTrackCover(queueCoverTarget, f); }} />
 
         {linkOuts.length > 0 && (<>
           <div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mt-3 mb-1">Streaming links ({linkOuts.length})</div>

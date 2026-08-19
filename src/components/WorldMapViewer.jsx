@@ -169,6 +169,23 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   const [flying, setFlying] = useState(false);
   const flyTimeoutRef = useRef(null);
   useEffect(() => () => clearTimeout(flyTimeoutRef.current), []);
+  // Triple-tap the globe to hide/show the whole UI, as a faster alternative
+  // to the 👁 button. Counts taps within a 500ms window; a genuine drag-to-
+  // rotate doesn't fire a click event here any more than it does for the
+  // existing onGlobeClick handler below, so this doesn't fight OrbitControls.
+  const tapCountRef = useRef(0);
+  const tapResetTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(tapResetTimerRef.current), []);
+  const handleGlobeTap = useCallback(() => {
+    tapCountRef.current += 1;
+    clearTimeout(tapResetTimerRef.current);
+    tapResetTimerRef.current = setTimeout(() => { tapCountRef.current = 0; }, 500);
+    if (tapCountRef.current >= 3) {
+      tapCountRef.current = 0;
+      clearTimeout(tapResetTimerRef.current);
+      setUiVisible(v => !v);
+    }
+  }, []);
   const onLocationOverrideRef = useRef(onLocationOverride);
   useEffect(() => { onLocationOverrideRef.current = onLocationOverride; }, [onLocationOverride]);
   // The globe.gl chunk is ~2MB — on a weak connection it can fail, or just
@@ -492,6 +509,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       {/* Globe container */}
       <div
         ref={containerRef}
+        onClick={handleGlobeTap}
         style={{
           position: 'absolute',
           inset: 0,
