@@ -252,13 +252,16 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   const onGlobeReadyRef = useRef(onGlobeReady);
   useEffect(() => { onGlobeReadyRef.current = onGlobeReady; }, [onGlobeReady]);
 
-  // 3D building extrusions — optional (off by default: it's a live network
-  // call to a third-party API and real GPU geometry, neither of which
-  // should ever be a silent cost). Loaded on demand for whatever the camera
-  // is currently looking at, not kept in continuous sync with panning — a
-  // "reload here" tap is simpler and far gentler on the public Overpass
-  // instance than firing a query on every camera move.
-  const [buildingsOn, setBuildingsOn] = useState(false);
+  // 3D building extrusions — on by default now that it's a headline feature
+  // rather than a hidden extra; still a real, visible toggle (🏢 in the
+  // glass cluster) since it's a live third-party network call and real GPU
+  // geometry. Auto-reloads for wherever the camera comes to rest (below,
+  // via OrbitControls' 'end' event, debounced) so panning and zooming
+  // around the globe keeps showing buildings for the new view without a
+  // manual reload tap each time — while still only firing once movement
+  // has actually stopped, not on every drag frame, to stay gentle on the
+  // public Overpass instance.
+  const [buildingsOn, setBuildingsOn] = useState(true);
   const [buildingsLoading, setBuildingsLoading] = useState(false);
   const [buildingsError, setBuildingsError] = useState('');
   const [buildingsCount, setBuildingsCount] = useState(0);
@@ -330,6 +333,14 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       if (myReqId === buildingsReqIdRef.current) setBuildingsLoading(false);
     }
   }, [clearBuildings]);
+  // Refs so the OrbitControls 'end' listener (added once, inside Effect 1's
+  // one-time setup) always calls the current version of these without
+  // needing to be in that effect's deps — the same pattern as
+  // onPostClickRef above.
+  const loadBuildingsRef = useRef(loadBuildings);
+  useEffect(() => { loadBuildingsRef.current = loadBuildings; }, [loadBuildings]);
+  const buildingsOnRef = useRef(buildingsOn);
+  useEffect(() => { buildingsOnRef.current = buildingsOn; }, [buildingsOn]);
 
   useEffect(() => {
     if (!buildingsOn) { clearBuildings(); return; }
@@ -465,6 +476,22 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           controls.dampingFactor = 0.08;
         }
 
+        // Auto-reload buildings for wherever the camera comes to rest —
+        // 'end' fires once when a drag/pinch/wheel interaction finishes,
+        // not per-frame during it, so this can't turn into a query storm
+        // while someone's actively spinning the globe. The 900ms debounce
+        // on top absorbs a quick flick-then-settle as one reload, not two.
+        let buildingsDebounce = null;
+        const onControlsSettled = () => {
+          if (!buildingsOnRef.current) return;
+          clearTimeout(buildingsDebounce);
+          buildingsDebounce = setTimeout(() => {
+            const p = globe.pointOfView();
+            if (p && p.altitude <= 0.35) loadBuildingsRef.current();
+          }, 900);
+        };
+        if (controls) controls.addEventListener('end', onControlsSettled);
+
         // Dev-only: reposition the user's own pin by tapping the globe.
         // Reads devMode from a ref rather than the effect's own deps, so
         // toggling dev mode never tears down and rebuilds the scene — same
@@ -512,6 +539,8 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       // another rAF loop. Hand it to the effect's real cleanup instead.
       cleanupScene = () => {
         window.removeEventListener('resize', handleResize);
+        clearTimeout(buildingsDebounce);
+        if (controls) controls.removeEventListener('end', onControlsSettled);
         cancelAnimationFrame(pulseFrameRef.current);
         userMarkerMeshesRef.current = [];
         disposablesRef.current.forEach(d => { try { d.dispose?.(); } catch {} });
@@ -598,6 +627,37 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     clearTimeout(flyTimeoutRef.current);
     flyTimeoutRef.current = setTimeout(() => setFlying(false), DURATION);
   }, [userLocation]);
+
+  // Explicit camera-angle control. Drag-to-rotate already lets someone tilt
+  // freely (OrbitControls' polar angle is unrestricted), but that's an easy
+  // gesture to miss entirely — this makes "change your viewing angle" a
+  // single discoverable tap through three presets, from looking straight
+  // down at the globe to a near-horizon street-level view. Pure spherical
+  // math around the existing OrbitControls target; no new camera mode.
+  const tiltIndexRef = useRef(0);
+  const [tiltLabel, setTiltLabel] = useState('Top-down');
+  const TILT_PRESETS = [
+    { deg: 15, label: 'Top-down' },
+    { deg: 55, label: 'Angled' },
+    { deg: 82, label: 'Street level' },
+  ];
+  const cycleTilt = useCallback(() => {
+    const globe = globeRef.current, THREE = threeRef.current;
+    if (!globe || !THREE) return;
+    const controls = globe.controls();
+    const camera = globe.camera?.();
+    if (!controls || !camera) return;
+    tiltIndexRef.current = (tiltIndexRef.current + 1) % TILT_PRESETS.length;
+    const preset = TILT_PRESETS[tiltIndexRef.current];
+    const offset = camera.position.clone().sub(controls.target);
+    const spherical = new THREE.Spherical().setFromVector3(offset);
+    spherical.phi = THREE.MathUtils.degToRad(preset.deg);
+    offset.setFromSpherical(spherical);
+    camera.position.copy(controls.target).add(offset);
+    camera.lookAt(controls.target);
+    controls.update();
+    setTiltLabel(preset.label);
+  }, []);
 
   useEffect(() => {
     if (!globeRef.current || !globeReady) return;
@@ -815,9 +875,12 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
 
       {/* Flight/rotation cluster — frosted "Liquid Glass" pill: Fly to me,
           Play/Pause, speed slider. Sits vertically centered on the right
-          edge so it's clear of both the header row and the bottom
-          post-card/view-selector bars regardless of which of those happen
-          to be showing. Fades with the rest of the chrome via uiVisible. */}
+          edge, stacked just above the view-selector row instead of dead
+          centre — vertically centred was in the way of drag-to-rotate
+          gestures right where a thumb naturally lands. Slides down with
+          the same offset the view-selector already uses when the post
+          preview card is showing, so it never collides with either.
+          Fades with the rest of the chrome via uiVisible. */}
       <style>{`
         .lok-glass-btn { transition: transform .18s cubic-bezier(.34,1.56,.64,1), background .2s ease; }
         .lok-glass-btn:active:not(:disabled) { transform: scale(0.84); background: rgba(255,255,255,.32) !important; }
@@ -825,7 +888,8 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       `}</style>
       <div style={{
         position: 'absolute',
-        top: '50%', right: 16, transform: 'translateY(-50%)',
+        bottom: `calc(${selectedPost ? 130 : 20}px + 54px + env(safe-area-inset-bottom))`, right: 16,
+        maxWidth: 'calc(100vw - 32px)', overflowX: 'auto', scrollbarWidth: 'none',
         zIndex: 3, display: 'flex', alignItems: 'center', gap: 10,
         padding: '9px 12px',
         background: 'rgba(255,255,255,0.10)',
@@ -869,8 +933,22 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           type="range" min="0" max="3" step="0.1" value={rotateSpeed}
           onChange={e => setRotateSpeed(+e.target.value)}
           aria-label="Globe rotation speed"
-          style={{ width: 70, accentColor: '#fff' }}
+          style={{ width: 70, flexShrink: 0, accentColor: '#fff' }}
         />
+        <button
+          className="lok-glass-btn"
+          onClick={cycleTilt}
+          aria-label={`Camera angle: ${tiltLabel}. Tap to change.`}
+          title={`View angle: ${tiltLabel} — tap to cycle`}
+          style={{
+            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+            background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+            color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          📐
+        </button>
         <button
           className="lok-glass-btn"
           onClick={() => setBuildingsOn(v => !v)}

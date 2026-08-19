@@ -84,26 +84,27 @@ await page.waitForFunction(() => window.__h && window.__h.done, null, { timeout:
 await page.waitForFunction(() => !!window.__globe, null, { timeout: 15000 });
 await page.waitForTimeout(7000); // let the harness's own churn re-renders finish first
 
-// Sanity check: BEFORE zooming in, the layer should refuse with the
-// "zoom in closer" message rather than silently doing nothing or firing
-// the network call anyway.
+// The layer is on by default now, so it should have already tried and
+// refused — at the default zoomed-out altitude — with the "zoom in
+// closer" message, rather than silently doing nothing or firing the
+// network call anyway. No click needed to reach this state.
 const buildingsBtn = page.locator('button[aria-label*="3D buildings"]');
-await buildingsBtn.click();
-await page.waitForTimeout(600);
+const reloadBtn = page.locator('button[aria-label="Reload buildings for the current view"]');
 const tooFarText = await page.locator('body').innerText();
 console.log('Refuses at default zoom (expect "Zoom in closer"):', /Zoom in closer/i.test(tooFarText));
 console.log('Overpass NOT called while too far out:', overpassCalled === false);
-await buildingsBtn.click(); // toggle back off before the real test
-await page.waitForTimeout(200);
 
 // Now set a street-level pointOfView directly on the real globe.gl
 // instance (the harness's own escape hatch — see onGlobeReady in
 // WorldMapViewer.jsx) rather than simulating an imprecise wheel-zoom
-// gesture, and drive the toggle for real.
+// gesture. Since this bypasses OrbitControls entirely there's no drag
+// 'end' event to trigger the auto-reload, so the ↻ reload button
+// (visible since the layer defaults on) drives the reload — same as a
+// real user would after panning somewhere new.
 await page.evaluate(() => window.__globe.pointOfView({ lat: 42.3555, lng: -71.0655, altitude: 0.1 }));
 await page.waitForTimeout(300);
 
-await buildingsBtn.click();
+await reloadBtn.click();
 await page.waitForTimeout(1500);
 
 console.log('Overpass endpoint actually called:', overpassCalled);
