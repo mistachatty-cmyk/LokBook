@@ -55,8 +55,11 @@ export async function deleteCover(id) {
   try { await tx(COVERS, "readwrite", s => s.delete(id)); return true; } catch { return false; }
 }
 
-/** Audio/video types a browser <audio> element can realistically decode. */
-export const ACCEPTED = ".mp3,.m4a,.mp4,.aac,.ogg,.oga,.wav,.flac,.webm,audio/*,video/mp4";
+/** Audio/video types a browser <audio> element can realistically decode.
+ * .caf is included for Voice Memos recordings saved to Files on older iOS
+ * versions — modern Voice Memos exports as .m4a, which was already covered,
+ * but .caf shows up from a "Save to Files" share on some devices/OS versions. */
+export const ACCEPTED = ".mp3,.m4a,.mp4,.aac,.ogg,.oga,.wav,.flac,.webm,.caf,audio/*,video/mp4";
 /** Cover-art image types recognised inside a folder/multi-file import. */
 export const IMAGE_TYPES = /^image\/(png|jpe?g|webp|gif)$/;
 

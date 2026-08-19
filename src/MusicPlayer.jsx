@@ -640,6 +640,7 @@ export function MusicSheet({ music, onClose, say, devMode = false, lokPass = fal
         <div className="p-3 rounded-2xl mb-2" style={{ border: `3px solid ${T.ink}`, background: T.paper }}>
           <div className="lok-display font-extrabold text-sm">Plug in your music</div>
           <div className="text-xs opacity-70 mt-0.5 leading-snug">Add MP3/M4A/MP4/WAV/FLAC files — they're stored on-device and keep playing offline. {isIOS ? "Multi-select an album's tracks together with its cover image in Files/Photos and every track picks up that cover." : "Select an album's cover image alongside its tracks (or a whole folder) and every track in it picks up that cover."} Streaming links are saved as shortcuts.</div>
+          {isIOS && <div className="mt-1.5 text-[10px] opacity-50 leading-snug">From Voice Memos: open the recording → Share → Save to Files, then tap "＋ Add files" here and pick it — recordings work the same as any other track.</div>}
           <div className="mt-2 flex gap-1.5">
             <button onClick={() => fileRef.current?.click()} className="lok-btn lok-display flex-1 py-2.5 rounded-xl font-extrabold text-sm" style={{ background: T.accent, color: T.onAccent, border: `3px solid ${T.ink}` }}>＋ Add files</button>
             {supportsFolder && <button onClick={() => folderRef.current?.click()} className="lok-btn lok-display flex-1 py-2.5 rounded-xl font-extrabold text-sm" style={{ background: T.card, color: T.ink, border: `3px solid ${T.ink}` }}>＋ Add a folder</button>}
