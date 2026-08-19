@@ -1035,9 +1035,12 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       }}>
         <h2 style={{
           margin: 0, color: T.paper, fontSize: 24, fontWeight: 700, textShadow: `2px 2px 0 ${T.accent}`,
-          opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+          // The one label that stays put at low opacity when everything
+          // else fully vanishes — a quiet "you're still in LokWorld"
+          // anchor rather than a totally blank screen.
+          opacity: uiVisible ? 1 : 0.28, pointerEvents: 'none',
           transition: 'opacity .35s ease',
-        }}>🌍 World Map</h2>
+        }}>🌍 LokWorld</h2>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             onClick={() => setFrameMode(m => (m === 'line' ? 'glow' : m === 'glow' ? 'off' : 'line'))}
@@ -1047,7 +1050,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
               color: frameMode === 'off' ? T.paper : T.onAccent,
               border: `2px solid ${T.accent}`, borderRadius: 8,
               padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+              opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
               transition: 'opacity .35s ease',
             }}
           >
@@ -1060,7 +1063,11 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
               background: 'rgba(0,0,0,.35)', border: `2px solid ${T.paper}88`, borderRadius: 8,
               color: T.paper, padding: '8px 10px', fontSize: 14, cursor: 'pointer',
               backdropFilter: 'blur(6px)', transition: 'opacity .35s ease, transform .35s ease',
-              opacity: uiVisible ? 1 : 0.6, transform: uiVisible ? 'scale(1)' : 'scale(0.92)',
+              // Fully gone when hidden — not a dead end, since triple-tapping
+              // the globe is the same gesture that hides it, so it's also
+              // exactly how it comes back.
+              opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
+              transform: uiVisible ? 'scale(1)' : 'scale(0.92)',
             }}
           >
             {uiVisible ? '👁' : '👁‍🗨'}
@@ -1076,7 +1083,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
               fontSize: 14,
               fontWeight: 600,
               cursor: 'pointer',
-              opacity: uiVisible ? 1 : 0.6,
+              opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
               transition: 'opacity .35s ease',
             }}
           >
@@ -1096,7 +1103,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           background: 'rgba(0,0,0,.5)', border: `2px dashed ${T.accent}`, borderRadius: 10,
           padding: '10px 12px', color: '#fff', fontSize: 11, fontWeight: 700,
           zIndex: 2, maxWidth: 190, backdropFilter: 'blur(6px)',
-          opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+          opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
           transition: 'opacity .35s ease',
         }}>
           🛠 Dev: tap the globe to move your pin
@@ -1130,7 +1137,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         // Street View's exit control must always be reachable — triple-tap
         // or the 👁 toggle hiding the UI can never strand someone standing
         // at ground level with no way back out.
-        opacity: (uiVisible || streetViewOn) ? 1 : 0.12, pointerEvents: (uiVisible || streetViewOn) ? 'auto' : 'none',
+        opacity: (uiVisible || streetViewOn) ? 1 : 0, pointerEvents: (uiVisible || streetViewOn) ? 'auto' : 'none',
         transition: 'opacity .35s ease',
       }}>
         {streetViewOn ? (<>
@@ -1291,7 +1298,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           background: 'rgba(0,0,0,.5)', border: `1.5px solid ${buildingsError ? '#E85D5D' : T.accent}`, borderRadius: 8,
           padding: '7px 10px', color: '#fff', fontSize: 10, fontWeight: 700, lineHeight: 1.4,
           zIndex: 2, backdropFilter: 'blur(6px)',
-          opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+          opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
           transition: 'opacity .35s ease',
         }}>
           {buildingsLoading ? '🏢 loading buildings…' : buildingsError ? `🏢 ${buildingsError}` : `🏢 ${buildingsCount} building${buildingsCount === 1 ? '' : 's'} loaded — exaggerated height, real footprints`}
@@ -1311,7 +1318,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           padding: 16,
           zIndex: 2,
           color: T.ink,
-          opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+          opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
           transition: 'opacity .35s ease',
         }}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
@@ -1340,7 +1347,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         color: T.ink,
         fontSize: 12, fontWeight: 700,
         zIndex: 2,
-        opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+        opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
         transition: 'opacity .35s ease',
       }}>
         🔒 Privacy: Everyone
@@ -1356,7 +1363,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           bottom: `calc(${selectedPost ? 130 : 20}px + env(safe-area-inset-bottom))`,
           left: 20, right: 20,
           zIndex: 2, display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4,
-          opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+          opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
           transition: 'opacity .35s ease',
         }}>
           {[{ id: null, name: '✨ Skin' }, ...GLOBE_CONFIG.tileLayerOptions.map(o => ({ id: o.id, name: o.name }))]
