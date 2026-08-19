@@ -464,6 +464,21 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       const globeTextureUrl = skinDef.textureUrl || '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg';
       const globeBumpUrl = skinDef.bumpUrl || '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png';
       let globe;
+      // Declared here, not inside the try block below, so cleanupScene (which
+      // runs on every teardown — a theme/skin/tileSource change, or closing
+      // World) can actually see it. It used to be declared inside the try
+      // block; since cleanupScene is assigned after that block ends,
+      // `clearTimeout(buildingsDebounce)` there was a genuine out-of-scope
+      // reference — a ReferenceError on every single teardown, caught by the
+      // ErrorBoundary around WorldMapViewer, which unmounted the whole modal
+      // and revealed whatever page was behind it. That's what made switching
+      // map style (which rebuilds the globe) look like "World won't open" /
+      // "every click bounces me back to Profile."
+      let buildingsDebounce = null;
+      // Same reason as buildingsDebounce above: cleanupScene reads this
+      // outside the try block, so it must be declared out here too.
+      let controls;
+      let onControlsSettled;
       try {
         const container = containerRef.current;
         if (!container) return;
@@ -506,7 +521,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         // instance. Calling `.autoRotate()` in the builder chain threw
         // "autoRotate is not a function" on every open, on every device, since
         // the feature was written — the real reason the globe never appeared.
-        const controls = globe.controls();
+        controls = globe.controls();
         if (controls) {
           controls.autoRotate = GLOBE_CONFIG.autoRotate;
           controls.autoRotateSpeed = GLOBE_CONFIG.autoRotateSpeed;
@@ -525,8 +540,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         // not per-frame during it, so this can't turn into a query storm
         // while someone's actively spinning the globe. The 900ms debounce
         // on top absorbs a quick flick-then-settle as one reload, not two.
-        let buildingsDebounce = null;
-        const onControlsSettled = () => {
+        onControlsSettled = () => {
           if (!buildingsOnRef.current) return;
           clearTimeout(buildingsDebounce);
           buildingsDebounce = setTimeout(() => {
