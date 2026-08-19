@@ -30,6 +30,7 @@ const draw = () => {
     gyroMotion: { gamma: 0, beta: 0, alpha: 0 },
     onPostClick: () => {},                        // new function
     onClose: () => {},
+    onGlobeReady: g => { window.__globe = g; },
   }));
 };
 draw();

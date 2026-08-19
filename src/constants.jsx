@@ -972,8 +972,12 @@ export const GLOBE_CONFIG = {
   autoRotate: true,
   autoRotateSpeed: 0.5,
   // How far the slippy-map tile engine will keep fetching detail as you zoom.
-  // 13 is a good ceiling for street-level without hammering the tile servers.
-  tileMaxLevel: 13,
+  // 19 is the ceiling OSM/ArcGIS raster tiles actually publish to — past
+  // that the server just re-serves the z19 tile scaled up, so there's no
+  // point asking higher. Paired with controls.minDistance in
+  // WorldMapViewer.jsx, which is what actually lets the camera get close
+  // enough to reach it.
+  tileMaxLevel: 19,
 };
 
 // Purchasable World globe skins. "none" (the default, free) follows the

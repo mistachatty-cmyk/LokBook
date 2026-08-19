@@ -133,6 +133,62 @@ function buildMarkerMesh(THREE, kind, style, color) {
   return mesh;
 }
 
+// Real buildings are ~10-100m tall against an ~6371km planet radius — at
+// three-globe's default 100-unit radius that's a fraction of a pixel,
+// invisible by construction, not by bug. Every "3D buildings on a globe"
+// implementation exaggerates height for exactly this reason; this constant
+// is that deliberate exaggeration, tuned against the ~1.5-3 unit camera
+// distance `minDistance` now allows so a real building actually reads as a
+// building rather than a bump.
+const BUILDING_UNITS_PER_LEVEL = 0.09;
+const DEFAULT_BUILDING_LEVELS = 3;
+
+// A building's OSM `levels`/`height` tags, normalised to a level count.
+function levelsForBuilding(tags = {}) {
+  const lv = parseFloat(tags['building:levels']);
+  if (lv > 0) return lv;
+  const h = parseFloat(tags.height);
+  if (h > 0) return h / 3; // ~3m per storey, the usual rule of thumb
+  return DEFAULT_BUILDING_LEVELS;
+}
+
+// Extrudes one building footprint (an Overpass `way.geometry` array of
+// {lat,lon} points) into a Three.js geometry sitting flush on the globe
+// surface at its real location, with "up" following the sphere's local
+// normal there rather than a flat world Y-axis (which would leave buildings
+// tilted everywhere except directly under the camera).
+function buildBuildingGeometry(THREE, globe, footprint, tags) {
+  if (!footprint || footprint.length < 3) return null;
+  const pts3D = footprint.map(p => {
+    const c = globe.getCoords(p.lat, p.lon, 0);
+    return new THREE.Vector3(c.x, c.y, c.z);
+  });
+  const centroid = pts3D.reduce((a, b) => a.add(b), new THREE.Vector3()).divideScalar(pts3D.length);
+  const normal = centroid.clone().normalize();
+  if (normal.lengthSq() === 0) return null;
+  // An arbitrary vector not parallel to `normal`, to seed an orthonormal
+  // tangent basis (u, v, normal) at this point on the sphere.
+  const seed = Math.abs(normal.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+  const tangentU = new THREE.Vector3().crossVectors(seed, normal).normalize();
+  const tangentV = new THREE.Vector3().crossVectors(normal, tangentU).normalize();
+  const shapePts = pts3D.map(p => {
+    const rel = p.clone().sub(centroid);
+    return new THREE.Vector2(rel.dot(tangentU), rel.dot(tangentV));
+  });
+  let geo;
+  try {
+    const shape = new THREE.Shape(shapePts);
+    geo = new THREE.ExtrudeGeometry(shape, { depth: levelsForBuilding(tags) * BUILDING_UNITS_PER_LEVEL, bevelEnabled: false });
+  } catch { return null; } // a self-intersecting/degenerate footprint throws inside earcut
+  // ExtrudeGeometry builds in the shape's own (x, y, z=depth) space — rotate
+  // that local frame onto (tangentU, tangentV, normal) so "depth" points away
+  // from the planet's centre at this exact spot, then move it into place.
+  const basis = new THREE.Matrix4().makeBasis(tangentU, tangentV, normal);
+  geo.applyMatrix4(basis);
+  geo.translate(centroid.x, centroid.y, centroid.z);
+  return geo;
+}
+
 // Deep space stays a fixed near-black across every theme (matching how
 // every real 3D-globe app renders the void) — it's the atmosphere glow,
 // starfield tint, and markers that actually read as "themed," derived
@@ -142,7 +198,7 @@ function buildMarkerMesh(THREE, kind, style, color) {
 // A purchasable skin (see WORLD_SKINS in constants.jsx) overrides the
 // theme-derived look with its own fixed texture, atmosphere tint, marker
 // shape, and starfield density/tint.
-export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso', skin = 'none', gyroMotion = { gamma: 0, beta: 0, alpha: 0 }, onPostClick, onClose, devMode = false, onLocationOverride }) {
+export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso', skin = 'none', gyroMotion = { gamma: 0, beta: 0, alpha: 0 }, onPostClick, onClose, devMode = false, onLocationOverride, onGlobeReady }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
   const [selectedPost, setSelectedPost] = useState(null);
@@ -188,6 +244,102 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   }, []);
   const onLocationOverrideRef = useRef(onLocationOverride);
   useEffect(() => { onLocationOverrideRef.current = onLocationOverride; }, [onLocationOverride]);
+  // Optional escape hatch for driving the real globe.gl instance from
+  // outside — used only by the Playwright test harness (world-harness.html)
+  // to set a close pointOfView() before exercising the buildings toggle,
+  // rather than simulating imprecise wheel-zoom gestures. App.jsx never
+  // passes this.
+  const onGlobeReadyRef = useRef(onGlobeReady);
+  useEffect(() => { onGlobeReadyRef.current = onGlobeReady; }, [onGlobeReady]);
+
+  // 3D building extrusions — optional (off by default: it's a live network
+  // call to a third-party API and real GPU geometry, neither of which
+  // should ever be a silent cost). Loaded on demand for whatever the camera
+  // is currently looking at, not kept in continuous sync with panning — a
+  // "reload here" tap is simpler and far gentler on the public Overpass
+  // instance than firing a query on every camera move.
+  const [buildingsOn, setBuildingsOn] = useState(false);
+  const [buildingsLoading, setBuildingsLoading] = useState(false);
+  const [buildingsError, setBuildingsError] = useState('');
+  const [buildingsCount, setBuildingsCount] = useState(0);
+  const buildingsGroupRef = useRef(null);
+  const buildingsDisposablesRef = useRef([]);
+  const buildingsReqIdRef = useRef(0);
+
+  const clearBuildings = useCallback(() => {
+    const globe = globeRef.current;
+    if (buildingsGroupRef.current && globe) {
+      try { globe.scene().remove(buildingsGroupRef.current); } catch {}
+    }
+    buildingsDisposablesRef.current.forEach(d => { try { d.dispose?.(); } catch {} });
+    buildingsDisposablesRef.current = [];
+    buildingsGroupRef.current = null;
+    setBuildingsCount(0);
+  }, []);
+
+  const loadBuildings = useCallback(async () => {
+    const globe = globeRef.current, THREE = threeRef.current;
+    if (!globe || !THREE) return;
+    const pov = globe.pointOfView();
+    // Real building footprints are only meaningful once you're at
+    // street-level altitude — fetching them for a screen-filling chunk of
+    // continent would be both useless (you couldn't see individual
+    // buildings anyway) and a good way to get an Overpass query timeout.
+    if (!pov || pov.altitude > 0.35) {
+      setBuildingsError('Zoom in closer first — buildings only load at street-level altitude.');
+      return;
+    }
+    const myReqId = ++buildingsReqIdRef.current;
+    setBuildingsError('');
+    setBuildingsLoading(true);
+    // Bbox sized off current altitude, capped small — this is a public,
+    // shared Overpass instance, not infrastructure LokBook controls.
+    const spanDeg = Math.min(0.01, Math.max(0.0025, pov.altitude * 0.02));
+    const south = pov.lat - spanDeg, north = pov.lat + spanDeg;
+    const west = pov.lng - spanDeg, east = pov.lng + spanDeg;
+    const query = `[out:json][timeout:15];way["building"](${south},${west},${north},${east});out geom;`;
+    try {
+      const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+      if (!res.ok) throw new Error(`Overpass ${res.status}`);
+      const data = await res.json();
+      // A slower/later request finishing after a newer one would otherwise
+      // clobber it with stale buildings for wherever the camera used to be.
+      if (myReqId !== buildingsReqIdRef.current) return;
+      const ways = (data.elements || []).filter(el => el.type === 'way' && el.geometry?.length >= 3).slice(0, 300);
+      clearBuildings();
+      const group = new THREE.Group();
+      const material = new THREE.MeshNormalMaterial({ flatShading: true });
+      buildingsDisposablesRef.current.push(material);
+      let built = 0;
+      for (const way of ways) {
+        const geo = buildBuildingGeometry(THREE, globe, way.geometry, way.tags);
+        if (!geo) continue;
+        buildingsDisposablesRef.current.push(geo);
+        group.add(new THREE.Mesh(geo, material));
+        built++;
+      }
+      globe.scene().add(group);
+      buildingsGroupRef.current = group;
+      setBuildingsCount(built);
+      if (!built) setBuildingsError('No tagged buildings found here — try a denser area, or a different map tile source.');
+    } catch (err) {
+      if (myReqId === buildingsReqIdRef.current) {
+        setBuildingsError(`Couldn't load buildings — ${err?.name || 'Error'}: ${err?.message || String(err)}`);
+      }
+    } finally {
+      if (myReqId === buildingsReqIdRef.current) setBuildingsLoading(false);
+    }
+  }, [clearBuildings]);
+
+  useEffect(() => {
+    if (!buildingsOn) { clearBuildings(); return; }
+    // globeReady flips false while Effect 1 (below) tears down and rebuilds
+    // the scene for a theme/skin/tile change — drop the stale group rather
+    // than leak its GPU buffers into a scene that no longer exists, and
+    // this effect re-fires to reload once the new globe is ready.
+    if (globeReady) loadBuildings(); else clearBuildings();
+  }, [buildingsOn, globeReady, loadBuildings, clearBuildings]);
+  useEffect(() => () => clearBuildings(), [clearBuildings]);
   // The globe.gl chunk is ~2MB — on a weak connection it can fail, or just
   // hang without ever technically rejecting. Previously any failure only
   // hit console.warn/console.error, so the modal's header rendered fine
@@ -303,8 +455,11 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         if (controls) {
           controls.autoRotate = GLOBE_CONFIG.autoRotate;
           controls.autoRotateSpeed = GLOBE_CONFIG.autoRotateSpeed;
-          // Let people get genuinely close to the surface for detail.
-          controls.minDistance = 110;
+          // Let people get genuinely close to the surface for detail — down
+          // to 1.5 units above three-globe's 100-unit default radius, close
+          // enough that street-level tiles (tileMaxLevel:19) and building
+          // extrusions actually read as something rather than a flat wash.
+          controls.minDistance = 101.5;
           controls.maxDistance = 800;
           controls.enableDamping = true;
           controls.dampingFactor = 0.08;
@@ -323,6 +478,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         clearTimeout(timeoutId);
         setGlobeReady(true);
         setStatus('ready');
+        onGlobeReadyRef.current?.(globe);
       } catch (err) {
         console.error('Globe initialization error:', err);
         clearTimeout(timeoutId);
@@ -715,7 +871,59 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           aria-label="Globe rotation speed"
           style={{ width: 70, accentColor: '#fff' }}
         />
+        <button
+          className="lok-glass-btn"
+          onClick={() => setBuildingsOn(v => !v)}
+          disabled={buildingsLoading}
+          aria-pressed={buildingsOn}
+          aria-label={buildingsOn ? 'Hide 3D buildings' : 'Show 3D buildings (experimental)'}
+          title={buildingsOn ? 'Hide 3D buildings' : 'Show 3D buildings — loads for wherever you\'re currently looking'}
+          style={{
+            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+            background: buildingsOn ? 'rgba(255,255,255,.34)' : 'rgba(255,255,255,.16)',
+            border: '1px solid rgba(255,255,255,.5)',
+            color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          {buildingsLoading ? '⏳' : '🏢'}
+        </button>
+        {buildingsOn && (
+          <button
+            className="lok-glass-btn"
+            onClick={loadBuildings}
+            disabled={buildingsLoading}
+            aria-label="Reload buildings for the current view"
+            title="Reload buildings here"
+            style={{
+              width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+              color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            ↻
+          </button>
+        )}
       </div>
+
+      {/* Buildings status — count / loading / error feedback for the
+          optional extrusion layer. Only shown while the layer is on, since
+          otherwise there's nothing to report. */}
+      {buildingsOn && (buildingsLoading || buildingsError || buildingsCount > 0) && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(130px + env(safe-area-inset-top))',
+          left: 20, maxWidth: 220,
+          background: 'rgba(0,0,0,.5)', border: `1.5px solid ${buildingsError ? '#E85D5D' : T.accent}`, borderRadius: 8,
+          padding: '7px 10px', color: '#fff', fontSize: 10, fontWeight: 700, lineHeight: 1.4,
+          zIndex: 2, backdropFilter: 'blur(6px)',
+          opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+          transition: 'opacity .35s ease',
+        }}>
+          {buildingsLoading ? '🏢 loading buildings…' : buildingsError ? `🏢 ${buildingsError}` : `🏢 ${buildingsCount} building${buildingsCount === 1 ? '' : 's'} loaded — exaggerated height, real footprints`}
+        </div>
+      )}
 
       {/* Post preview card */}
       {selectedPost && (
