@@ -142,7 +142,7 @@ function buildMarkerMesh(THREE, kind, style, color) {
 // A purchasable skin (see WORLD_SKINS in constants.jsx) overrides the
 // theme-derived look with its own fixed texture, atmosphere tint, marker
 // shape, and starfield density/tint.
-export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso', skin = 'none', gyroMotion = { gamma: 0, beta: 0, alpha: 0 }, onPostClick, onClose }) {
+export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso', skin = 'none', gyroMotion = { gamma: 0, beta: 0, alpha: 0 }, onPostClick, onClose, devMode = false, onLocationOverride }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
   const [selectedPost, setSelectedPost] = useState(null);
@@ -150,6 +150,14 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   const cameraRotationRef = useRef({ longitude: 0, latitude: 0 });
   const userMarkerMeshesRef = useRef([]);
   const pulseFrameRef = useRef(0);
+  // UI chrome (header, indicators, view selector) can be hidden for a clean
+  // shot of the globe. The toggle button itself always stays reachable.
+  const [uiVisible, setUiVisible] = useState(true);
+  // Dev-only: adjustable auto-rotate speed, live-patched onto the existing
+  // OrbitControls instance rather than rebuilding the globe.
+  const [rotateSpeed, setRotateSpeed] = useState(GLOBE_CONFIG.autoRotateSpeed);
+  const onLocationOverrideRef = useRef(onLocationOverride);
+  useEffect(() => { onLocationOverrideRef.current = onLocationOverride; }, [onLocationOverride]);
   // The globe.gl chunk is ~2MB — on a weak connection it can fail, or just
   // hang without ever technically rejecting. Previously any failure only
   // hit console.warn/console.error, so the modal's header rendered fine
@@ -179,6 +187,8 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   // things that genuinely change the scene; data updates in a second effect.
   const onPostClickRef = useRef(onPostClick);
   useEffect(() => { onPostClickRef.current = onPostClick; }, [onPostClick]);
+  const devModeRef = useRef(devMode);
+  useEffect(() => { devModeRef.current = devMode; }, [devMode]);
 
   const threeRef = useRef(null);
   const disposablesRef = useRef([]);
@@ -269,6 +279,15 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           controls.enableDamping = true;
           controls.dampingFactor = 0.08;
         }
+
+        // Dev-only: reposition the user's own pin by tapping the globe.
+        // Reads devMode from a ref rather than the effect's own deps, so
+        // toggling dev mode never tears down and rebuilds the scene — same
+        // pattern as onPostClickRef above.
+        globe.onGlobeClick(({ lat, lng }) => {
+          if (!devModeRef.current) return;
+          onLocationOverrideRef.current?.({ lat, lng });
+        });
 
         globe.pointOfView({ altitude: 2.5 });
         clearTimeout(timeoutId);
@@ -371,6 +390,15 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       });
   }, [posts, userLocation, globeReady, skinDef.markerStyle, T.accent, T.alt]);
 
+
+  // Live-patch auto-rotate speed onto the existing OrbitControls instance —
+  // no globe rebuild needed, controls() persists for the scene's lifetime.
+  useEffect(() => {
+    const controls = globeRef.current?.controls();
+    if (!controls || !globeReady) return;
+    controls.autoRotate = rotateSpeed > 0;
+    controls.autoRotateSpeed = rotateSpeed;
+  }, [rotateSpeed, globeReady]);
 
   useEffect(() => {
     if (!globeRef.current || !globeReady) return;
@@ -499,7 +527,11 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         </div>
       )}
 
-      {/* Controls overlay */}
+      {/* Controls overlay. Fades to translucent + click-through when UI is
+          hidden, so the globe underneath is unobstructed (needed for the
+          dev tap-to-move-pin gesture, and for a clean unobstructed shot of
+          the globe generally). The eye toggle and Close stay reachable at
+          all times so hiding the UI can never strand the user. */}
       <div style={{
         position: 'absolute',
         top: 'calc(20px + env(safe-area-inset-top))',
@@ -509,37 +541,84 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        gap: 8,
       }}>
-        <h2 style={{ margin: 0, color: T.paper, fontSize: 24, fontWeight: 700, textShadow: `2px 2px 0 ${T.accent}` }}>🌍 World Map</h2>
-        <button
-          onClick={() => setFrameMode(m => (m === 'line' ? 'glow' : m === 'glow' ? 'off' : 'line'))}
-          aria-label={`Border: ${frameMode}. Tap to change.`}
-          style={{
-            marginLeft: 'auto', marginRight: 8,
-            background: frameMode === 'off' ? 'transparent' : T.accent,
-            color: frameMode === 'off' ? T.paper : T.onAccent,
-            border: `2px solid ${T.accent}`, borderRadius: 8,
-            padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-          }}
-        >
-          {frameMode === 'line' ? '▢ Line' : frameMode === 'glow' ? '✧ Glow' : '▢ Off'}
-        </button>
-        <button
-          onClick={onClose}
-          style={{
-            background: T.card,
-            border: `2px solid ${T.ink}`,
-            borderRadius: 8,
-            color: T.ink,
-            padding: '8px 16px',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          ✕ Close
-        </button>
+        <h2 style={{
+          margin: 0, color: T.paper, fontSize: 24, fontWeight: 700, textShadow: `2px 2px 0 ${T.accent}`,
+          opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+          transition: 'opacity .35s ease',
+        }}>🌍 World Map</h2>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => setFrameMode(m => (m === 'line' ? 'glow' : m === 'glow' ? 'off' : 'line'))}
+            aria-label={`Border: ${frameMode}. Tap to change.`}
+            style={{
+              background: frameMode === 'off' ? 'transparent' : T.accent,
+              color: frameMode === 'off' ? T.paper : T.onAccent,
+              border: `2px solid ${T.accent}`, borderRadius: 8,
+              padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+              transition: 'opacity .35s ease',
+            }}
+          >
+            {frameMode === 'line' ? '▢ Line' : frameMode === 'glow' ? '✧ Glow' : '▢ Off'}
+          </button>
+          <button
+            onClick={() => setUiVisible(v => !v)}
+            aria-label={uiVisible ? 'Hide map UI' : 'Show map UI'}
+            style={{
+              background: 'rgba(0,0,0,.35)', border: `2px solid ${T.paper}88`, borderRadius: 8,
+              color: T.paper, padding: '8px 10px', fontSize: 14, cursor: 'pointer',
+              backdropFilter: 'blur(6px)', transition: 'opacity .35s ease, transform .35s ease',
+              opacity: uiVisible ? 1 : 0.6, transform: uiVisible ? 'scale(1)' : 'scale(0.92)',
+            }}
+          >
+            {uiVisible ? '👁' : '👁‍🗨'}
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              background: T.card,
+              border: `2px solid ${T.ink}`,
+              borderRadius: 8,
+              color: T.ink,
+              padding: '8px 16px',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              opacity: uiVisible ? 1 : 0.6,
+              transition: 'opacity .35s ease',
+            }}
+          >
+            ✕ Close
+          </button>
+        </div>
       </div>
+
+      {/* Dev mode: tap-to-move-pin banner + rotation speed slider. */}
+      {devMode && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(80px + env(safe-area-inset-top))',
+          right: 20,
+          background: 'rgba(0,0,0,.5)', border: `2px dashed ${T.accent}`, borderRadius: 10,
+          padding: '10px 12px', color: '#fff', fontSize: 11, fontWeight: 700,
+          zIndex: 2, maxWidth: 190, backdropFilter: 'blur(6px)',
+          opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+          transition: 'opacity .35s ease',
+        }}>
+          <div style={{ marginBottom: 6 }}>🛠 Dev: tap the globe to move your pin</div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, opacity: 0.85 }}>
+            🌐 Spin
+            <input
+              type="range" min="0" max="3" step="0.1" value={rotateSpeed}
+              onChange={e => setRotateSpeed(+e.target.value)}
+              aria-label="Globe rotation speed"
+              style={{ flex: 1, accentColor: T.accent }}
+            />
+          </label>
+        </div>
+      )}
 
       {/* Post preview card */}
       {selectedPost && (
@@ -554,6 +633,8 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           padding: 16,
           zIndex: 2,
           color: T.ink,
+          opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+          transition: 'opacity .35s ease',
         }}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
             📍 {selectedPost.location_name || 'Unknown location'}
@@ -581,6 +662,8 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         color: T.ink,
         fontSize: 12, fontWeight: 700,
         zIndex: 2,
+        opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+        transition: 'opacity .35s ease',
       }}>
         🔒 Privacy: Everyone
       </div>
@@ -595,6 +678,8 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           bottom: `calc(${selectedPost ? 130 : 20}px + env(safe-area-inset-bottom))`,
           left: 20, right: 20,
           zIndex: 2, display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4,
+          opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+          transition: 'opacity .35s ease',
         }}>
           {[{ id: null, name: '✨ Skin' }, ...GLOBE_CONFIG.tileLayerOptions.map(o => ({ id: o.id, name: o.name }))]
             .map(opt => {
