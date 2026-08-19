@@ -562,6 +562,7 @@ export function MusicSheet({ music, onClose, say, devMode = false, lokPass = fal
   const [fullScreen, setFullScreen] = useState(false);
   const fileRef = useRef(null);
   const folderRef = useRef(null);
+  const voiceRef = useRef(null);
   // `'webkitdirectory' in input` is true on basically every engine, including
   // iOS Safari — it's a spec'd IDL property that exists whether or not the OS
   // actually honors it. iOS never offers a real folder-picker dialog for file
@@ -640,7 +641,7 @@ export function MusicSheet({ music, onClose, say, devMode = false, lokPass = fal
         <div className="p-3 rounded-2xl mb-2" style={{ border: `3px solid ${T.ink}`, background: T.paper }}>
           <div className="lok-display font-extrabold text-sm">Plug in your music</div>
           <div className="text-xs opacity-70 mt-0.5 leading-snug">Add MP3/M4A/MP4/WAV/FLAC files — they're stored on-device and keep playing offline. {isIOS ? "Multi-select an album's tracks together with its cover image in Files/Photos and every track picks up that cover." : "Select an album's cover image alongside its tracks (or a whole folder) and every track in it picks up that cover."} Streaming links are saved as shortcuts.</div>
-          {isIOS && <div className="mt-1.5 text-[10px] opacity-50 leading-snug">From Voice Memos: open the recording → Share → Save to Files, then tap "＋ Add files" here and pick it — recordings work the same as any other track.</div>}
+          {isIOS && <div className="mt-1.5 text-[10px] opacity-50 leading-snug">From Voice Memos: open the recording → Share → Save to Files, then use "🎙️ Add a voice memo" below to pick it straight from Files — mixing images into "＋ Add files"' picker is what buries the file browser behind Photo Library on iOS.</div>}
           <div className="mt-2 flex gap-1.5">
             <button onClick={() => fileRef.current?.click()} className="lok-btn lok-display flex-1 py-2.5 rounded-xl font-extrabold text-sm" style={{ background: T.accent, color: T.onAccent, border: `3px solid ${T.ink}` }}>＋ Add files</button>
             {supportsFolder && <button onClick={() => folderRef.current?.click()} className="lok-btn lok-display flex-1 py-2.5 rounded-xl font-extrabold text-sm" style={{ background: T.card, color: T.ink, border: `3px solid ${T.ink}` }}>＋ Add a folder</button>}
@@ -650,6 +651,16 @@ export function MusicSheet({ music, onClose, say, devMode = false, lokPass = fal
             onChange={async e => { const f = [...(e.target.files || [])]; e.target.value = ""; if (!f.length) return; await music.addFiles(f); say && say(`${f.length} file${f.length > 1 ? "s" : ""} added`, "success"); }} />
           {supportsFolder && <input ref={folderRef} type="file" webkitdirectory="" directory="" multiple hidden aria-hidden="true"
             onChange={async e => { const f = [...(e.target.files || [])]; e.target.value = ""; if (!f.length) return; await music.addFiles(f); say && say(`Folder added (${f.length} file${f.length > 1 ? "s" : ""})`, "success"); }} />}
+          {/* Audio-only picker, deliberately separate from "Add files" above.
+              That input's accept mixes in image MIME types (so an album's
+              cover art can be selected alongside its tracks), and on iOS
+              that's what makes Safari lead with a Photo Library / Camera
+              sheet instead of going straight to Files — exactly the
+              friction reported for picking a Voice Memos export. An
+              audio-only accept skips that sheet and opens Files directly. */}
+          <button onClick={() => voiceRef.current?.click()} className="lok-btn lok-display mt-1.5 w-full py-2.5 rounded-xl font-extrabold text-sm" style={{ background: T.card, color: T.ink, border: `2.5px dashed ${T.ink}` }}>🎙️ Add a voice memo</button>
+          <input ref={voiceRef} type="file" accept={ACCEPTED} multiple hidden aria-hidden="true"
+            onChange={async e => { const f = [...(e.target.files || [])]; e.target.value = ""; if (!f.length) return; await music.addFiles(f); say && say(`${f.length} voice memo${f.length > 1 ? "s" : ""} added`, "success"); }} />
           <div className="mt-2 flex gap-1.5">
             <input value={url} onChange={e => setUrl(e.target.value)} placeholder="…or paste an album / track link" aria-label="Music URL"
               className="flex-1 min-w-0 px-3 py-2 rounded-xl font-bold text-sm" style={{ border: `2.5px solid ${T.ink}`, background: T.card, color: T.ink }}
