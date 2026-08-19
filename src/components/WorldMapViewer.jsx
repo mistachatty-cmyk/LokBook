@@ -300,10 +300,19 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     const spanDeg = Math.min(0.01, Math.max(0.0025, pov.altitude * 0.02));
     const south = pov.lat - spanDeg, north = pov.lat + spanDeg;
     const west = pov.lng - spanDeg, east = pov.lng + spanDeg;
-    const query = `[out:json][timeout:15];way["building"](${south},${west},${north},${east});out geom;`;
     try {
-      const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
-      if (!res.ok) throw new Error(`Overpass ${res.status}`);
+      // Same-origin proxy (api/buildings.js), not overpass-api.de directly:
+      // its response carries no Access-Control-Allow-Origin header at all
+      // (confirmed live against the real API), so a direct browser fetch()
+      // is rejected as a CORS failure — the "TypeError: Load failed" seen
+      // on real devices. Server-to-server calls aren't subject to CORS, so
+      // the proxy makes the exact same Overpass request this used to.
+      const res = await fetch('/api/buildings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ south, west, north, east }),
+      });
+      if (!res.ok) throw new Error(`buildings API ${res.status}`);
       const data = await res.json();
       // A slower/later request finishing after a newer one would otherwise
       // clobber it with stale buildings for wherever the camera used to be.

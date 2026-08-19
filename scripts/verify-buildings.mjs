@@ -1,12 +1,18 @@
 // Proves the optional 3D building-extrusion layer actually resolves to real
-// geometry, not just that the toggle button exists. Overpass API is a
-// third-party network dependency the CI sandbox can't reliably depend on
-// (see CLAUDE.md's "gate that cannot reach its subject" lesson from
-// verify-payload.mjs) — this stubs it with a real captured Overpass response
-// (curled live against overpass-api.de for a real Boston block) so the test
-// is deterministic and offline, and asserts on what the component actually
-// produced: the visible "N buildings loaded" status text, driven by the
-// real buildBuildingGeometry() extrusion path running against real data.
+// geometry, not just that the toggle button exists. The client calls the
+// same-origin proxy at /api/buildings (see api/buildings.js) rather than
+// overpass-api.de directly — that direct-fetch version shipped to
+// production and broke there ("TypeError: Load failed" on real devices)
+// because overpass-api.de sends no Access-Control-Allow-Origin header at
+// all, so a real browser rejects the response as a CORS failure. This test
+// stubs /api/buildings (a route the vite preview server used here can't
+// serve — it's a Vercel function) with a real captured Overpass response so
+// this stays deterministic and offline; api/buildings.js's own contract
+// with the real Overpass API is verified separately and for real in
+// verify-buildings-api.mjs, which imports and calls the actual handler
+// against the live upstream. Together the two prove the whole path: the
+// client calls the right (same-origin, CORS-safe) URL, and that URL's
+// server-side handler really does what it claims with real upstream data.
 //
 // Run with `node scripts/verify-buildings.mjs` after `LOK_TEST_HARNESS=1 vite build`.
 import { chromium } from 'playwright';
@@ -74,9 +80,17 @@ const OVERPASS_FIXTURE = {
 };
 
 let overpassCalled = false;
-await page.route('**overpass-api.de/**', r => {
+await page.route('**/api/buildings', r => {
   overpassCalled = true;
   r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(OVERPASS_FIXTURE) });
+});
+// Also assert the client NEVER calls overpass-api.de directly any more —
+// that's the exact regression this whole file exists to prevent. Any hit
+// here fails the run.
+let calledOverpassDirectly = false;
+await page.route('**overpass-api.de/**', r => {
+  calledOverpassDirectly = true;
+  r.abort();
 });
 
 await page.goto(`http://localhost:${PORT}/world-harness.html`, { waitUntil: 'load', timeout: 60000 });
@@ -123,10 +137,11 @@ await page.waitForTimeout(300);
 const afterOffText = await page.locator('body').innerText();
 console.log('Status cleared after toggling off:', !/buildings? loaded/.test(afterOffText));
 
+console.log('Client never calls overpass-api.de directly (the CORS bug this fixed):', !calledOverpassDirectly);
 console.log('Page errors:', errors);
 await browser.close();
 stop();
 
-const ok = overpassCalled && allThreeExtruded && errors.length === 0;
-console.log(ok ? '\nBUILDINGS OK — 3D extrusion layer resolves to real geometry from real Overpass-shaped data.' : '\nBUILDINGS FAILED');
+const ok = overpassCalled && allThreeExtruded && !calledOverpassDirectly && errors.length === 0;
+console.log(ok ? '\nBUILDINGS OK — 3D extrusion layer resolves to real geometry via the same-origin proxy, never calling Overpass directly.' : '\nBUILDINGS FAILED');
 process.exit(ok ? 0 : 1);

@@ -18,6 +18,7 @@
     "verify:weather": "node scripts/verify-weather.mjs",
     "verify:world": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-world.mjs",
     "verify:buildings": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-buildings.mjs",
+    "verify:buildings-api": "node scripts/verify-buildings-api.mjs",
     "verify:cosmetics": "node scripts/verify-cosmetics.mjs",
     "verify:strokes": "node scripts/verify-strokes.mjs",
     "verify:lok": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-lok.mjs",
