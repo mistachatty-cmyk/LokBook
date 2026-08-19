@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { GLOBE_CONFIG, WORLD_SKINS } from '../constants.jsx';
 import { THEMES } from '../theme/theme.js';
@@ -153,9 +153,22 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   // UI chrome (header, indicators, view selector) can be hidden for a clean
   // shot of the globe. The toggle button itself always stays reachable.
   const [uiVisible, setUiVisible] = useState(true);
-  // Dev-only: adjustable auto-rotate speed, live-patched onto the existing
-  // OrbitControls instance rather than rebuilding the globe.
+  // Rotation: `rotateSpeed` is the target speed the slider is set to;
+  // `rotating` is the play/pause flag. Kept separate so pausing doesn't
+  // lose whatever speed was dialled in — resuming picks the same speed
+  // back up. Both live-patch the existing OrbitControls instance rather
+  // than rebuilding the globe.
   const [rotateSpeed, setRotateSpeed] = useState(GLOBE_CONFIG.autoRotateSpeed);
+  const [rotating, setRotating] = useState(GLOBE_CONFIG.autoRotate);
+  // True only while a "Fly to me" camera animation is in flight. Rotation is
+  // force-paused for its duration (an OrbitControls auto-rotate tick fighting
+  // an in-progress pointOfView() camera move is exactly the kind of thing
+  // that made the globe jitter before) and stays paused once it lands —
+  // arriving at your own pin and immediately spinning away from it would
+  // defeat the point of flying there.
+  const [flying, setFlying] = useState(false);
+  const flyTimeoutRef = useRef(null);
+  useEffect(() => () => clearTimeout(flyTimeoutRef.current), []);
   const onLocationOverrideRef = useRef(onLocationOverride);
   useEffect(() => { onLocationOverrideRef.current = onLocationOverride; }, [onLocationOverride]);
   // The globe.gl chunk is ~2MB — on a weak connection it can fail, or just
@@ -391,14 +404,27 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   }, [posts, userLocation, globeReady, skinDef.markerStyle, T.accent, T.alt]);
 
 
-  // Live-patch auto-rotate speed onto the existing OrbitControls instance —
-  // no globe rebuild needed, controls() persists for the scene's lifetime.
+  // Live-patch auto-rotate onto the existing OrbitControls instance — no
+  // globe rebuild needed, controls() persists for the scene's lifetime.
   useEffect(() => {
     const controls = globeRef.current?.controls();
     if (!controls || !globeReady) return;
-    controls.autoRotate = rotateSpeed > 0;
+    controls.autoRotate = rotating && !flying && rotateSpeed > 0;
     controls.autoRotateSpeed = rotateSpeed;
-  }, [rotateSpeed, globeReady]);
+  }, [rotateSpeed, rotating, flying, globeReady]);
+
+  // "Fly to me" — animates the camera to the user's own marker via globe.gl's
+  // built-in pointOfView(pov, ms) tween. Pauses rotation immediately (so the
+  // two camera movements don't fight) and leaves it paused after landing.
+  const flyToMe = useCallback(() => {
+    if (!globeRef.current || !userLocation) return;
+    setRotating(false);
+    setFlying(true);
+    const DURATION = 1400;
+    globeRef.current.pointOfView({ lat: userLocation.lat, lng: userLocation.lng, altitude: 1.6 }, DURATION);
+    clearTimeout(flyTimeoutRef.current);
+    flyTimeoutRef.current = setTimeout(() => setFlying(false), DURATION);
+  }, [userLocation]);
 
   useEffect(() => {
     if (!globeRef.current || !globeReady) return;
@@ -595,7 +621,9 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         </div>
       </div>
 
-      {/* Dev mode: tap-to-move-pin banner + rotation speed slider. */}
+      {/* Dev mode: tap-to-move-pin hint only. Rotation controls moved out to
+          the general Liquid Glass cluster below — flying/rotating are
+          everyone's controls, not a dev feature. */}
       {devMode && (
         <div style={{
           position: 'absolute',
@@ -607,18 +635,69 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
           transition: 'opacity .35s ease',
         }}>
-          <div style={{ marginBottom: 6 }}>🛠 Dev: tap the globe to move your pin</div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, opacity: 0.85 }}>
-            🌐 Spin
-            <input
-              type="range" min="0" max="3" step="0.1" value={rotateSpeed}
-              onChange={e => setRotateSpeed(+e.target.value)}
-              aria-label="Globe rotation speed"
-              style={{ flex: 1, accentColor: T.accent }}
-            />
-          </label>
+          🛠 Dev: tap the globe to move your pin
         </div>
       )}
+
+      {/* Flight/rotation cluster — frosted "Liquid Glass" pill: Fly to me,
+          Play/Pause, speed slider. Sits vertically centered on the right
+          edge so it's clear of both the header row and the bottom
+          post-card/view-selector bars regardless of which of those happen
+          to be showing. Fades with the rest of the chrome via uiVisible. */}
+      <style>{`
+        .lok-glass-btn { transition: transform .18s cubic-bezier(.34,1.56,.64,1), background .2s ease; }
+        .lok-glass-btn:active:not(:disabled) { transform: scale(0.84); background: rgba(255,255,255,.32) !important; }
+        .lok-glass-btn:disabled { cursor: default; }
+      `}</style>
+      <div style={{
+        position: 'absolute',
+        top: '50%', right: 16, transform: 'translateY(-50%)',
+        zIndex: 3, display: 'flex', alignItems: 'center', gap: 10,
+        padding: '9px 12px',
+        background: 'rgba(255,255,255,0.10)',
+        backdropFilter: 'blur(18px) saturate(180%)', WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+        border: '1px solid rgba(255,255,255,0.35)',
+        borderRadius: 999,
+        boxShadow: '0 8px 32px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.35)',
+        opacity: uiVisible ? 1 : 0.12, pointerEvents: uiVisible ? 'auto' : 'none',
+        transition: 'opacity .35s ease',
+      }}>
+        <button
+          className="lok-glass-btn"
+          onClick={flyToMe}
+          disabled={!userLocation || flying}
+          aria-label="Fly to my location"
+          title={userLocation ? 'Fly to me' : 'Location unavailable'}
+          style={{
+            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+            background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+            color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: userLocation ? 'pointer' : 'default', opacity: userLocation ? 1 : 0.35,
+          }}
+        >
+          {flying ? '⏳' : '🎯'}
+        </button>
+        <button
+          className="lok-glass-btn"
+          onClick={() => setRotating(r => !r)}
+          aria-label={rotating && !flying ? 'Pause globe rotation' : 'Resume globe rotation'}
+          title={rotating && !flying ? 'Pause rotation' : 'Resume rotation'}
+          style={{
+            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+            background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+            color: '#fff', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          {rotating && !flying ? '⏸' : '▶'}
+        </button>
+        <input
+          type="range" min="0" max="3" step="0.1" value={rotateSpeed}
+          onChange={e => setRotateSpeed(+e.target.value)}
+          aria-label="Globe rotation speed"
+          style={{ width: 70, accentColor: '#fff' }}
+        />
+      </div>
 
       {/* Post preview card */}
       {selectedPost && (
