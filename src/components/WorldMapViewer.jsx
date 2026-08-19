@@ -1017,309 +1017,147 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         </div>
       )}
 
-      {/* Controls overlay. Fades to translucent + click-through when UI is
-          hidden, so the globe underneath is unobstructed (needed for the
-          dev tap-to-move-pin gesture, and for a clean unobstructed shot of
-          the globe generally). The eye toggle and Close stay reachable at
-          all times so hiding the UI can never strand the user. */}
-      <div style={{
-        position: 'absolute',
-        top: 'calc(20px + env(safe-area-inset-top))',
-        left: 20,
-        right: 20,
-        zIndex: 3,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 8,
-      }}>
-        <h2 style={{
-          margin: 0, color: T.paper, fontSize: 24, fontWeight: 700, textShadow: `2px 2px 0 ${T.accent}`,
-          // The one label that stays put at low opacity when everything
-          // else fully vanishes — a quiet "you're still in LokWorld"
-          // anchor rather than a totally blank screen.
-          opacity: uiVisible ? 1 : 0.28, pointerEvents: 'none',
-          transition: 'opacity .35s ease',
-        }}>🌍 LokWorld</h2>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            onClick={() => setFrameMode(m => (m === 'line' ? 'glow' : m === 'glow' ? 'off' : 'line'))}
-            aria-label={`Border: ${frameMode}. Tap to change.`}
-            style={{
-              background: frameMode === 'off' ? 'transparent' : T.accent,
-              color: frameMode === 'off' ? T.paper : T.onAccent,
-              border: `2px solid ${T.accent}`, borderRadius: 8,
-              padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
-              transition: 'opacity .35s ease',
-            }}
-          >
-            {frameMode === 'line' ? '▢ Line' : frameMode === 'glow' ? '✧ Glow' : '▢ Off'}
-          </button>
-          <button
-            onClick={() => setUiVisible(v => !v)}
-            aria-label={uiVisible ? 'Hide map UI' : 'Show map UI'}
-            style={{
-              background: 'rgba(0,0,0,.35)', border: `2px solid ${T.paper}88`, borderRadius: 8,
-              color: T.paper, padding: '8px 10px', fontSize: 14, cursor: 'pointer',
-              backdropFilter: 'blur(6px)', transition: 'opacity .35s ease, transform .35s ease',
-              // Fully gone when hidden — not a dead end, since triple-tapping
-              // the globe is the same gesture that hides it, so it's also
-              // exactly how it comes back.
-              opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
-              transform: uiVisible ? 'scale(1)' : 'scale(0.92)',
-            }}
-          >
-            {uiVisible ? '👁' : '👁‍🗨'}
-          </button>
-          <button
-            onClick={onClose}
-            style={{
-              background: T.card,
-              border: `2px solid ${T.ink}`,
-              borderRadius: 8,
-              color: T.ink,
-              padding: '8px 16px',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
-              transition: 'opacity .35s ease',
-            }}
-          >
-            ✕ Close
-          </button>
-        </div>
-      </div>
-
-      {/* Dev mode: tap-to-move-pin hint only. Rotation controls moved out to
-          the general Liquid Glass cluster below — flying/rotating are
-          everyone's controls, not a dev feature. */}
-      {devMode && (
-        <div style={{
-          position: 'absolute',
-          top: 'calc(80px + env(safe-area-inset-top))',
-          right: 20,
-          background: 'rgba(0,0,0,.5)', border: `2px dashed ${T.accent}`, borderRadius: 10,
-          padding: '10px 12px', color: '#fff', fontSize: 11, fontWeight: 700,
-          zIndex: 2, maxWidth: 190, backdropFilter: 'blur(6px)',
-          opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
-          transition: 'opacity .35s ease',
-        }}>
-          🛠 Dev: tap the globe to move your pin
-        </div>
-      )}
-
-      {/* Flight/rotation cluster — frosted "Liquid Glass" pill: Fly to me,
-          Play/Pause, speed slider. Sits vertically centered on the right
-          edge, stacked just above the view-selector row instead of dead
-          centre — vertically centred was in the way of drag-to-rotate
-          gestures right where a thumb naturally lands. Slides down with
-          the same offset the view-selector already uses when the post
-          preview card is showing, so it never collides with either.
-          Fades with the rest of the chrome via uiVisible. */}
       <style>{`
         .lok-glass-btn { transition: transform .18s cubic-bezier(.34,1.56,.64,1), background .2s ease; }
-        .lok-glass-btn:active:not(:disabled) { transform: scale(0.84); background: rgba(255,255,255,.32) !important; }
+        .lok-glass-btn:active:not(:disabled) { transform: scale(0.86); background: rgba(255,255,255,.32) !important; }
         .lok-glass-btn:disabled { cursor: default; }
+        .lok-icon-btn { transition: transform .15s ease, background .2s ease; }
+        .lok-icon-btn:active { transform: scale(0.88); }
+        .lok-chip-scroll::-webkit-scrollbar { display: none; }
       `}</style>
+
+      {/* Top-left: title only, low-opacity anchor when UI is hidden. */}
       <div style={{
         position: 'absolute',
-        bottom: `calc(${selectedPost ? 130 : 20}px + 54px + env(safe-area-inset-bottom))`, right: 16,
-        maxWidth: 'calc(100vw - 32px)', overflowX: 'auto', scrollbarWidth: 'none',
-        zIndex: 3, display: 'flex', alignItems: 'center', gap: 10,
-        padding: '9px 12px',
-        background: 'rgba(255,255,255,0.10)',
-        backdropFilter: 'blur(18px) saturate(180%)', WebkitBackdropFilter: 'blur(18px) saturate(180%)',
-        border: '1px solid rgba(255,255,255,0.35)',
-        borderRadius: 999,
-        boxShadow: '0 8px 32px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.35)',
-        // Street View's exit control must always be reachable — triple-tap
-        // or the 👁 toggle hiding the UI can never strand someone standing
-        // at ground level with no way back out.
-        opacity: (uiVisible || streetViewOn) ? 1 : 0, pointerEvents: (uiVisible || streetViewOn) ? 'auto' : 'none',
-        transition: 'opacity .35s ease',
+        top: 'calc(16px + env(safe-area-inset-top))', left: 14,
+        zIndex: 3, display: 'flex', flexDirection: 'column', gap: 8,
+        pointerEvents: 'none',
       }}>
-        {streetViewOn ? (<>
-          <button
-            className="lok-glass-btn"
-            onClick={exitStreetView}
-            aria-label="Exit Street View"
-            title="Exit Street View"
-            style={{
-              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(255,120,120,.35)', border: '1px solid rgba(255,255,255,.5)',
-              color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            🚪
-          </button>
-          <button
-            className="lok-glass-btn"
-            onClick={() => stepStreetView(-1)}
-            aria-label="Step back"
-            title="Step back"
-            style={{
-              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
-              color: '#fff', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            ◀
-          </button>
-          <button
-            className="lok-glass-btn"
-            onClick={() => stepStreetView(1)}
-            aria-label="Step forward"
-            title="Step forward"
-            style={{
-              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
-              color: '#fff', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            ▶
-          </button>
-          <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, opacity: 0.85, paddingRight: 4 }}>
-            drag to look around
-          </span>
-        </>) : (<>
-          <button
-            className="lok-glass-btn"
-            onClick={flyToMe}
-            disabled={!userLocation || flying}
-            aria-label="Fly to my location"
-            title={userLocation ? 'Fly to me' : 'Location unavailable'}
-            style={{
-              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
-              color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: userLocation ? 'pointer' : 'default', opacity: userLocation ? 1 : 0.35,
-            }}
-          >
-            {flying ? '⏳' : '🎯'}
-          </button>
-          <button
-            className="lok-glass-btn"
-            onClick={() => setRotating(r => !r)}
-            aria-label={rotating && !flying ? 'Pause globe rotation' : 'Resume globe rotation'}
-            title={rotating && !flying ? 'Pause rotation' : 'Resume rotation'}
-            style={{
-              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
-              color: '#fff', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            {rotating && !flying ? '⏸' : '▶'}
-          </button>
-          <input
-            type="range" min="0" max="3" step="0.1" value={rotateSpeed}
-            onChange={e => setRotateSpeed(+e.target.value)}
-            aria-label="Globe rotation speed"
-            style={{ width: 70, flexShrink: 0, accentColor: '#fff' }}
-          />
-          <button
-            className="lok-glass-btn"
-            onClick={cycleTilt}
-            aria-label={`Camera angle: ${tiltLabel}. Tap to change.`}
-            title={`View angle: ${tiltLabel} — tap to cycle`}
-            style={{
-              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
-              color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            📐
-          </button>
-          <button
-            className="lok-glass-btn"
-            onClick={() => setBuildingsOn(v => !v)}
-            disabled={buildingsLoading}
-            aria-pressed={buildingsOn}
-            aria-label={buildingsOn ? 'Hide 3D buildings' : 'Show 3D buildings (experimental)'}
-            title={buildingsOn ? 'Hide 3D buildings' : 'Show 3D buildings — loads for wherever you\'re currently looking'}
-            style={{
-              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-              background: buildingsOn ? 'rgba(255,255,255,.34)' : 'rgba(255,255,255,.16)',
-              border: '1px solid rgba(255,255,255,.5)',
-              color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            {buildingsLoading ? '⏳' : '🏢'}
-          </button>
-          {buildingsOn && (
-            <button
-              className="lok-glass-btn"
-              onClick={loadBuildings}
-              disabled={buildingsLoading}
-              aria-label="Reload buildings for the current view"
-              title="Reload buildings here"
-              style={{
-                width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
-                color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              ↻
-            </button>
-          )}
-          <button
-            className="lok-glass-btn"
-            onClick={enterStreetView}
-            aria-label="Enter Street View — look around and up at buildings from ground level"
-            title="Street View"
-            style={{
-              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
-              color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            🚶
-          </button>
-        </>)}
-      </div>
-
-      {/* Buildings status — count / loading / error feedback for the
-          optional extrusion layer. Only shown while the layer is on, since
-          otherwise there's nothing to report. */}
-      {buildingsOn && (buildingsLoading || buildingsError || buildingsCount > 0) && (
         <div style={{
-          position: 'absolute',
-          top: 'calc(130px + env(safe-area-inset-top))',
-          left: 20, maxWidth: 220,
-          background: 'rgba(0,0,0,.5)', border: `1.5px solid ${buildingsError ? '#E85D5D' : T.accent}`, borderRadius: 8,
-          padding: '7px 10px', color: '#fff', fontSize: 10, fontWeight: 700, lineHeight: 1.4,
-          zIndex: 2, backdropFilter: 'blur(6px)',
-          opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
+          padding: '9px 14px', borderRadius: 999,
+          background: 'rgba(255,255,255,0.10)',
+          backdropFilter: 'blur(18px) saturate(180%)', WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.35)',
+          color: T.paper, fontSize: 16, fontWeight: 800, letterSpacing: '-0.01em',
+          display: 'flex', alignItems: 'center', gap: 7, width: 'fit-content',
+          opacity: uiVisible ? 1 : 0.28,
           transition: 'opacity .35s ease',
         }}>
-          {buildingsLoading ? '🏢 loading buildings…' : buildingsError ? `🏢 ${buildingsError}` : `🏢 ${buildingsCount} building${buildingsCount === 1 ? '' : 's'} loaded — exaggerated height, real footprints`}
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: T.accent, flexShrink: 0 }} />
+          🌍 LokWorld
         </div>
-      )}
 
-      {/* Post preview card */}
+        {/* Status chips — privacy + buildings feedback, grouped right under
+            the title instead of scattered across the screen. */}
+        <div className="lok-chip-scroll" style={{
+          display: 'flex', flexDirection: 'column', gap: 6,
+          opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
+          transition: 'opacity .35s ease', maxWidth: 230,
+        }}>
+          <div style={{
+            padding: '5px 11px', borderRadius: 999, width: 'fit-content',
+            background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.3)',
+            color: '#fff', fontSize: 10.5, fontWeight: 700, backdropFilter: 'blur(6px)',
+          }}>
+            🔒 Everyone
+          </div>
+          {buildingsOn && (buildingsLoading || buildingsError || buildingsCount > 0) && (
+            <div style={{
+              padding: '5px 11px', borderRadius: 12, width: 'fit-content', maxWidth: 220,
+              background: 'rgba(0,0,0,.4)', border: `1px solid ${buildingsError ? '#E85D5D' : T.accent}88`,
+              color: '#fff', fontSize: 10, fontWeight: 700, lineHeight: 1.4, backdropFilter: 'blur(6px)',
+            }}>
+              {buildingsLoading ? '🏢 loading buildings…' : buildingsError ? `🏢 ${buildingsError}` : `🏢 ${buildingsCount} building${buildingsCount === 1 ? '' : 's'} loaded`}
+            </div>
+          )}
+          {devMode && (
+            <div style={{
+              padding: '6px 11px', borderRadius: 10, width: 'fit-content', maxWidth: 200,
+              background: 'rgba(0,0,0,.4)', border: `1px dashed ${T.accent}`,
+              color: '#fff', fontSize: 10, fontWeight: 700, backdropFilter: 'blur(6px)',
+            }}>
+              🛠 Dev: tap the globe to move your pin
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Top-right: icon-only cluster — border style, hide UI, close. */}
+      <div style={{
+        position: 'absolute',
+        top: 'calc(16px + env(safe-area-inset-top))', right: 14,
+        zIndex: 3, display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <button
+          className="lok-icon-btn"
+          onClick={() => setFrameMode(m => (m === 'line' ? 'glow' : m === 'glow' ? 'off' : 'line'))}
+          aria-label={`Border: ${frameMode}. Tap to change.`}
+          title={`Border: ${frameMode}`}
+          style={{
+            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+            background: frameMode === 'off' ? 'rgba(255,255,255,0.10)' : T.accent,
+            border: `1px solid ${frameMode === 'off' ? 'rgba(255,255,255,.35)' : T.accent}`,
+            backdropFilter: 'blur(18px) saturate(180%)', WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+            color: frameMode === 'off' ? '#fff' : T.onAccent, fontSize: 14,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
+            transition: 'opacity .35s ease',
+          }}
+        >
+          {frameMode === 'line' ? '▢' : frameMode === 'glow' ? '✧' : '▢'}
+        </button>
+        <button
+          className="lok-icon-btn"
+          onClick={() => setUiVisible(v => !v)}
+          aria-label={uiVisible ? 'Hide map UI' : 'Show map UI'}
+          title={uiVisible ? 'Hide UI' : 'Show UI'}
+          style={{
+            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+            background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,.35)',
+            backdropFilter: 'blur(18px) saturate(180%)', WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+            color: '#fff', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', transition: 'opacity .35s ease, transform .35s ease',
+            // Always reachable — the same triple-tap gesture that hides the
+            // UI is also how it comes back, so this can never strand anyone.
+            opacity: uiVisible ? 1 : 0.28,
+          }}
+        >
+          {uiVisible ? '👁' : '👁‍🗨'}
+        </button>
+        <button
+          className="lok-icon-btn"
+          onClick={onClose}
+          aria-label="Close LokWorld"
+          title="Close"
+          style={{
+            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+            background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,.35)',
+            backdropFilter: 'blur(18px) saturate(180%)', WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+            color: '#fff', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
+            transition: 'opacity .35s ease',
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Post preview card — floats just above the bottom drawer. */}
       {selectedPost && (
         <div style={{
           position: 'absolute',
-          bottom: 20,
-          left: 20,
-          right: 20,
+          bottom: `calc(${streetViewOn ? 118 : 210}px + env(safe-area-inset-bottom))`,
+          left: 14, right: 14,
           background: T.card,
           border: `2px solid ${T.accent}`,
-          borderRadius: 12,
-          padding: 16,
+          borderRadius: 14,
+          padding: 14,
           zIndex: 2,
           color: T.ink,
+          boxShadow: '0 8px 24px rgba(0,0,0,.35)',
           opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
-          transition: 'opacity .35s ease',
+          transition: 'opacity .35s ease, bottom .25s ease',
         }}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
             📍 {selectedPost.location_name || 'Unknown location'}
@@ -1335,60 +1173,213 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         </div>
       )}
 
-      {/* Location privacy indicator */}
+      {/* Bottom drawer — everything else, consolidated into one frosted
+          sheet along the thumb-reachable bottom edge instead of scattered
+          floating clusters. Street View swaps the drawer's content for its
+          own walk/look controls rather than adding a second panel. Always
+          reachable while Street View is on (its exit control lives here),
+          same as the eye toggle above. */}
       <div style={{
         position: 'absolute',
-        top: 'calc(80px + env(safe-area-inset-top))',
-        left: 20,
-        background: T.card,
-        border: `2px solid ${T.ink}`,
-        borderRadius: 8,
-        padding: '8px 12px',
-        color: T.ink,
-        fontSize: 12, fontWeight: 700,
-        zIndex: 2,
-        opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
-        transition: 'opacity .35s ease',
+        left: 0, right: 0, bottom: 0, zIndex: 3,
+        borderRadius: '22px 22px 0 0',
+        padding: `10px 16px calc(14px + env(safe-area-inset-bottom))`,
+        display: 'flex', flexDirection: 'column', gap: 12,
+        background: 'rgba(255,255,255,0.10)',
+        backdropFilter: 'blur(18px) saturate(180%)', WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+        borderTop: '1px solid rgba(255,255,255,0.35)',
+        boxShadow: '0 -8px 32px rgba(0,0,0,.28)',
+        opacity: (uiVisible || streetViewOn) ? 1 : 0,
+        pointerEvents: (uiVisible || streetViewOn) ? 'auto' : 'none',
+        transform: (uiVisible || streetViewOn) ? 'translateY(0)' : 'translateY(12px)',
+        transition: 'opacity .35s ease, transform .35s ease',
       }}>
-        🔒 Privacy: Everyone
-      </div>
+        <div style={{ width: 36, height: 4, borderRadius: 99, background: 'rgba(255,255,255,.35)', margin: '0 auto' }} />
 
-      {/* View selector — the stylised skin, or real map tiles that keep
-          resolving detail as you zoom. GLOBE_CONFIG.tileLayerOptions has been
-          in the codebase unused since this feature was written; globe.gl's tile
-          engine is what finally makes it real. */}
-      {status === 'ready' && (
-        <div style={{
-          position: 'absolute',
-          bottom: `calc(${selectedPost ? 130 : 20}px + env(safe-area-inset-bottom))`,
-          left: 20, right: 20,
-          zIndex: 2, display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4,
-          opacity: uiVisible ? 1 : 0, pointerEvents: uiVisible ? 'auto' : 'none',
-          transition: 'opacity .35s ease',
-        }}>
-          {[{ id: null, name: '✨ Skin' }, ...GLOBE_CONFIG.tileLayerOptions.map(o => ({ id: o.id, name: o.name }))]
-            .map(opt => {
-              const active = tileSource === opt.id;
-              return (
-                <button
-                  key={opt.id || 'skin'}
-                  onClick={() => setTileSource(opt.id)}
-                  style={{
-                    flexShrink: 0,
-                    background: active ? '#fff' : 'rgba(255,255,255,0.12)',
-                    color: active ? '#111' : '#fff',
-                    border: `1.5px solid ${active ? '#fff' : 'rgba(255,255,255,0.35)'}`,
-                    borderRadius: 999, padding: '7px 14px',
-                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    backdropFilter: 'blur(6px)',
-                  }}
-                >
-                  {opt.name}
-                </button>
-              );
-            })}
-        </div>
-      )}
+        {streetViewOn ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              className="lok-glass-btn"
+              onClick={exitStreetView}
+              aria-label="Exit Street View"
+              title="Exit Street View"
+              style={{
+                width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                background: 'rgba(255,120,120,.35)', border: '1px solid rgba(255,255,255,.5)',
+                color: '#fff', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              🚪
+            </button>
+            <button
+              className="lok-glass-btn"
+              onClick={() => stepStreetView(-1)}
+              aria-label="Step back"
+              title="Step back"
+              style={{
+                width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+                color: '#fff', fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              ◀
+            </button>
+            <button
+              className="lok-glass-btn"
+              onClick={() => stepStreetView(1)}
+              aria-label="Step forward"
+              title="Step forward"
+              style={{
+                width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+                color: '#fff', fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              ▶
+            </button>
+            <span style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, opacity: 0.8, flex: 1 }}>
+              drag to look around
+            </span>
+          </div>
+        ) : (<>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'rgba(255,255,255,.5)', width: 64, flexShrink: 0 }}>Navigate</span>
+            <button
+              className="lok-glass-btn"
+              onClick={flyToMe}
+              disabled={!userLocation || flying}
+              aria-label="Fly to my location"
+              title={userLocation ? 'Fly to me' : 'Location unavailable'}
+              style={{
+                flex: 1, height: 42, borderRadius: 999,
+                background: T.accent, border: `1px solid ${T.accent}`,
+                color: T.onAccent, fontSize: 12.5, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                cursor: userLocation ? 'pointer' : 'default', opacity: userLocation ? 1 : 0.4,
+              }}
+            >
+              {flying ? '⏳' : '🎯'} Fly to me
+            </button>
+            <button
+              className="lok-glass-btn"
+              onClick={() => setRotating(r => !r)}
+              aria-label={rotating && !flying ? 'Pause globe rotation' : 'Resume globe rotation'}
+              title={rotating && !flying ? 'Pause rotation' : 'Resume rotation'}
+              style={{
+                width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
+                background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+                color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              {rotating && !flying ? '⏸' : '▶'}
+            </button>
+            <button
+              className="lok-glass-btn"
+              onClick={enterStreetView}
+              aria-label="Enter Street View — look around and up at buildings from ground level"
+              title="Street View"
+              style={{
+                width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
+                background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+                color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              🚶
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'rgba(255,255,255,.5)', width: 64, flexShrink: 0 }}>Speed</span>
+            <input
+              type="range" min="0" max="3" step="0.1" value={rotateSpeed}
+              onChange={e => setRotateSpeed(+e.target.value)}
+              aria-label="Globe rotation speed"
+              style={{ flex: 1, accentColor: T.accent }}
+            />
+            <button
+              className="lok-glass-btn"
+              onClick={cycleTilt}
+              aria-label={`Camera angle: ${tiltLabel}. Tap to change.`}
+              title={`View angle: ${tiltLabel} — tap to cycle`}
+              style={{
+                height: 32, borderRadius: 999, flexShrink: 0, padding: '0 12px',
+                background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+                color: '#fff', fontSize: 11, fontWeight: 700,
+                display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer',
+              }}
+            >
+              📐 {tiltLabel}
+            </button>
+            <button
+              className="lok-glass-btn"
+              onClick={() => setBuildingsOn(v => !v)}
+              disabled={buildingsLoading}
+              aria-pressed={buildingsOn}
+              aria-label={buildingsOn ? 'Hide 3D buildings' : 'Show 3D buildings (experimental)'}
+              title={buildingsOn ? 'Hide 3D buildings' : 'Show 3D buildings — loads for wherever you\'re currently looking'}
+              style={{
+                width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                background: buildingsOn ? 'rgba(255,255,255,.34)' : 'rgba(255,255,255,.16)',
+                border: '1px solid rgba(255,255,255,.5)',
+                color: '#fff', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              {buildingsLoading ? '⏳' : '🏢'}
+            </button>
+            {buildingsOn && (
+              <button
+                className="lok-glass-btn"
+                onClick={loadBuildings}
+                disabled={buildingsLoading}
+                aria-label="Reload buildings for the current view"
+                title="Reload buildings here"
+                style={{
+                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                  background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.5)',
+                  color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                ↻
+              </button>
+            )}
+          </div>
+
+          {status === 'ready' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'rgba(255,255,255,.5)', width: 56, flexShrink: 0 }}>Map</span>
+              <div className="lok-chip-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+                {[{ id: null, name: '✨ Skin' }, ...GLOBE_CONFIG.tileLayerOptions.map(o => ({ id: o.id, name: o.name }))]
+                  .map(opt => {
+                    const active = tileSource === opt.id;
+                    return (
+                      <button
+                        key={opt.id || 'skin'}
+                        onClick={() => setTileSource(opt.id)}
+                        style={{
+                          flexShrink: 0,
+                          background: active ? T.alt || T.accent : 'rgba(255,255,255,0.14)',
+                          color: active ? T.onAccent : '#fff',
+                          border: `1px solid ${active ? (T.alt || T.accent) : 'rgba(255,255,255,0.35)'}`,
+                          borderRadius: 999, padding: '7px 13px',
+                          fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+                        }}
+                      >
+                        {opt.name}
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+        </>)}
+      </div>
     </div>
   ), document.body);
 }
