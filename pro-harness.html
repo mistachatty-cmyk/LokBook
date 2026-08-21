@@ -1,0 +1,208 @@
+<!doctype html>
+<html><body style="margin:0;background:#111;color:#0f0;font:12px monospace">
+<div id="out" style="padding:8px;white-space:pre-wrap"></div>
+<div id="root" style="width:480px;height:600px"></div>
+<script type="module">
+// Harness for Lok Studio Pro. Deliberately separate from easel-harness.html:
+// that one must stay green untouched, since it is the proof the CLASSIC path
+// still behaves exactly as it always did.
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import Easel from '/src/Easel.jsx';
+import { createStrokeState, strokeTo } from '/src/engine/brushEngine.js';
+import { normalizeSpec } from '/src/engine/brushSpec.js';
+import { TIP_KEYS, renderTip } from '/src/engine/brushTips.js';
+
+const out = document.getElementById('out');
+window.__p = { done: false, problems: [], info: {} };
+const log = m => { out.textContent += m + '\n'; };
+const fail = m => { window.__p.problems.push(m); log('FAIL: ' + m); };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Count non-transparent pixels + a cheap content hash, so "did the pixels
+// actually change" is a measurement rather than a vibe.
+function scan(cv) {
+  const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+  let lit = 0, hash = 0;
+  for (let i = 3; i < d.length; i += 4) {
+    if (d[i] > 8) { lit++; hash = (hash * 31 + i + d[i]) >>> 0; }
+  }
+  return { lit, hash };
+}
+
+(async () => {
+try {
+  const ref = React.createRef();
+  createRoot(document.getElementById('root')).render(
+    React.createElement(Easel, { ref, say: () => {}, lokPass: true })
+  );
+  await sleep(1200);
+  if (!ref.current) throw new Error('Easel did not mount');
+
+  const surface = document.querySelector('[aria-label="Drawing canvas"]');
+  const wrap = surface?.closest('.rounded-2xl');
+  if (!surface || !wrap) throw new Error('drawing surface not found');
+  wrap.style.width = '480px'; wrap.style.height = '600px';
+  await sleep(200);
+
+  const pe = (type, x, y) => {
+    const rr = wrap.getBoundingClientRect();
+    surface.dispatchEvent(new PointerEvent(type, {
+      pointerId: 1, pointerType: 'pen', isPrimary: true, bubbles: true, cancelable: true,
+      clientX: rr.left + x, clientY: rr.top + y, pressure: 0.6,
+      buttons: type === 'pointerup' ? 0 : 1,
+    }));
+  };
+  // A long horizontal stroke delivered in `n` events. Varying n at fixed
+  // geometry is how input-rate independence gets measured on the REAL surface.
+  const drawLine = (y, n) => {
+    pe('pointerdown', 40, y);
+    for (let i = 1; i <= n; i++) pe('pointermove', 40 + (i / n) * 360, y);
+    pe('pointerup', 400, y);
+  };
+  const layer = () => document.querySelector('#root canvas');
+
+  // ---------------------------------------------------------------------
+  // 1. Pro OFF must draw. This is the baseline the classic path still owns.
+  ref.current.clearAll();
+  await sleep(60);
+  drawLine(80, 30);
+  await sleep(120);
+  const classic = scan(layer());
+  log(`classic stroke: ${classic.lit} lit px`);
+  if (classic.lit < 200) fail(`classic path drew almost nothing (${classic.lit} px)`);
+
+  // ---------------------------------------------------------------------
+  // 2. Turn Pro on THROUGH THE REAL UI — the ✦ button, then ENGINE ON.
+  // Reaching into component state instead would prove the engine works while
+  // leaving the button wired to nothing, which is exactly the class of bug
+  // that shipped stroke-less .lok files.
+  const proBtn = [...document.querySelectorAll('button')]
+    .find(b => /Studio Pro/i.test(b.getAttribute('aria-label') || ''));
+  if (!proBtn) throw new Error('the ✦ Studio Pro button is not on the canvas');
+  proBtn.click();
+  await sleep(300);
+
+  const engineBtn = [...document.querySelectorAll('button')].find(b => /ENGINE (ON|OFF)/.test(b.textContent || ''));
+  if (!engineBtn) throw new Error('Studio Pro panel did not open (no engine switch found)');
+  if (!/ENGINE OFF/.test(engineBtn.textContent)) fail('engine started ON — Pro must be opt-in');
+  engineBtn.click();
+  await sleep(150);
+  window.__p.info.engineLabel = engineBtn.textContent.trim();
+
+  const closeBtn = [...document.querySelectorAll('button')].find(b => /Close Studio Pro/i.test(b.getAttribute('aria-label') || ''));
+  closeBtn?.click();
+  await sleep(200);
+
+  // The canvas button must now advertise the active engine.
+  const litBtn = [...document.querySelectorAll('button')].find(b => /Studio Pro \(active\)/i.test(b.getAttribute('aria-label') || ''));
+  if (!litBtn) fail('the ✦ button does not report Pro as active after switching the engine on');
+
+  // ---------------------------------------------------------------------
+  // 3. With Pro on, the SAME gesture must produce genuinely different pixels.
+  ref.current.clearAll();
+  await sleep(60);
+  drawLine(80, 30);
+  await sleep(120);
+  const pro = scan(layer());
+  log(`pro stroke:     ${pro.lit} lit px`);
+  if (pro.lit < 200) fail(`Pro path drew almost nothing (${pro.lit} px) — the engine is not reaching the canvas`);
+  if (pro.hash === classic.hash) fail('Pro produced byte-identical pixels to classic — the toggle is decorative');
+  window.__p.info.classicLit = classic.lit;
+  window.__p.info.proLit = pro.lit;
+
+  // ---------------------------------------------------------------------
+  // 4. Input-rate independence, measured on the real surface. The same 360px
+  // line drawn in 6 events vs 90 events must land near-identical ink. This is
+  // THE assertion that fails if the Pro path silently falls back to per-event
+  // stamping.
+  ref.current.clearAll(); await sleep(60);
+  drawLine(200, 6); await sleep(120);
+  const few = scan(layer());
+  ref.current.clearAll(); await sleep(60);
+  drawLine(200, 90); await sleep(120);
+  const many = scan(layer());
+  const drift = Math.abs(few.lit - many.lit) / Math.max(1, few.lit);
+  log(`same line, 6 events: ${few.lit} px | 90 events: ${many.lit} px | drift ${(drift * 100).toFixed(1)}%`);
+  if (drift > 0.06) fail(`ink varies ${(drift * 100).toFixed(1)}% with input rate — spacing is not driving the walk`);
+  window.__p.info.rateDrift = +(drift * 100).toFixed(2);
+
+  // ---------------------------------------------------------------------
+  // 5. Engine-level assertions against a scratch canvas: exact dab counts, and
+  // every tip in the catalogue putting real pixels down.
+  const scratch = document.createElement('canvas');
+  scratch.width = 300; scratch.height = 120;
+  const sctx = scratch.getContext('2d');
+
+  const countDabs = (specPatch, segments) => {
+    const st = createStrokeState(normalizeSpec(specPatch), { seed: 3 });
+    let n = 0;
+    for (let i = 0; i < segments; i++) {
+      const x0 = (i / segments) * 100, x1 = ((i + 1) / segments) * 100;
+      strokeTo(sctx, st, [x0, 50], [x1, 50], { pressure: 0.5 },
+        { size: 20, color: '#000', onDab: () => n++ });
+    }
+    return n;
+  };
+  const one = countDabs({ tip: { spacing: 0.25 } }, 1);
+  const fifty = countDabs({ tip: { spacing: 0.25 } }, 50);
+  const tight = countDabs({ tip: { spacing: 0.05 } }, 1);
+  log(`dabs — 100px @25% spacing: 1 seg=${one}, 50 segs=${fifty}; @5% spacing=${tight}`);
+  if (one !== 20) fail(`expected 20 dabs at 25% spacing over 100px, got ${one}`);
+  if (fifty !== one) fail(`dab count changed with segmentation (${one} vs ${fifty}) — carry is being dropped between events`);
+  if (tight !== 100) fail(`expected 100 dabs at 5% spacing, got ${tight}`);
+
+  // Scatter must actually displace ink off the path.
+  const straight = (() => { sctx.clearRect(0,0,300,120);
+    const st = createStrokeState(normalizeSpec({ tip:{spacing:0.25} }), { seed: 3 });
+    strokeTo(sctx, st, [20,60], [280,60], { pressure:0.5 }, { size:14, color:'#000' });
+    return scan(scratch); })();
+  const scattered = (() => { sctx.clearRect(0,0,300,120);
+    const st = createStrokeState(normalizeSpec({ tip:{spacing:0.25}, scattering:{ scatter:{amount:1,control:'random',min:0}, bothAxes:true, count:1 } }), { seed: 3 });
+    strokeTo(sctx, st, [20,60], [280,60], { pressure:0.5 }, { size:14, color:'#000' });
+    return scan(scratch); })();
+  log(`scatter 0 -> ${straight.lit} px, scatter 1 -> ${scattered.lit} px`);
+  if (straight.hash === scattered.hash) fail('scatter changed nothing — the control is inert');
+
+  // Every tip must put pixels on a canvas. A tip that resolves but draws
+  // nothing is the exact "sellable, renders nothing" failure in a new place.
+  const deadTips = [];
+  for (const key of TIP_KEYS) {
+    sctx.clearRect(0, 0, 300, 120);
+    sctx.save(); sctx.translate(150, 60);
+    renderTip(sctx, key, 22, { hardness: 0.7, color: '#000', pressure: 0.8, customParams: { flow: .5, scatter: .2, dabs: 3, angleJitter: .2, roundness: 1 } });
+    sctx.restore();
+    if (scan(scratch).lit < 8) deadTips.push(key);
+  }
+  log(`tips drawing real pixels: ${TIP_KEYS.length - deadTips.length}/${TIP_KEYS.length}`);
+  if (deadTips.length) fail(`tips that render nothing: ${deadTips.join(', ')}`);
+
+  // ---------------------------------------------------------------------
+  // 6. Locked users must not be able to paint with it.
+  const ref2 = React.createRef();
+  const host = document.createElement('div');
+  host.style.cssText = 'width:480px;height:600px';
+  document.body.appendChild(host);
+  createRoot(host).render(React.createElement(Easel, { ref: ref2, say: () => {}, lokPass: false, ccTier: false }));
+  await sleep(900);
+  const lockedPro = [...host.querySelectorAll('button')].find(b => /Studio Pro/i.test(b.getAttribute('aria-label') || ''));
+  lockedPro?.click();
+  await sleep(300);
+  const lockedSwitch = [...document.querySelectorAll('button')].find(b => /ENGINE (ON|OFF)/.test(b.textContent || ''));
+  if (!lockedSwitch) fail('locked user cannot even see the Pro panel — they should see it read-only');
+  else {
+    if (!lockedSwitch.disabled) fail('a non-subscriber can switch the Pro engine on');
+    lockedSwitch.click();
+    await sleep(100);
+    if (/ENGINE ON/.test(lockedSwitch.textContent)) fail('locked engine switch flipped anyway');
+  }
+
+  window.__p.info.tips = TIP_KEYS.length;
+} catch (e) {
+  fail(e.message + '\n' + (e.stack || '').split('\n').slice(0, 4).join('\n'));
+}
+window.__p.done = true;
+log(window.__p.problems.length ? 'RESULT: FAIL' : 'RESULT: PASS');
+})();
+</script>
+</body></html>

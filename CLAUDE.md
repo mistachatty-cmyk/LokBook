@@ -71,3 +71,26 @@ A new page effect / sky / paper / avatar frame / blot border / cursor / sticker 
 `verify-rotation.mjs` and `verify-cosmetics.mjs` esbuild-bundle a minimal entry importing just `constants.jsx`/`rotation.js` and check every sellable id resolves to a renderer table entry, string match, or explicit `WIP_CATEGORIES` disclaimer. `verify-world.mjs` builds with `LOK_TEST_HARNESS=1` (adds `world-harness.html` as a second Vite entry — never set in a normal build), spins up its own preview server, and drives the real component in Playwright/Chromium, including a churn test that re-renders it with fresh prop identities and fails if more than one `<canvas>` is ever created.
 
 When adding a new gate like these: prove it can actually fail before trusting it (temporarily break something it should catch, confirm non-zero exit, revert).
+
+## Lok Studio Pro (`src/engine/brushSpec.js`, `brushEngine.js`, `brushTips.js`)
+
+A Photoshop-class brush engine behind the ✦ button at the **bottom right of the Studio canvas**.
+
+- **Access is subscription-only** — `lokPass || ccTier`. `engine/deviceTier.js` never gates
+  access; it only sizes the per-stroke dab budget, texture resolution and live-preview mode, so a
+  slow phone with a subscription gets every control, just cheaper. Do not turn it into a paywall.
+- **The engine is opt-in.** With the switch off, `stamp()` runs exactly as it always has — that is
+  what `verify:easel` keeps proving. Never make Pro the default render path.
+- **Spacing drives the walk, not pointer events.** `strokeTo()` consumes a *segment* and lays dabs
+  by arc length; `state.carry` persists the remainder *between* events. Dropping that carry
+  silently reintroduces input-rate-dependent density while still looking right in a single-segment
+  test — `verify:brushengine` measures ink for the same line at 6 vs 90 events to catch exactly that.
+- **A brush is one JSON row**, same rule as cosmetics. Every jitter control in the panel is the
+  same `{amount, control, min}` channel through one `evalChannel()`. Adding a driver is a row in
+  `DYNAMIC_CONTROLS`, not an `if` in nine places.
+- **Never build a translucent colour by string concatenation.** `color + "88"` breaks on 3-digit
+  hex and on the `rgb(r,g,b)` strings the eyedropper produces — it threw mid-stroke on Glow, Neon,
+  Wash and Galaxy for anyone who used the eyedropper first. Use `withAlpha()` from `engine/brushes.js`.
+
+Run `verify:brushspec` (data resolves) **and** `verify:brushengine` (the feature is actually wired,
+driven from the real ✦ button) before any commit touching these. Neither substitutes for the other.

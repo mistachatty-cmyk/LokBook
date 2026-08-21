@@ -38,6 +38,34 @@ function getGrainTexture() {
 }
 const grainStampCv = typeof document !== "undefined" ? document.createElement("canvas") : null;
 
+
+// Translucent variant of a brush colour.
+//
+// Glow, Neon, Wash and Galaxy used to build this by string-concatenating an
+// alpha suffix (`color + "88"`). That silently assumes `color` is always
+// 6-digit hex, and it is not: the eyedropper sets `rgb(r,g,b)` (Easel.jsx's
+// eyedrop()), and a 3-digit hex is legal everywhere else in the app. Both
+// produce garbage — "rgb(0,0,0)88", "#00088" — and Canvas throws a SyntaxError
+// mid-stroke, killing the stroke. Use the eyedropper then pick Glow and you hit
+// it every time. Caught by verify:brushengine.
+export function withAlpha(color, alpha) {
+  const a = Math.max(0, Math.min(1, alpha));
+  const c = String(color).trim();
+  const m = c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (m) return `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${a})`;
+  if (c[0] === "#") {
+    let h = c.slice(1);
+    if (h.length === 3 || h.length === 4) h = h.slice(0, 3).split("").map(x => x + x).join("");
+    if (h.length >= 6) {
+      const n = parseInt(h.slice(0, 6), 16);
+      if (!Number.isNaN(n)) return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+    }
+  }
+  // Named colours ("red") and anything exotic: fall back to the opaque colour
+  // rather than emitting something Canvas will reject.
+  return c;
+}
+
 const legacyDabAt = (ctx, x, y, { color, size, tool, brush }) => {
   ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = brush === "chalk" ? 0.5 : 0.09;
@@ -97,7 +125,7 @@ const improvedGlowAt = (ctx, x, y, { color, size, pressure: pr = 0.5 }) => {
   const es = size * (0.3 + pr * 0.7); const flicker = 0.85 + Math.random() * 0.15;
   ctx.globalCompositeOperation = "source-over";
   const g = ctx.createRadialGradient(x, y, 0, x, y, es * 2.5);
-  g.addColorStop(0, color); g.addColorStop(0.15, color); g.addColorStop(0.5, color + "88"); g.addColorStop(1, "transparent");
+  g.addColorStop(0, color); g.addColorStop(0.15, color); g.addColorStop(0.5, withAlpha(color, 0.53)); g.addColorStop(1, "transparent");
   ctx.fillStyle = g; ctx.globalAlpha = 0.25 * flicker * pr; ctx.beginPath(); ctx.arc(x, y, es * 2.5, 0, Math.PI * 2); ctx.fill();
   ctx.globalAlpha = 0.4 * flicker * pr; ctx.beginPath(); ctx.arc(x, y, es * 1.2, 0, Math.PI * 2); ctx.fill();
   ctx.globalAlpha = 1;
@@ -145,7 +173,7 @@ const improvedNeonAt = (ctx, x, y, { color, size, pressure: pr = 0.5 }) => {
   const es = size * (0.3 + pr * 0.7); const pulse = 0.9 + Math.random() * 0.1;
   ctx.globalCompositeOperation = "source-over";
   const g = ctx.createRadialGradient(x, y, 0, x, y, es * 2.2);
-  g.addColorStop(0, color); g.addColorStop(0.15, "#fff"); g.addColorStop(0.35, color); g.addColorStop(0.7, color + "66"); g.addColorStop(1, "transparent");
+  g.addColorStop(0, color); g.addColorStop(0.15, "#fff"); g.addColorStop(0.35, color); g.addColorStop(0.7, withAlpha(color, 0.4)); g.addColorStop(1, "transparent");
   ctx.fillStyle = g; ctx.globalAlpha = 0.35 * pulse * pr; ctx.beginPath(); ctx.arc(x, y, es * 2.2, 0, Math.PI * 2); ctx.fill();
   ctx.globalAlpha = 0.6 * pulse * pr; ctx.beginPath(); ctx.arc(x, y, es * 0.5, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill();
   ctx.globalAlpha = 1;
@@ -220,7 +248,7 @@ const improvedWashAt = (ctx, x, y, { color, size, pressure: pr = 0.5 }) => {
   const n = 2 + Math.round(pr * 2);
   for (let w = 0; w < n; w++) { ctx.globalAlpha = 0.04 + Math.random() * 0.06 * pr; ctx.fillStyle = color; const r = es * (0.6 + Math.random() * 0.6); const ox = Math.random() * 8 - 4, oy = Math.random() * 8 - 4; ctx.beginPath(); ctx.arc(x + ox, y + oy, r, 0, Math.PI * 2); ctx.fill(); }
   ctx.globalAlpha = 0.07 * pr; const er = es * 1.2;
-  ctx.beginPath(); ctx.arc(x, y, er, 0, Math.PI * 2); ctx.fillStyle = color + "33"; ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, er, 0, Math.PI * 2); ctx.fillStyle = withAlpha(color, 0.2); ctx.fill();
   ctx.globalAlpha = 1;
 };
 export function washAt(ctx, x, y, p) { return p.legacy ? legacyWashAt(ctx, x, y, p) : improvedWashAt(ctx, x, y, p); }
@@ -243,7 +271,7 @@ const improvedGalaxyAt = (ctx, x, y, { color, size, pressure: pr = 0.5 }) => {
     ctx.beginPath(); ctx.arc(x + Math.cos(a) * cluster, y + Math.sin(a) * cluster, 0.8 + Math.random() * 2.5, 0, Math.PI * 2); ctx.fill();
   }
   ctx.fillStyle = color; ctx.globalAlpha = 0.5 * pr; ctx.beginPath(); ctx.arc(x, y, es * 0.35, 0, Math.PI * 2); ctx.fill();
-  const g = ctx.createRadialGradient(x, y, 0, x, y, es * 1.5); g.addColorStop(0, color + "88"); g.addColorStop(1, "transparent");
+  const g = ctx.createRadialGradient(x, y, 0, x, y, es * 1.5); g.addColorStop(0, withAlpha(color, 0.53)); g.addColorStop(1, "transparent");
   ctx.fillStyle = g; ctx.globalAlpha = 0.15; ctx.beginPath(); ctx.arc(x, y, es * 1.5, 0, Math.PI * 2); ctx.fill();
   ctx.globalAlpha = 1;
 };

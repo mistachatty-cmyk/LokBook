@@ -567,6 +567,58 @@ export const STUDIO_MODULES = [
   { id: "anim_export_video", type: "feature", name: "Video Export", desc: "Export animation as MP4/WebM video file", price: 150 },
   { id: "anim_export_spritesheet", type: "feature", name: "Sprite Sheet", desc: "Export all frames as a single grid image", price: 80 },
   { id: "anim_timeline_zoom", type: "feature", name: "Timeline Zoom", desc: "Resize timeline thumbnails from 40px to 120px", price: 40 },
+  { id: "studio_pro", type: "feature", name: "Lok Studio Pro", desc: "Full brush engine — tip shape, dynamics, scattering, texture, dual brush, colour & transfer. Included with LokPass.", price: 0, unlock: "LokPass subscription" },
+];
+
+
+// Lok Studio Pro brush presets. Data only — every id here must resolve to a real
+// tip renderer / texture pattern / dynamic control, which is exactly what
+// `npm run verify:brushspec` asserts. A preset naming a tip that doesn't exist
+// is the docs/AUDIT.md Finding 2 failure mode wearing a new costume: sellable,
+// clickable, draws nothing.
+export const BRUSH_SPEC_PRESETS = [
+  { id: "pro_round", name: "Round", desc: "Clean round tip, tight spacing",
+    tip: { src: "round", spacing: 0.08, hardness: 0.9, roundness: 1 },
+    transfer: { opacity: 1, flow: 1 } },
+
+  { id: "pro_soft_air", name: "Soft Air", desc: "Airbrush that builds up on overlap",
+    tip: { src: "round", spacing: 0.05, hardness: 0.05 },
+    transfer: { opacity: 0.35, flow: 0.3, flowJitter: { amount: 0.2, control: "pressure", min: 0.2 } },
+    flags: { buildUp: true, smoothing: true } },
+
+  { id: "pro_nib", name: "Calligraphy Nib", desc: "Flat nib that thins with stroke direction",
+    tip: { src: "chisel", spacing: 0.04, roundness: 0.28, angle: 45 },
+    shapeDynamics: { angleJitter: { amount: 1, control: "direction", min: 0 }, minRoundness: 0.2 } },
+
+  { id: "pro_bristle", name: "Dry Bristle", desc: "Scattered, textured, pressure-sized",
+    tip: { src: "round", spacing: 0.12, hardness: 0.6 },
+    shapeDynamics: { sizeJitter: { amount: 0.5, control: "pressure", min: 0.35 }, angleJitter: { amount: 0.3, control: "off", min: 0 } },
+    scattering: { scatter: { amount: 0.55, control: "off", min: 0 }, bothAxes: true, count: 4,
+                  countJitter: { amount: 0.4, control: "pressure", min: 0.25 } },
+    texture: { pattern: "rough", scale: 0.8, depth: { amount: 1, control: "pressure", min: 0.3 } } },
+
+  { id: "pro_speckle", name: "Speckle", desc: "Sparse scattered specks, random sizes",
+    tip: { src: "round", spacing: 0.35, hardness: 1 },
+    shapeDynamics: { sizeJitter: { amount: 0.85, control: "random", min: 0.15 } },
+    scattering: { scatter: { amount: 1, control: "random", min: 0 }, bothAxes: true, count: 5 },
+    transfer: { opacity: 0.85, flow: 1, opacityJitter: { amount: 0.5, control: "random", min: 0.3 } } },
+
+  { id: "pro_canvas_wash", name: "Canvas Wash", desc: "Broad wash pulled through canvas weave",
+    tip: { src: "wash", spacing: 0.18 },
+    texture: { pattern: "canvas", scale: 1.4, depth: { amount: 0.8, control: "off", min: 0.2 } },
+    transfer: { opacity: 0.5, flow: 0.55 } },
+
+  { id: "pro_confetti", name: "Confetti", desc: "Hue-shifting scattered squares",
+    tip: { src: "square", spacing: 0.4, hardness: 1 },
+    shapeDynamics: { angleJitter: { amount: 1, control: "random", min: 0 }, sizeJitter: { amount: 0.6, control: "random", min: 0.3 } },
+    scattering: { scatter: { amount: 1, control: "random", min: 0 }, bothAxes: true, count: 3 },
+    colorDynamics: { hueJitter: { amount: 1, control: "random", min: 0 }, satJitter: { amount: 0.3, control: "random", min: 0 }, purity: 0.3 } },
+
+  { id: "pro_ink_grit", name: "Ink Grit", desc: "Solid ink with crosshatch tooth and noise",
+    tip: { src: "round", spacing: 0.06, hardness: 0.85 },
+    shapeDynamics: { sizeJitter: { amount: 0.4, control: "velocity", min: 0.4 } },
+    texture: { pattern: "crosshatch", scale: 0.6, depth: { amount: 0.7, control: "off", min: 0.25 }, eachTip: true },
+    flags: { noise: true, smoothing: true } },
 ];
 
 export function getModuleLayers(modules) {

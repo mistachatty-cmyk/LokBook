@@ -31,7 +31,9 @@
     "verify:payload": "vite build && node scripts/verify-payload.mjs",
     "verify:waitlist": "vite build && node scripts/verify-waitlist.mjs",
     "db:migrate": "supabase db push",
-    "build:steam": "vite build --config vite.config.steam.js"
+    "build:steam": "vite build --config vite.config.steam.js",
+    "verify:brushspec": "node scripts/verify-brushspec.mjs",
+    "verify:brushengine": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-brushengine.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",

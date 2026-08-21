@@ -1,4 +1,4 @@
-import { useState, useRef, forwardRef, useImperativeHandle, useEffect } from "react";
+import { useState, useRef, forwardRef, useImperativeHandle, useEffect, useMemo } from "react";
 import { useT, ART } from "./theme/theme.js";
 import { W, H, BLENDS, hasModule, getModuleLayers } from "./constants.jsx";
 import { getStroke } from 'perfect-freehand';
@@ -8,6 +8,10 @@ import { ROTATION_PAPERS } from "./engine/rotation.js";
 import { hitSticker, drawStickerItem, getSticker } from "./engine/stickers.js";
 import { useBodyScrollLock } from "./hooks/useBodyScrollLock.js";
 import * as Brushes from "./engine/brushes.js";
+import StudioPro from "./components/StudioPro.jsx";
+import { DEFAULT_SPEC, normalizeSpec } from "./engine/brushSpec.js";
+import { createStrokeState, strokeTo } from "./engine/brushEngine.js";
+import { deviceQuality } from "./engine/deviceTier.js";
 
 const PALLETS={
   default:[ART.ink,ART.pink,ART.teal,"#E8B14B","#7A4FBF","#3E8E4B","#D94040","#5A5A5A","#FF8C42","#C4E8C2","#4EBFFF","#F7D4FF"],
@@ -26,7 +30,7 @@ const DEMO_BRUSH_PRESETS=[
   {id:"basics",name:"Bold Basics",flow:0.6,scatter:0.1,dabs:2,angleJitter:0.1,roundness:1},
 ];
 
-const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper="plain",legacyMode=false,onLegacyToggle,maxLayers:maxLayersProp,ccTier=false,animFx="none",cursorPack="default",stickers=[],onStickersChange,pendingSticker=null,onStickerPlaced,say,grainIntroSeen=false,onGrainIntroSeen},ref){
+const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper="plain",legacyMode=false,onLegacyToggle,maxLayers:maxLayersProp,ccTier=false,animFx="none",cursorPack="default",stickers=[],onStickersChange,pendingSticker=null,onStickerPlaced,say,grainIntroSeen=false,onGrainIntroSeen,lokPass=false,onUpsell},ref){
   const T=useT();
   // Layer cap: the Studio TIERS system passes maxLayers explicitly; otherwise
   // fall back to whatever the owned layer modules allow.
@@ -42,6 +46,22 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const[active,setActive]=useState(1);const[tool,setTool]=useState("pen");const[color,setColor]=useState(ART.ink);  const[recentColors,setRecentColors]=useState(()=>{try{const r=localStorage.getItem("lok:recentColors");return r?JSON.parse(r):[];}catch{return[];}});const[size,setSize]=useState(7);const[symmetry,setSymmetry]=useState("none");const[brush,setBrush]=useState("ink");const[cursorPos,setCursorPos]=useState(null);const[zoom,setZoom]=useState(1);const[pan,setPan]=useState({x:0,y:0});const[clonePt,setClonePt]=useState(null);const[shapeMode,setShapeMode]=useState("rect");const[showGuides,setShowGuides]=useState(false);const[anchorPt,setAnchorPt]=useState(null);const[blurAmount,setBlurAmount]=useState(5);  const[refImg,setRefImg]=useState(null);const[refIsVideo,setRefIsVideo]=useState(false);const[refOpacity,setRefOpacity]=useState(0.3);const[smoothStrength,setSmoothStrength]=useState(0.5);const[palette,setPalette]=useState("default");const[canvasSize,setCanvasSize]=useState("default");const isPanning=useRef(false);const panStart=useRef({x:0,y:0});const pinchRef=useRef(null);
   const[dynamics,setDynamics]=useState(true);const[brushLabOpen,setBrushLabOpen]=useState(false);const[customBrushParams,setCustomBrushParams]=useState({flow:0.35,scatter:0.15,dabs:3,angleJitter:0.2,roundness:1});
   const[fullscreen,setFullscreen]=useState(false);const[fsToolsHidden,setFsToolsHidden]=useState(false);useBodyScrollLock(fullscreen);
+  // ---- Lok Studio Pro ------------------------------------------------------
+  // Access is subscription-only (lokPass || ccTier). deviceQuality() never gates
+  // access — it only sizes the per-stroke dab budget, so a slow phone with a
+  // subscription still gets every control.
+  const proUnlocked=lokPass||ccTier;
+  const[proOpen,setProOpen]=useState(false);
+  const[proOn,setProOn]=useState(false);
+  const[proSpec,setProSpec]=useState(()=>{try{const r=localStorage.getItem("lok:proSpec");return r?normalizeSpec(JSON.parse(r)):DEFAULT_SPEC;}catch{return DEFAULT_SPEC;}});
+  useEffect(()=>{try{localStorage.setItem("lok:proSpec",JSON.stringify(proSpec));}catch{}},[proSpec]);
+  // The Pro engine only ever runs when it is explicitly switched on AND paid
+  // for. With it off, `stamp()` runs exactly as it always has — that is what
+  // verify:easel keeps proving.
+  const proActive=proUnlocked&&proOn;
+  const proQuality=useMemo(()=>deviceQuality(),[]);
+  const proStateRef=useRef(null);
+  const proLastPtRef=useRef(null);
   // Vanishing point for the perspective guide paper, as a % of the canvas so
   // it survives resizing. Persisted because re-placing it every time you come
   // back to Studio would make the guide useless for a multi-session drawing.
@@ -156,6 +176,35 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
   const partialPatternAt=(ctx,x,y)=>Brushes.partialPatternAt(ctx,x,y,{color,size});
   const symXY=(x,y)=>{const o=[[x,y]];if(symmetry==="mirrorX"||symmetry==="quad")o.push([W-x,y]);if(symmetry==="mirrorY"||symmetry==="quad")o.push([x,H-y]);if(symmetry==="quad")o.push([W-x,H-y]);if(symmetry.startsWith("radial")){const n=+symmetry.slice(6),cx=W/2,cy=H/2;for(let i=1;i<n;i++){const a=(i/n)*Math.PI*2,c=Math.cos(a),s=Math.sin(a);o.push([cx+(x-cx)*c-(y-cy)*s,cy+(x-cx)*s+(y-cy)*c]);}}return o;};
   const brushFn=brush==="spray"?sprayAt:brush==="glow"?glowAt:brush==="watercolor"?watercolorAt:brush==="pattern"?partialPatternAt:brush==="calligraphy"?calligraphyAt:brush==="neon"?neonAt:brush==="sparkle"?sparkleAt:brush==="crayon"?crayonAt:brush==="wash"?washAt:brush==="galaxy"?galaxyAt:brush==="grain"?grainAt:brush==="custom"?customAt:null;
+  // ---- Pro stroke plumbing -------------------------------------------------
+  // The classic path stamps once per pointer EVENT, so dab density tracks how
+  // fast your hand moves. The Pro engine instead walks the stroke PATH at
+  // spacing intervals, which is the whole reason jitter/scatter/texture can look
+  // right. proStrokeTo() is therefore fed segments, never single points, and
+  // proStateRef carries the arc-length remainder BETWEEN events — dropping that
+  // carry is the subtle bug that silently reintroduces input-rate dependence.
+  const proBegin=(x,y)=>{
+    proStateRef.current=createStrokeState(proSpec,{seed:Date.now()%100000,quality:proQuality});
+    proLastPtRef.current=[x,y];
+  };
+  const proStrokeTo=(ctx,x,y)=>{
+    const st=proStateRef.current;
+    if(!st)return 0;
+    const from=proLastPtRef.current||[x,y];
+    const p=pct();
+    const n=strokeTo(ctx,st,from,[x,y],
+      {pressure:p.pressure,tiltX:p.tiltX,tiltY:p.tiltY,twist:p.twist,velocity:0.5},
+      {size:tool==="eraser"?size*2.4:size,color,
+       erase:tool==="eraser",
+       legacy:legacyRef.current,
+       customParams:customBrushParams,
+       // Symmetry fans out per DAB, not per event — mirroring whole events would
+       // put the mirrored copies on a different spacing phase from the original.
+       expand:symmetry==="none"?null:symXY});
+    proLastPtRef.current=[x,y];
+    return n;
+  };
+  const proEnd=()=>{proStateRef.current=null;proLastPtRef.current=null;};
   const stamp=(ctx,x,y,start)=>{
     const pts=symXY(x,y);
     if(brushFn){pts.forEach(([sx,sy])=>brushFn(ctx,sx,sy));return;}
@@ -194,7 +243,9 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
     // one sample late, and a tap recorded nothing at all despite drawing a dab.
     capturePts.current=[{x:p0[0],y:p0[1],pressure:e.pointerType==="pen"&&e.pressure>0?e.pressure:0.5}];
     captureMeta.current={tool,color,size,layer:active};
-    const mul=dynMul(e,p0[0],p0[1]);const pressure=e.pointerType==="pen"&&e.pressure>0?e.pressure:mul;pointerRef.current={pressure,tiltX:e.tiltX||0,tiltY:e.tiltY||0,twist:e.twist||0,pointerType:e.pointerType||"mouse"};strokePoints.current=[[...p0,pressure]];if(tool==="eyedrop"){eyedrop(...p0);return;}if(tool==="transform"){transformDrag.current={startClient:[e.clientX,e.clientY],startCanvas:p0};return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}if(tool==="clone"){if(!clonePt){setClonePt(p0);return;}const[ox,oy]=clonePt;const[cx,cy]=p0;const src=cv.getContext("2d").getImageData(Math.floor(ox),Math.floor(oy),48,60);cv.getContext("2d").putImageData(src,Math.floor(cx)-24,Math.floor(cy)-30);setClonePt(null);return;}if(tool==="shape"){setAnchorPt(p0);drawing.current=true;return;}if(tool==="gradient"){setAnchorPt(p0);drawing.current=true;return;}drawing.current=true;onStroke&&onStroke();stamp(cv.getContext("2d"),...p0,true);};
+    const mul=dynMul(e,p0[0],p0[1]);const pressure=e.pointerType==="pen"&&e.pressure>0?e.pressure:mul;pointerRef.current={pressure,tiltX:e.tiltX||0,tiltY:e.tiltY||0,twist:e.twist||0,pointerType:e.pointerType||"mouse"};strokePoints.current=[[...p0,pressure]];if(tool==="eyedrop"){eyedrop(...p0);return;}if(tool==="transform"){transformDrag.current={startClient:[e.clientX,e.clientY],startCanvas:p0};return;}pushUndo();if(tool==="fill"){fillLayer(cv.getContext("2d"));return;}if(tool==="clone"){if(!clonePt){setClonePt(p0);return;}const[ox,oy]=clonePt;const[cx,cy]=p0;const src=cv.getContext("2d").getImageData(Math.floor(ox),Math.floor(oy),48,60);cv.getContext("2d").putImageData(src,Math.floor(cx)-24,Math.floor(cy)-30);setClonePt(null);return;}if(tool==="shape"){setAnchorPt(p0);drawing.current=true;return;}if(tool==="gradient"){setAnchorPt(p0);drawing.current=true;return;}drawing.current=true;onStroke&&onStroke();
+    if(proActive){proBegin(p0[0],p0[1]);proStrokeTo(cv.getContext("2d"),p0[0],p0[1]);}
+    else stamp(cv.getContext("2d"),...p0,true);};
   // Animation FX overlay — ported from the previous easel so ANIMATION_FX
   // purchases keep working after the component swap.
   const fxAt=(ctx,x,y)=>{if(!animFx||animFx==="none"||Math.random()>0.4)return;ctx.save();ctx.globalCompositeOperation="source-over";
@@ -210,8 +261,9 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
     const freehand=brush==="ink"&&tool==="pen";
     evs.forEach(ev=>{const q=pos(ev);if(freehand)strokePoints.current.push([q[0],q[1],pointerRef.current.pressure]);
       if(captureMeta.current)capturePts.current.push({x:q[0],y:q[1],pressure:pointerRef.current.pressure});
-      stamp(ctx,q[0],q[1],false);});};
-  const up=e=>{if(stickerDrag.current){stickerDrag.current=null;try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}return;}if(tool==="transform"){const cv=canvases.current.get(active);if(cv)cv.style.transform="";if(transformDrag.current&&e){const p1=pos(e);const[sx,sy]=transformDrag.current.startCanvas;const dx=p1[0]-sx,dy=p1[1]-sy;if(Math.abs(dx)>0.5||Math.abs(dy)>0.5)commitTranslate(dx,dy);}transformDrag.current=null;return;}drawing.current=false;strokePoints.current=[];
+      if(proActive)proStrokeTo(ctx,q[0],q[1]);
+      else stamp(ctx,q[0],q[1],false);});};
+  const up=e=>{if(stickerDrag.current){stickerDrag.current=null;try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}return;}if(tool==="transform"){const cv=canvases.current.get(active);if(cv)cv.style.transform="";if(transformDrag.current&&e){const p1=pos(e);const[sx,sy]=transformDrag.current.startCanvas;const dx=p1[0]-sx,dy=p1[1]-sy;if(Math.abs(dx)>0.5||Math.abs(dy)>0.5)commitTranslate(dx,dy);}transformDrag.current=null;return;}drawing.current=false;strokePoints.current=[];proEnd();
     if(captureMeta.current&&capturePts.current.length>0){strokeLog.current.push({...captureMeta.current,points:capturePts.current});if(strokeLog.current.length>4000)strokeLog.current.shift();}
     captureMeta.current=null;capturePts.current=[];
     if(tool==="shape"&&anchorPt){const cv=canvases.current.get(active);if(cv){const ctx=cv.getContext("2d");const[ax,ay]=anchorPt;const[sx,sy]=lastPts.current[0]||[ax,ay];const x=Math.min(ax,sx),y=Math.min(ay,sy),w=Math.abs(sx-ax),h=Math.abs(sy-ay);ctx.globalCompositeOperation="source-over";ctx.fillStyle=color;if(shapeMode==="ellipse")ctx.beginPath(),ctx.ellipse(x+w/2,y+h/2,w/2,h/2,0,0,Math.PI*2),ctx.fill();else ctx.fillRect(x,y,w,h);ctx.globalAlpha=1;}setAnchorPt(null);}if(tool==="gradient"&&anchorPt){const cv=canvases.current.get(active);if(cv){const ctx=cv.getContext("2d");const[ax,ay]=anchorPt;const[sx,sy]=lastPts.current[0]||[ax,ay];const g=ctx.createLinearGradient(ax,ay,sx,sy);g.addColorStop(0,color);g.addColorStop(0.5,color);g.addColorStop(1,T.paper);ctx.globalCompositeOperation="source-over";ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}setAnchorPt(null);}lastPts.current=[];midPts.current=[];try{if(e?.currentTarget?.releasePointerCapture&&e?.pointerId!=null)e.currentTarget.releasePointerCapture(e.pointerId);}catch{}};
@@ -280,6 +332,17 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
       {canvasSize!=="default"&&(<div aria-hidden="true" className="absolute inset-0 pointer-events-none flex items-center justify-center" style={{zIndex:6}}><div style={{width:canvasSize==="story"?"37.5%":canvasSize==="square"?"80%":canvasSize==="wide"?"100%":"100%",height:canvasSize==="story"?"100%":canvasSize==="square"?"80%":canvasSize==="wide"?"56.25%":"100%",border:`2px dashed ${T.accent}`,opacity:0.5}}/></div>)}
     </div>
     {zoom!==1&&<div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold pointer-events-none" style={{background:"rgba(0,0,0,.6)",color:"#fff"}}>{Math.round(zoom*100)}%</div>}
+    {/* Lok Studio Pro — bottom right of the canvas. Lit in the accent colour
+        while the Pro engine is actually driving strokes, so there is never any
+        doubt about which engine you are painting with. */}
+    <button onClick={()=>setProOpen(true)}
+      aria-label={proActive?"Lok Studio Pro (active)":"Open Lok Studio Pro"}
+      title={proUnlocked?(proActive?"Studio Pro is painting":"Open Studio Pro"):"Studio Pro — LokPass"}
+      className="lok-btn absolute bottom-2 right-2 z-10 w-9 h-9 rounded-full flex items-center justify-center text-base transition-opacity duration-200"
+      style={{border:`2px solid ${proActive?T.accent:T.ink}`,background:proActive?T.accent:T.card,color:proActive?T.onAccent:T.ink,opacity:proActive?1:0.55}}
+      onMouseEnter={e=>e.currentTarget.style.opacity=1}
+      onMouseLeave={e=>e.currentTarget.style.opacity=proActive?1:0.55}>✦</button>
+    {proActive&&<div className="absolute bottom-2 right-12 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold pointer-events-none" style={{background:T.accent,color:T.onAccent}}>PRO</div>}
     </div>
     <div style={fullscreen&&fsToolsHidden?{maxHeight:0,overflow:"hidden",opacity:0}:{maxHeight:"none",opacity:1,transition:"opacity .2s ease"}}>
     <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1" role="toolbar" aria-label="Layer controls">
@@ -389,6 +452,18 @@ const Easel=forwardRef(function Easel({modules=[],onionFrames=[],onStroke,paper=
     </div>)}
     {showGuides&&<div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{zIndex:20}}><div style={{position:"absolute",left:"33.33%",top:0,bottom:0,width:1,background:`repeating-linear-gradient(${T.alt}40 0 4px,transparent 4px 8px)`}}/><div style={{position:"absolute",left:"66.66%",top:0,bottom:0,width:1,background:`repeating-linear-gradient(${T.alt}40 0 4px,transparent 4px 8px)`}}/><div style={{position:"absolute",top:"33.33%",left:0,right:0,height:1,background:`repeating-linear-gradient(90deg,${T.alt}40 0 4px,transparent 4px 8px)`}}/><div style={{position:"absolute",top:"66.66%",left:0,right:0,height:1,background:`repeating-linear-gradient(90deg,${T.alt}40 0 4px,transparent 4px 8px)`}}/><div style={{position:"absolute",left:"50%",top:0,bottom:0,width:1,background:`repeating-linear-gradient(${T.alt}60 0 6px,transparent 6px 12px)`}}/><div style={{position:"absolute",top:"50%",left:0,right:0,height:1,background:`repeating-linear-gradient(90deg,${T.alt}60 0 6px,transparent 6px 12px)`}}/></div>}
     </div>
+    <StudioPro
+      open={proOpen}
+      onClose={()=>setProOpen(false)}
+      spec={proSpec}
+      onSpecChange={next=>{setProSpec(next);if(!proOn){setProOn(true);say&&say("✦ Studio Pro engine on");}}}
+      unlocked={proUnlocked}
+      proOn={proOn}
+      onProOnChange={setProOn}
+      color={color}
+      size={size}
+      onUpsell={onUpsell}
+      say={say}/>
   </div>);
 });
 

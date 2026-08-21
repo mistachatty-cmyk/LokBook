@@ -31,7 +31,7 @@ export default defineConfig({
       // build (see scripts/verify-world.mjs). Never set in normal builds, so
       // the harness is not part of anything that ships.
       input: process.env.LOK_TEST_HARNESS
-        ? { main: 'index.html', harness: 'world-harness.html', lok: 'lok-harness.html', easel: 'easel-harness.html' }
+        ? { main: 'index.html', harness: 'world-harness.html', lok: 'lok-harness.html', easel: 'easel-harness.html', pro: 'pro-harness.html' }
         : undefined,
       output: { manualChunks: { vendor: ['react'], app: ['src/App.jsx'] } },
     },
