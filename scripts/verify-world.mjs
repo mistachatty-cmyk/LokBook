@@ -100,9 +100,28 @@ console.log('canvases:', dom.canvas);
 console.log('pixels :', JSON.stringify(pixels));
 console.log('visible text:', dom.text);
 console.log('pageerrors:', errors.length ? errors.join('\n') : 'none');
-const pass = h?.status === 'ready' && dom.canvas > 0 && drew && stable;
+
+// Privacy, asserted on the REAL component. The harness feeds five posts; only
+// three may become markers for viewer "me" — two public, plus the viewer's own
+// only-me pin. Someone else's only-me and a friends-only pin must never reach
+// the globe. Before the world-store seam this filtering happened inside the
+// component, which meant private coordinates were already in the browser and
+// were merely not drawn.
+const pids = (await page.evaluate(() => {
+  const g = window.__globe;
+  return g && g.objectsData ? (g.objectsData() || []).map(d => d.id).filter(Boolean) : [];
+})).sort();
+console.log('markers on globe:', JSON.stringify(pids));
+const leaked = pids.filter(id => id === 'secret' || id === 'friendsOnly');
+const missingPins = ['p1', 'p2', 'myown'].filter(id => !pids.includes(id));
+if (leaked.length) console.error('PRIVACY LEAK — private pins rendered:', leaked.join(', '));
+if (missingPins.length) console.error('MISSING markers that should render:', missingPins.join(', '));
+const privacyOk = leaked.length === 0 && missingPins.length === 0;
+console.log('privacy on the real globe:', privacyOk ? 'OK' : 'FAILED');
+
+const pass = h?.status === 'ready' && dom.canvas > 0 && drew && stable && privacyOk;
 if (!stable) console.error('FAIL: globe rebuilt on prop-identity change (loading loop)');
-console.log(pass ? '\nPASS ✅ globe renders and stays stable across re-renders' : '\nFAIL ❌');
+console.log(pass ? '\nPASS ✅ globe renders, stays stable, and private pins never reach it' : '\nFAIL ❌');
 await page.screenshot({ path: '/tmp/world-verified.png' });
 await browser.close();
 stop();

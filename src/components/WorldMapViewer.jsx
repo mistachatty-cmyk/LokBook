@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { GLOBE_CONFIG, WORLD_SKINS } from '../constants.jsx';
 import { THEMES } from '../theme/theme.js';
+import { postsInBounds, putPost, capabilities } from '../engine/worldStore.js';
 
 // Flat starfield image, used ONLY as the CSS backdrop behind the modal — it is
 // what you see the instant World opens and during the loading/error states,
@@ -214,7 +215,7 @@ function buildBuildingGeometry(THREE, globe, footprint, tags) {
 // A purchasable skin (see WORLD_SKINS in constants.jsx) overrides the
 // theme-derived look with its own fixed texture, atmosphere tint, marker
 // shape, and starfield density/tint.
-export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso', skin = 'none', gyroMotion = { gamma: 0, beta: 0, alpha: 0 }, onPostClick, onClose, devMode = false, onLocationOverride, onGlobeReady, onThreeReady }) {
+export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso', skin = 'none', gyroMotion = { gamma: 0, beta: 0, alpha: 0 }, onPostClick, onClose, devMode = false, onLocationOverride, onGlobeReady, onThreeReady, viewerId = null }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
   const [selectedPost, setSelectedPost] = useState(null);
@@ -635,6 +636,25 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     };
   }, [theme, skin, tileSource, retryKey]);
 
+  // Pins read back through the world store. `posts` (this session's own, still
+  // local-only) are mirrored in first, so the single-player world behaves
+  // exactly as before while every read now goes through the seam that a shared
+  // backend will later satisfy.
+  const [storeMarkers, setStoreMarkers] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      for (const p of posts) {
+        if (typeof p?.latitude === 'number' && typeof p?.longitude === 'number') await putPost(p);
+      }
+      // Whole-globe bounds: the globe view shows everything at once. Street
+      // level will narrow this to the visible box once regions land.
+      const rows = await postsInBounds({ south: -90, west: -180, north: 90, east: 180 }, { viewerId });
+      if (!cancelled) setStoreMarkers(rows);
+    })();
+    return () => { cancelled = true; };
+  }, [posts, viewerId]);
+
   // ---- Effect 2: marker data only. Never rebuilds the globe. ---------------
   useEffect(() => {
     const globe = globeRef.current, THREE = threeRef.current;
@@ -644,9 +664,16 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       lat: userLocation.lat, lng: userLocation.lng,
       kind: 'user', color: T.accent, isUser: true,
     }] : [];
-    const postMarkers = posts
-      .filter(p => p.latitude && p.longitude && p.location_privacy === 'everyone')
-      .map(p => ({ id: p.id, lat: p.latitude, lng: p.longitude, kind: 'post', color: T.alt || T.accent, post: p }));
+    // Markers come from the world store, NOT from filtering the in-memory
+    // `posts` array. That filter was the privacy bug: every post's coordinates
+    // reached the browser and `only-me` pins were merely not drawn. The store
+    // resolves privacy before a row is ever handed back (in SQL once a remote
+    // adapter is on), so the component is no longer the thing standing between
+    // private data and the screen.
+    const postMarkers = storeMarkers.map(p => ({
+      id: p.id, lat: p.latitude, lng: p.longitude,
+      kind: 'post', color: T.alt || T.accent, post: p,
+    }));
 
     // Release the previous generation's GPU buffers before building new ones.
     disposablesRef.current.forEach(d => { try { d.dispose?.(); } catch {} });
@@ -668,7 +695,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         setSelectedPost(d.post);
         onPostClickRef.current?.(d.post);
       });
-  }, [posts, userLocation, globeReady, skinDef.markerStyle, T.accent, T.alt]);
+  }, [storeMarkers, userLocation, globeReady, skinDef.markerStyle, T.accent, T.alt]);
 
 
   // Live-patch auto-rotate onto the existing OrbitControls instance — no

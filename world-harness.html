@@ -10,8 +10,14 @@ window.__h = { done: false, status: null, error: null };
 window.addEventListener('error', e => { window.__h.error = e.message; });
 
 const posts = [
-  { id: 'p1', latitude: 40.7, longitude: -74.0, location_privacy: 'everyone', location_name: 'NYC', author: 'tinta' },
-  { id: 'p2', latitude: 51.5, longitude: -0.12, location_privacy: 'everyone', location_name: 'London', author: 'nib' },
+  { id: 'p1', latitude: 40.7, longitude: -74.0, location_privacy: 'everyone', location_name: 'NYC', author: 'tinta', user_id: 'other' },
+  { id: 'p2', latitude: 51.5, longitude: -0.12, location_privacy: 'everyone', location_name: 'London', author: 'nib', user_id: 'other' },
+  // Privacy fixtures. These must NEVER become markers for viewer 'me':
+  // someone else's private pin, and a friends-only pin with no friend graph.
+  { id: 'secret', latitude: 48.85, longitude: 2.35, location_privacy: 'only-me', location_name: 'Paris', author: 'nib', user_id: 'other' },
+  { id: 'friendsOnly', latitude: 35.68, longitude: 139.69, location_privacy: 'friends', location_name: 'Tokyo', author: 'nib', user_id: 'other' },
+  // ...but the viewer's OWN private pin must still show, to them.
+  { id: 'myown', latitude: -33.87, longitude: 151.21, location_privacy: 'only-me', location_name: 'Sydney', author: 'me', user_id: 'me' },
 ];
 
 const root = createRoot(document.getElementById('root'));
@@ -25,6 +31,7 @@ const draw = () => {
   root.render(React.createElement(WorldMapViewer, {
     posts: posts.map(p => ({ ...p })),            // new array + new objects
     userLocation: { lat: 37.77, lng: -122.42 },   // new object
+    viewerId: 'me',
     theme: 'riso',
     skin: 'none',
     gyroMotion: { gamma: 0, beta: 0, alpha: 0 },
