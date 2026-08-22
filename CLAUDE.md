@@ -94,3 +94,30 @@ A Photoshop-class brush engine behind the ✦ button at the **bottom right of th
 
 Run `verify:brushspec` (data resolves) **and** `verify:brushengine` (the feature is actually wired,
 driven from the real ✦ button) before any commit touching these. Neither substitutes for the other.
+
+## LokWorld: the storage seam and region packs
+
+- **No world feature imports `supabase` directly.** Everything goes through
+  `engine/worldStore.js` (`postsInBounds`, `putPost`, `buildingArt`, `plotsFor`, `claimPlot`).
+  Three adapters sit behind it — `local` (IndexedDB, the default, free and single-player),
+  `supabase` (written, off), `http` (a plain REST contract for a future non-Supabase server).
+  `verify:worldstore` fails if any adapter is missing a method.
+- **Pin privacy is resolved inside the store, never in a component.** WorldMapViewer used to
+  receive every post and filter `location_privacy` in JS, so `only-me` coordinates were already
+  in the browser and merely undrawn. `verify:world` now feeds the real component someone else's
+  private pin and asserts it never reaches the globe.
+- **Buildings come from pre-baked region packs, not live Overpass.** OSMF policy says heavy read
+  users must not lean on their infrastructure; ODbL lets us store and serve derived geometry
+  ourselves (Google's tile terms would not have). `scripts/bake-region.mjs` runs offline and
+  writes `public/regions/<id>.json`; Overpass is only the outside-a-region fallback.
+- **A region may not claim `live` without a real pack**, and a real place may not be backed by a
+  synthetic one — `verify:regions` enforces both, plus that the pack's buildings actually fall
+  inside the bbox it claims.
+- **The ODbL attribution is a licence obligation, not chrome.** It deliberately does not fade
+  with the rest of the UI on triple-tap.
+- **Auto-rotate yields at street level.** Spinning the planet under someone looking at a block
+  carried the camera clean out of the region between loads.
+- **Never wire `loadBuildings` (or anything taking an optional object) straight to `onClick`.**
+  React passes the PointerEvent as the first argument; it is truthy, has no `lat`/`lng`, and
+  produced a NaN bbox on every ↻ reload. A stub that answers regardless of the bbox it is asked
+  for will hide this — `verify:buildings` now inspects the request body.

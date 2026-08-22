@@ -34,7 +34,9 @@
     "build:steam": "vite build --config vite.config.steam.js",
     "verify:brushspec": "node scripts/verify-brushspec.mjs",
     "verify:brushengine": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-brushengine.mjs",
-    "verify:worldstore": "node scripts/verify-worldstore.mjs"
+    "verify:worldstore": "node scripts/verify-worldstore.mjs",
+    "verify:regions": "node scripts/verify-regions.mjs",
+    "bake:region": "node scripts/bake-region.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",

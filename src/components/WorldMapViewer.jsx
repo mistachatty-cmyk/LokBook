@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { GLOBE_CONFIG, WORLD_SKINS } from '../constants.jsx';
+import { GLOBE_CONFIG, WORLD_SKINS, LOK_REGIONS, OSM_ATTRIBUTION } from '../constants.jsx';
+import { loadRegion, regionAt, buildingsNear } from '../engine/regions.js';
 import { THEMES } from '../theme/theme.js';
 import { postsInBounds, putPost, capabilities } from '../engine/worldStore.js';
 
@@ -291,6 +292,14 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   const buildingsGroupRef = useRef(null);
   const buildingsDisposablesRef = useRef([]);
   const buildingsReqIdRef = useRef(0);
+  const [activeRegion, setActiveRegion] = useState(null);
+  // True once the camera is low enough that buildings load. Auto-rotation is
+  // suppressed while it is set: spinning the planet under someone who is trying
+  // to look at a specific block is actively hostile, and it silently carried the
+  // camera out of the region between loads (caught by verify:buildings, which
+  // measured the longitude drifting ~12 degrees mid-test).
+  const [nearGround, setNearGround] = useState(false);
+  const nearGroundRef = useRef(false);
 
   const clearBuildings = useCallback(() => {
     const globe = globeRef.current;
@@ -312,7 +321,12 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     const globe = globeRef.current, THREE = threeRef.current;
     if (!globe || !THREE) return;
     let lat, lng, spanDeg;
-    if (overrideLatLng) {
+    // Guard on real coordinates, not just truthiness. This function is used as
+    // an onClick handler, and React hands those a PointerEvent as the first
+    // argument — which is very truthy and has no lat/lng, so the override branch
+    // silently produced a NaN bounding box on every ↻ reload. The call site is
+    // fixed too; this is the belt to that pair of braces.
+    if (Number.isFinite(overrideLatLng?.lat) && Number.isFinite(overrideLatLng?.lng)) {
       ({ lat, lng } = overrideLatLng);
       spanDeg = 0.0025; // tightest span — you're standing right there
     } else {
@@ -330,11 +344,64 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       // shared Overpass instance, not infrastructure LokBook controls.
       spanDeg = Math.min(0.01, Math.max(0.0025, pov.altitude * 0.02));
     }
+    if (!nearGroundRef.current) { nearGroundRef.current = true; setNearGround(true); }
     const myReqId = ++buildingsReqIdRef.current;
     setBuildingsError('');
     setBuildingsLoading(true);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setBuildingsLoading(false);
+      setBuildingsError('Could not work out where the camera is pointing.');
+      return;
+    }
     const south = lat - spanDeg, north = lat + spanDeg;
     const west = lng - spanDeg, east = lng + spanDeg;
+    // ---- Region packs first --------------------------------------------
+    // A baked region is pre-simplified, already storey-normalised, and served
+    // as a static file from our own origin — no third-party call at all. The
+    // Overpass path below only runs OUTSIDE a live region, which is what keeps
+    // us inside the OSM Foundation's policy that heavy read users must not
+    // lean on their shared infrastructure.
+    const region = regionAt(LOK_REGIONS, lat, lng);
+    if (region) {
+      try {
+        const decoded = await loadRegion(region);
+        if (myReqId !== buildingsReqIdRef.current) return;
+        if (decoded && decoded.length) {
+          const near = buildingsNear(decoded, lat, lng, spanDeg * 2, 400);
+          clearBuildings();
+          const group = new THREE.Group();
+          const material = new THREE.MeshNormalMaterial({ flatShading: true });
+          buildingsDisposablesRef.current.push(material);
+          let built = 0;
+          for (const b of near) {
+            // The pack carries `levels` already normalised, so the extruder is
+            // handed a tag object shaped the way it already expects.
+            const geo = buildBuildingGeometry(THREE, globe, b.points.map(p => ({ lat: p.lat, lon: p.lng })),
+              { 'building:levels': String(b.levels) });
+            if (!geo) continue;
+            geo.userData = { wayId: b.wayId, regionId: region.id };
+            buildingsDisposablesRef.current.push(geo);
+            const mesh = new THREE.Mesh(geo, material);
+            mesh.userData = { wayId: b.wayId, regionId: region.id };
+            group.add(mesh);
+            built++;
+          }
+          globe.scene().add(group);
+          buildingsGroupRef.current = group;
+          setBuildingsCount(built);
+          setActiveRegion(region);
+          setBuildingsLoading(false);
+          if (!built) setBuildingsError(`No buildings within range in ${region.name}.`);
+          return;
+        }
+      } catch (err) {
+        // A failed pack is not fatal — fall through to the live Overpass path
+        // so the user still sees something, and say why in the status chip.
+        console.warn('region pack failed, falling back to Overpass:', err?.message);
+      }
+    }
+    setActiveRegion(null);
+
     try {
       // Same-origin proxy (api/buildings.js), not overpass-api.de directly:
       // its response carries no Access-Control-Allow-Origin header at all
@@ -542,6 +609,9 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         // while someone's actively spinning the globe. The 900ms debounce
         // on top absorbs a quick flick-then-settle as one reload, not two.
         onControlsSettled = () => {
+          const pv = globe.pointOfView();
+          const low = !!pv && pv.altitude <= 0.35;
+          if (low !== nearGroundRef.current) { nearGroundRef.current = low; setNearGround(low); }
           if (!buildingsOnRef.current) return;
           clearTimeout(buildingsDebounce);
           buildingsDebounce = setTimeout(() => {
@@ -703,9 +773,11 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   useEffect(() => {
     const controls = globeRef.current?.controls();
     if (!controls || !globeReady) return;
-    controls.autoRotate = rotating && !flying && rotateSpeed > 0;
+    // `nearGround` wins over the play/pause state: at street level the globe
+    // must hold still regardless of what the rotation control says.
+    controls.autoRotate = rotating && !flying && !nearGround && rotateSpeed > 0;
     controls.autoRotateSpeed = rotateSpeed;
-  }, [rotateSpeed, rotating, flying, globeReady]);
+  }, [rotateSpeed, rotating, flying, nearGround, globeReady]);
 
   // "Fly to me" — animates the camera to the user's own marker via globe.gl's
   // built-in pointOfView(pov, ms) tween. Pauses rotation immediately (so the
@@ -1102,6 +1174,15 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           }}>
             🔒 Everyone
           </div>
+          {activeRegion && (
+            <div style={{
+              padding: '5px 11px', borderRadius: 999, width: 'fit-content',
+              background: 'rgba(0,0,0,.4)', border: `1px solid ${T.alt || T.accent}88`,
+              color: '#fff', fontSize: 10.5, fontWeight: 700, backdropFilter: 'blur(6px)',
+            }}>
+              📍 {activeRegion.name}{activeRegion.synthetic ? ' · test city' : ''}
+            </div>
+          )}
           {buildingsOn && (buildingsLoading || buildingsError || buildingsCount > 0) && (
             <div style={{
               padding: '5px 11px', borderRadius: 12, width: 'fit-content', maxWidth: 220,
@@ -1211,6 +1292,24 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
               by {selectedPost.author}
             </div>
           )}
+        </div>
+      )}
+
+      {/* OpenStreetMap attribution. ODbL requires this wherever the derived
+          geometry is displayed. It deliberately does NOT fade out with the rest
+          of the chrome on triple-tap: a licence obligation is not decoration.
+          Sits above the drawer so it is never covered. */}
+      {(buildingsCount > 0 || activeRegion) && (
+        <div aria-label="Map data attribution" style={{
+          position: 'absolute', left: 14,
+          bottom: `calc(${streetViewOn ? 74 : 196}px + env(safe-area-inset-bottom))`,
+          zIndex: 4, pointerEvents: 'none',
+          padding: '3px 8px', borderRadius: 6,
+          background: 'rgba(0,0,0,.45)', color: 'rgba(255,255,255,.85)',
+          fontSize: 9.5, fontWeight: 600, letterSpacing: '.01em',
+          backdropFilter: 'blur(4px)',
+        }}>
+          {OSM_ATTRIBUTION}
         </div>
       )}
 
@@ -1376,7 +1475,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
             {buildingsOn && (
               <button
                 className="lok-glass-btn"
-                onClick={loadBuildings}
+                onClick={() => loadBuildings()}
                 disabled={buildingsLoading}
                 aria-label="Reload buildings for the current view"
                 title="Reload buildings here"

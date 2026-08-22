@@ -621,6 +621,46 @@ export const BRUSH_SPEC_PRESETS = [
     flags: { noise: true, smoothing: true } },
 ];
 
+
+// LokWorld regions — where the city is actually built out.
+//
+// One row per region, same rule as cosmetics: unlocking a new place is a data
+// edit plus a committed pack file, never a code change. `status` is the honest
+// state of the data, and `verify:regions` refuses to let a region claim "live"
+// without a pack that really loads and really contains buildings.
+//
+//   live   — a baked pack exists in public/regions/ and streets are explorable
+//   soon   — bbox is defined, pack not baked yet; shown as "coming soon"
+//
+// bbox is [south, west, north, east]. Geometry is © OpenStreetMap contributors,
+// ODbL — which, unlike Google's tile terms, is exactly what lets us pre-bake and
+// serve it ourselves. The attribution is displayed in LokWorld; keep it there.
+//
+// To light one up:  node scripts/bake-region.mjs <id>   (see the script header
+// for the offline path if the machine can't reach Overpass)
+export const LOK_REGIONS = [
+  { id: "demo-grid", name: "Sandbox City", status: "live", synthetic: true,
+    bbox: [40.700, -74.020, 40.720, -73.995], pack: "/regions/demo-grid.json",
+    blurb: "A generated test city. Not a real place — for trying the tools." },
+  { id: "nyc-midtown", name: "Midtown Manhattan", status: "soon",
+    bbox: [40.745, -74.000, 40.770, -73.970], pack: "/regions/nyc-midtown.json",
+    blurb: "Times Square, Bryant Park, the Garment District." },
+  { id: "london-city", name: "City of London", status: "soon",
+    bbox: [51.505, -0.110, 51.525, -0.070], pack: "/regions/london-city.json",
+    blurb: "The Square Mile." },
+  { id: "paris-centre", name: "Paris Centre", status: "soon",
+    bbox: [48.850, 2.320, 48.870, 2.360], pack: "/regions/paris-centre.json",
+    blurb: "Île de la Cité and the Marais." },
+  { id: "tokyo-shibuya", name: "Shibuya", status: "soon",
+    bbox: [35.655, 139.690, 35.670, 139.710], pack: "/regions/tokyo-shibuya.json",
+    blurb: "The scramble and everything around it." },
+  { id: "sf-downtown", name: "Downtown San Francisco", status: "soon",
+    bbox: [37.780, -122.410, 37.800, -122.390], pack: "/regions/sf-downtown.json",
+    blurb: "Market Street and the Financial District." },
+];
+
+export const OSM_ATTRIBUTION = "\u00A9 OpenStreetMap contributors";
+
 export function getModuleLayers(modules) {
   if (modules.includes("module_uber")) return 500;
   const layerMods = STUDIO_MODULES.filter(m => m.type === "layers" && modules.includes(m.id) && m.layers);

@@ -80,8 +80,23 @@ const OVERPASS_FIXTURE = {
 };
 
 let overpassCalled = false;
+let overpassRequestCount = 0;
+const badBboxRequests = [];
 await page.route('**/api/buildings', r => {
   overpassCalled = true;
+  overpassRequestCount++;
+  // Inspect the bbox we were actually asked for. Returning the fixture no
+  // matter what is exactly how this stub hid a real bug for as long as it
+  // existed: the ↻ button was wired as onClick={loadBuildings}, so React passed
+  // the PointerEvent as the first argument, the override branch destructured
+  // {lat,lng} off it, and every reload sent {"south":null,...} — which the stub
+  // cheerfully answered with three Boston buildings.
+  try {
+    const body = JSON.parse(r.request().postData() || '{}');
+    for (const k of ['south', 'west', 'north', 'east']) {
+      if (!Number.isFinite(body[k])) badBboxRequests.push(`${k}=${JSON.stringify(body[k])}`);
+    }
+  } catch (err) { badBboxRequests.push(`unparseable body: ${err.message}`); }
   r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(OVERPASS_FIXTURE) });
 });
 // Also assert the client NEVER calls overpass-api.de directly any more —
@@ -138,10 +153,75 @@ const afterOffText = await page.locator('body').innerText();
 console.log('Status cleared after toggling off:', !/buildings? loaded/.test(afterOffText));
 
 console.log('Client never calls overpass-api.de directly (the CORS bug this fixed):', !calledOverpassDirectly);
+
+// ---------------------------------------------------------------------------
+// REGION PACKS. Inside a live LOK_REGIONS bbox the client must extrude from the
+// pre-baked static pack and must NOT touch /api/buildings at all — that is the
+// whole point of baking, and the OSM Foundation's policy reason for it.
+// Asserting only "buildings appeared" would pass even if the region code were
+// dead and Overpass had quietly served the view instead, so the decisive
+// assertion here is that the proxy call count does not move.
+// Getting the camera to a precise place turned out to be the whole difficulty
+// here, and it is worth recording why. Auto-rotate moves ~3 deg/sec, so between
+// a programmatic pointOfView and the reload click the longitude drifted 5-12
+// degrees and the camera left the region entirely. Pausing helps but is not
+// enough on its own: OrbitControls has enableDamping with dampingFactor 0.08,
+// so the existing angular velocity bleeds off over many frames rather than
+// stopping dead, leaving a residual ~0.7 degrees. Rather than guess a sleep
+// long enough to cover that, this waits until the camera has demonstrably
+// arrived. (The component now also suppresses auto-rotate at street level, but
+// a programmatic pointOfView fires no OrbitControls event, so the test still
+// pauses explicitly — as someone exploring a city would.)
+const pauseBtn = page.locator('button[aria-label="Pause globe rotation"]');
+if (await pauseBtn.count()) { await pauseBtn.click(); await page.waitForTimeout(300); }
+
+// The step above deliberately toggled the layer OFF, so switch it back on.
+await buildingsBtn.click();
+await page.waitForTimeout(400);
+const proxyCallsBeforeRegion = overpassRequestCount;
+
+// Centre of the "demo-grid" region declared in LOK_REGIONS.
+const TARGET = { lat: 40.710, lng: -74.0075 };
+await page.evaluate(t => window.__globe.pointOfView({ ...t, altitude: 0.1 }), TARGET);
+await page.waitForFunction(t => {
+  const p = window.__globe.pointOfView();
+  return p && Math.abs(p.lat - t.lat) < 0.004 && Math.abs(p.lng - t.lng) < 0.004;
+}, TARGET, { timeout: 15000 }).catch(async () => {
+  const p = await page.evaluate(() => window.__globe.pointOfView());
+  console.error(`camera never settled on the region: wanted ${JSON.stringify(TARGET)}, got ${JSON.stringify(p)}`);
+});
+await reloadBtn.click();
+await page.waitForTimeout(2500);
+
+const regionState = await page.evaluate(() => {
+  const txt = document.body.innerText || '';
+  let meshes = 0, tagged = 0;
+  const g = window.__globe;
+  if (g && g.scene) {
+    g.scene().traverse(o => {
+      if (o.isMesh && o.userData && o.userData.regionId) { meshes++; if (o.userData.wayId) tagged++; }
+    });
+  }
+  return { meshes, tagged, showsRegion: /Sandbox City/.test(txt), showsAttribution: /OpenStreetMap contributors/.test(txt) };
+});
+
+const proxyUntouched = overpassRequestCount === proxyCallsBeforeRegion;
+console.log('Region pack extruded meshes (expect > 0):', regionState.meshes);
+console.log('Meshes carry their OSM way id, so art can be keyed to a building:', regionState.tagged === regionState.meshes && regionState.tagged > 0);
+console.log('Region name shown in the UI:', regionState.showsRegion);
+console.log('ODbL attribution displayed (licence requirement):', regionState.showsAttribution);
+console.log('Did NOT fall back to /api/buildings inside a baked region:', proxyUntouched);
+
+const regionOk = regionState.meshes > 0 && regionState.tagged === regionState.meshes
+  && regionState.showsRegion && regionState.showsAttribution && proxyUntouched;
+
+console.log('Every /api/buildings request carried a real numeric bbox:', badBboxRequests.length === 0,
+  badBboxRequests.length ? `(bad: ${badBboxRequests.slice(0, 4).join(', ')})` : '');
 console.log('Page errors:', errors);
 await browser.close();
 stop();
 
-const ok = overpassCalled && allThreeExtruded && !calledOverpassDirectly && errors.length === 0;
+
+const ok = badBboxRequests.length === 0 && regionOk && overpassCalled && allThreeExtruded && !calledOverpassDirectly && errors.length === 0;
 console.log(ok ? '\nBUILDINGS OK — 3D extrusion layer resolves to real geometry via the same-origin proxy, never calling Overpass directly.' : '\nBUILDINGS FAILED');
 process.exit(ok ? 0 : 1);
