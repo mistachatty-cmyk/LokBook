@@ -33,6 +33,7 @@ import NameTag from "./NameTag.jsx";
 import { FramedAvatar, ReactionIcon, PageEffect, SkyEffect, GlobalStyle } from "./art.jsx";
 import LilLokPanel, { LilLokBubble, LilLokSprite } from "./LilLok.jsx";
 import { idleAnimationCss, bounceAnimationCss } from "./engine/blotLook.js";
+import { kvGet, kvSet } from "./engine/kv.js";
 import { BlotSpeech } from "./components/BlotSpeech.jsx";
 import { getBlotResponse } from "./engine/blotDialogue.js";
 import InterventionFX from "./InterventionFX.jsx";
@@ -109,17 +110,35 @@ const mem = new Map();
 // Without the localStorage rung the web build kept everything in memory only,
 // so a refresh silently wiped the gallery, Loks, LilLok and owned modules —
 // while Settings claimed "saves automatically on this device".
+// Tiers, in order: the Tauri host store, IndexedDB, localStorage, memory.
+//
+// IndexedDB was added ahead of localStorage because localStorage's ~5MB cap was
+// not a theoretical limit here — posts carry their frames inline as base64, so
+// a real gallery reaches it, `setItem` throws QuotaExceededError, and the write
+// silently failed. The app said "Gallery too big", which sounds like a warning
+// and actually meant the drawings existed only in memory and were lost on the
+// next reload. See engine/kv.js.
 const store = {
   async get(k) {
     try { if (typeof window !== "undefined" && window.storage) { const r = await window.storage.get(k); return r ? JSON.parse(r.value) : null; } } catch {}
-    try { if (typeof localStorage !== "undefined") { const raw = localStorage.getItem(k); if (raw != null) return JSON.parse(raw); } } catch {}
+    try { const v = await kvGet(k); if (v !== undefined) return v; } catch {}
+    // Read-through migration: an existing install has its save and gallery in
+    // localStorage. Return it, and copy it forward so the next write is not
+    // fighting the quota again. The localStorage copy is deliberately left in
+    // place — an interrupted migration must never be able to lose data.
+    try {
+      if (typeof localStorage !== "undefined") {
+        const raw = localStorage.getItem(k);
+        if (raw != null) { const parsed = JSON.parse(raw); kvSet(k, parsed); return parsed; }
+      }
+    } catch {}
     return mem.has(k) ? mem.get(k) : null;
   },
   async set(k, v) {
     mem.set(k, v);
     try { if (typeof window !== "undefined" && window.storage) { await window.storage.set(k, JSON.stringify(v)); return true; } } catch {}
-    // Throws QuotaExceededError once the gallery outgrows the ~5MB budget; the
-    // caller surfaces that as "Gallery too big".
+    if (await kvSet(k, v)) return true;
+    // Only reached when IndexedDB is unavailable (private mode, blocked storage).
     try { if (typeof localStorage !== "undefined") { localStorage.setItem(k, JSON.stringify(v)); return true; } } catch { return false; }
     return false;
   },
@@ -1308,6 +1327,8 @@ export default function LokApp(){
   const ads=adPlan({tier:vp.tier,orientation:vp.orientation,lokPass,kids});
   const[interstitial,setInterstitial]=useState(null);const lastInterstitialRef=useRef(0);
   const galleryRef=useRef([]); // kept current by the gallery-persist effect; read by cloud push so pushes need not depend on `posts`
+  // One warning per run of failures, reset when a write succeeds again.
+  const galleryFullRef=useRef(false);
   // LilLok's ink decays on a 12s interval. Reading `lillok` through a ref
   // instead of as a getSaveBlob dependency keeps that tick from changing
   // doSave's identity, which is what re-armed the debounced save — and with it
@@ -1382,7 +1403,26 @@ export default function LokApp(){
   const guardedAddLoks=useCallback(n=>{const now=Date.now();const x2=isActive(doubleLoksUntil,now);const amt=x2?n*2:n;const cap=x2?240:120;if(now-earnLog.current.ts>3600000){earnLog.current={ts:now,total:0};}if(earnLog.current.total+amt>cap){return;}earnLog.current.total+=amt;setLoks(l=>l+amt);setTotalEarned(t=>t+amt);},[doubleLoksUntil]);
   const addLoks=guardedAddLoks;
   const pushNotif=useCallback((msg,type="info")=>{setNotifications(ns=>[...ns.slice(-49),{id:Date.now(),msg,type,ts:Date.now()}]);setNotifUnread(n=>n+1);},[]);
-  const say=useCallback((m,type="default")=>{const id=Date.now()+Math.random();setToasts(t=>[...t.slice(-4),{id,msg:m,type}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),2600);},[]);
+  // Every toast used to hold for a flat 2600ms, however long it was. The
+  // comeback reward — "Welcome back! +50 Loks for taking a break" — is a
+  // sentence with a number in it and was gone before it could be read.
+  // Reading speed is roughly 12-15 characters/second for a glanceable message,
+  // so scale with length, and give success/error longer because they carry
+  // something the user is meant to act on or remember.
+  //
+  // The timeout was also never cleared, so a toast fired just before unmount
+  // left a setState scheduled against a dead component.
+  const toastTimers=useRef(new Set());
+  useEffect(()=>()=>{toastTimers.current.forEach(clearTimeout);toastTimers.current.clear();},[]);
+  const say=useCallback((m,type="default")=>{
+    const id=Date.now()+Math.random();
+    const text=String(m||"");
+    const base=type==="success"||type==="error"?3200:2200;
+    const ms=Math.min(9000,Math.max(base,base+text.length*70));
+    setToasts(t=>[...t.slice(-4),{id,msg:m,type}]);
+    const timer=setTimeout(()=>{toastTimers.current.delete(timer);setToasts(t=>t.filter(x=>x.id!==id));},ms);
+    toastTimers.current.add(timer);
+  },[]);
   // Applies a completed rewarded-ad view. Rewards flagged `server:true` touch
   // durable economy state and go through the claim_reward RPC, which enforces
   // the cooldown itself — the client cooldown below is only UI courtesy.
@@ -1443,7 +1483,7 @@ export default function LokApp(){
     if(save.daily?.day){if(save.daily.day===todayKey)loadedDaily=save.daily;else{const diff=Math.round((new Date(todayKey)-new Date(new Date(save.daily.day).toDateString()))/86400000);loadedDaily={day:todayKey,streak:diff===1?(save.daily.streak||0)+1:1,claimed:false,prompt:PROMPTS[todayPromptIdx]};}}
     gap=Date.now()-(save.lillok?.lastSeen||Date.now());const ll=save.lillok||lillok;const buffer=1-((ll.bond||0)/100)*0.5;const inkDrain=Math.min(ll.ink,Math.floor(gap/60000)*1.2*buffer);const newInk=Math.max(0,ll.ink-inkDrain);setLillok({...ll,stasis:ll.stasis||(newInk===0&&gap>600000),ink:newInk,inkZeroAt:null,lastSeen:Date.now()});}
     if(gap>=OFFLINE_BONUS_HOURS*60*60*1000&&(Date.now()-(save.lastOfflineBonus||0))>OFFLINE_BONUS_HOURS*60*60*1000){setLoks(l=>l+OFFLINE_BONUS_LOKS);setTotalEarned(t=>t+OFFLINE_BONUS_LOKS);setLastOfflineBonus(Date.now());setTimeout(()=>say(`Welcome back! +${OFFLINE_BONUS_LOKS} Loks for taking a break`,"success"),500);}
-    if(save?.comebackActive&&gap>=OFFLINE_BONUS_HOURS*60*60*1000){setLoks(l=>l+1000);setTotalEarned(t=>t+1000);setComebackActive(false);setLastComebackAward(Date.now());const style=save.comebackStyle||"confetti";setComebackCelebration(style);setTimeout(()=>{setComebackCelebration(null);say("Take a break! +25 Loks — click the bubble","success");},4500);}
+    if(save?.comebackActive&&gap>=OFFLINE_BONUS_HOURS*60*60*1000){setLoks(l=>l+1000);setTotalEarned(t=>t+1000);setComebackActive(false);setLastComebackAward(Date.now());const style=save.comebackStyle||"confetti";setComebackCelebration(style);setTimeout(()=>{setComebackCelebration(null);say("Take a break! +25 Loks — click the bubble","success");},7000);}
     setDaily(loadedDaily);const savedQ=save?.quests&&save.quests.day===todayKey?save.quests:{day:todayKey,items:makeQuests()};setQuests(savedQ);
     const userPosts=(savedGallery||[]).map(p=>({...p,voted:false,viewed:false}));setPosts([...userPosts,...seed]);if(!save||!save.onboarded)setShowOnboard(true);
     // Metadata for more posts costs far less than pixels for six: this used to
@@ -1654,7 +1694,14 @@ export default function LokApp(){
   useEffect(()=>{if(!activeTutorialId)return;setTutorialProgress(tp=>({...tp,[activeTutorialId]:{frames:studioFrames,frameDurations:studioFrameDurations,title:studioTitle}}));},[activeTutorialId,studioFrames,studioFrameDurations,studioTitle]);
   useEffect(()=>{if(tab!=="studio")setActiveTutorialId(null);},[tab]);
   useEffect(()=>{if(!ready)return;const t=setTimeout(doSave,400);return()=>clearTimeout(t);},[ready,doSave]);
-  useEffect(()=>{if(!ready)return;const userPosts=posts.filter(p=>!p.id?.startsWith("seed"));galleryRef.current=userPosts;const t=setTimeout(()=>{store.set(GALLERY_KEY,userPosts).then(ok=>{if(!ok)say("Gallery too big");});},500);return()=>clearTimeout(t);},[ready,posts]);
+  useEffect(()=>{if(!ready)return;const userPosts=posts.filter(p=>!p.id?.startsWith("seed"));galleryRef.current=userPosts;const t=setTimeout(()=>{store.set(GALLERY_KEY,userPosts).then(ok=>{
+      // This effect re-runs on EVERY posts change — publishing, voting, viewing,
+      // reacting, bot drops — so once storage was full it pushed an identical
+      // toast every time, three deep over the feed. `say` keys each toast on
+      // Date.now()+random, so identical messages never collapse. Warn once.
+      if(!ok&&!galleryFullRef.current){galleryFullRef.current=true;say("Gallery too big","error");}
+      else if(ok)galleryFullRef.current=false;
+    });},500);return()=>clearTimeout(t);},[ready,posts]);
   useEffect(()=>{if(!ready||kids)return;let interval=null;const startDecay=()=>{interval=setInterval(()=>setLillok(s=>{if(s.stasis)return s;if(s.ink===0){if(!s.inkZeroAt)return{...s,inkZeroAt:Date.now()};if(Date.now()-s.inkZeroAt>120000)return{...s,stasis:true,inkZeroAt:null};return s;}const buffer=1-(s.bond/100)*0.5;return{...s,ink:Math.max(0,s.ink-1.4*buffer)};}),12000);};const stopDecay=()=>{clearInterval(interval);interval=null;};const onVisible=()=>{if(document.visibilityState==="hidden")stopDecay();else startDecay();};startDecay();document.addEventListener("visibilitychange",onVisible);return()=>{stopDecay();document.removeEventListener("visibilitychange",onVisible);};},[ready,kids]);
   useEffect(()=>{const h=e=>{e.preventDefault();setInstallEvt(e);};window.addEventListener("beforeinstallprompt",h);return()=>window.removeEventListener("beforeinstallprompt",h);},[]);
   useEffect(()=>{const save=()=>doSave();window.addEventListener("beforeunload",save);return()=>window.removeEventListener("beforeunload",save);},[doSave]);
