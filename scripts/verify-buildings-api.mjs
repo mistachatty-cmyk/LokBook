@@ -37,6 +37,15 @@ const check = (label, cond) => {
 // prove is that OUR code makes the real request and handles the real
 // response shape either way, not that a third party's public server has
 // perfect uptime at the moment CI happens to run.
+//
+// The handler tries three mirrors in order before giving up (see
+// api/buildings.js), reporting a single `overpass_unavailable` if every one
+// of them refused, timed out, or errored — one shape regardless of which
+// mirror or failure mode struck last, since from the caller's side "all
+// three failed" is one outcome. An environment whose fetch() can't reach
+// any of the three at all (e.g. a sandboxed dev box with proxy-only egress,
+// confirmed separately via curl against the mirrors directly) should not
+// fail this test over that — it's exercising the same code path either way.
 {
   const res = mockRes();
   await handler({ method: 'POST', body: { south: 42.354, west: -71.067, north: 42.356, east: -71.065 } }, res);
@@ -45,7 +54,10 @@ const check = (label, cond) => {
     check('real bbox: at least one building way returned', (res._body?.elements || []).some(e => e.type === 'way' && e.tags?.building));
   } else {
     console.log(`(Overpass returned non-200 right now: ${JSON.stringify(res._body)} — treating as upstream flakiness, not a proxy bug, since the proxy correctly relayed it)`);
-    check('real bbox: clean relay of a real upstream response (200 or 502)', res._status === 502 && res._body?.error === 'overpass_error');
+    check(
+      'real bbox: clean relay of a real upstream response (200 or 502)',
+      res._status === 502 && res._body?.error === 'overpass_unavailable',
+    );
   }
 }
 

@@ -1112,15 +1112,19 @@ export const ownsCosmetic = (owned, cat, id) => ownedIds(owned, cat).includes(id
 
 // Globe.gl configuration for world map visualization
 export const GLOBE_CONFIG = {
-  tileLayer: 'USGS',
-  // There used to be a fifth entry here, `USGS / "USGS Imagery"`, whose url was
-  // BYTE-IDENTICAL to `satellite` — two chips, one map — and whose label was
-  // wrong anyway (the imagery is Esri's, not USGS's). Removed: a duplicate
+  tileLayer: 'OSM',
+  // OpenStreetMap first, and it is the default: it is what building extrusion
+  // and street mode are built against, so it should be the first thing offered
+  // rather than buried after imagery that carries no footprints at all.
+  //
+  // There used to be a fourth entry here, `USGS / "USGS Imagery"`, whose url
+  // was BYTE-IDENTICAL to `satellite` — two chips, one map — and whose label
+  // was wrong anyway (the imagery is Esri's, not USGS's). Removed: a duplicate
   // option that silently does nothing is worse than no option.
   tileLayerOptions: [
+    { id: 'OSM', name: 'OpenStreetMap', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
     { id: 'satellite', name: 'Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
     { id: 'terrain', name: 'Terrain', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}' },
-    { id: 'OSM', name: 'OpenStreetMap', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
   ],
   defaultGlobeRadius: 100,
   autoRotate: true,
