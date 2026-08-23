@@ -219,6 +219,13 @@ export function GlobalStyle({ T, pace = "sweep", speed = 1 }) {
   @keyframes loknudge{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
   @keyframes lokcount{from{opacity:0;transform:translateY(-6px) scale(1.3)}to{opacity:1;transform:translateY(0) scale(1)}}
   @keyframes lokwobble{0%,92%,100%{transform:translate(0,0)}93%{transform:translate(-2px,1px) rotate(-.15deg)}95%{transform:translate(1.5px,-1px) rotate(.15deg)}97%{transform:translate(-1px,.5px)}}
+  /* ---- Blot tap bounces. One @keyframes per BLOT_BOUNCES row; the table that
+     names them is engine/blotLook.js. Four of the five were sold for months
+     with no keyframe behind them, so every bounce style played "gentle". ---- */
+  @keyframes blotBounceEnergetic{0%{transform:scale(1)}30%{transform:scale(1.22) translateY(-7px)}60%{transform:scale(.94) translateY(2px)}100%{transform:scale(1)}}
+  @keyframes blotBounceBouncy{0%{transform:scale(1) translateY(0)}20%{transform:scale(1.18) translateY(-14px)}40%{transform:scale(.92) translateY(0)}60%{transform:scale(1.1) translateY(-7px)}80%{transform:scale(.97) translateY(0)}100%{transform:scale(1)}}
+  @keyframes blotBounceElastic{0%{transform:scaleX(1) scaleY(1)}25%{transform:scaleX(1.3) scaleY(.72)}45%{transform:scaleX(.78) scaleY(1.28) translateY(-9px)}65%{transform:scaleX(1.12) scaleY(.9)}85%{transform:scaleX(.95) scaleY(1.05)}100%{transform:scaleX(1) scaleY(1)}}
+  @keyframes blotBounceWobbly{0%{transform:rotate(0) translateY(0)}20%{transform:rotate(-9deg) translateY(-6px)}40%{transform:rotate(7deg) translateY(-2px)}60%{transform:rotate(-5deg) translateY(-4px)}80%{transform:rotate(3deg)}100%{transform:rotate(0) translateY(0)}}
   @keyframes loksheen{from{background-position:200% 0}to{background-position:-50% 0}}
   @keyframes inkdrop{0%{transform:scaleY(0.2) scaleX(0.8);opacity:0}40%{transform:scaleY(1.1) scaleX(0.95);opacity:1}60%{transform:scaleY(0.9) scaleX(1.05)}100%{transform:scale(1);opacity:1}}
   @keyframes fireanim{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}

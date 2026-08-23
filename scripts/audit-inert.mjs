@@ -39,6 +39,7 @@ const cats = [...new Set([...KNOWN, ...scrapeCats(read('src/pages/Shop.jsx'))])]
 const app = read('src/App.jsx');
 const shopLine = app.split('\n').find(l=>/<Shop\b/.test(l)) || '';
 const appNoShop = app.split('\n').filter(l=>!/<Shop\b/.test(l)).join('\n');
+const nameOnly=[];
 console.log('== COSMETIC CATEGORIES (consumed outside Shop) ==');
 for(const k of cats){
   const viaCosmetics=(consumerSrc.match(new RegExp(`cosmetics\\.${k}\\b`,'g'))||[]).length;
@@ -53,7 +54,51 @@ for(const k of cats){
     + (consumerFiles.filter(p=>!/App\.jsx$/.test(p)).map(read).join('\n').match(new RegExp(`\\b${k}\\b`,'g'))||[]).length;
   const n=viaCosmetics+viaTopLevel;
   const how=viaCosmetics&&viaTopLevel?'cosmetics+state':viaCosmetics?'cosmetics':viaTopLevel?'top-level state':'';
-  console.log(`${n? 'WIRED  ':'INERT  '} ${k.padEnd(14)} ${n} consumer(s)${how?`  [${how}]`:''}`);
+
+  // ---- "referenced" is not "rendered" -----------------------------------
+  // blotExpression, blotIdleAnimation and blotBounce all reported WIRED here
+  // for months while rendering absolutely nothing. The only code outside the
+  // Shop that touched them was
+  //     BLOT_EXPRESSIONS.filter(p=>p.id===cosmetics.blotExpression)
+  // which reads the row's `giftReward` field to pick a random gift. The id
+  // satisfied the grep above and never reached the sprite: 14 items, 20-45
+  // Loks each, all drawing the default face and the default bounce.
+  //
+  // So also ask whether the value reaches something that can DRAW: passed as a
+  // JSX prop, used to index a renderer table, or fed to a style/animation/class.
+  // A category consumed only inside a catalogue lookup that reads some OTHER
+  // field is reported separately, because that is indistinguishable from inert
+  // to anyone actually using the app.
+  // Three independent signals, because a prop is usually RENAMED at the
+  // component boundary (`expression={cosmetics.blotExpression}` becomes plain
+  // `expression` inside the sprite), so grepping the category name inside the
+  // renderer alone is not enough:
+  //   a) the name appears in some non-App, non-Shop file — a real renderer;
+  //   b) App.jsx passes it into a JSX element as a prop value;
+  //   c) App.jsx passes it as a call argument (e.g. getBlotResponse(...)),
+  //      or uses it to index a table, or feeds it to a style/animation.
+  // Deliberately NOT counted: `x.id === cosmetics.<k>` catalogue lookups and
+  // useEffect dependency arrays. Those are exactly what made three sellable
+  // categories look wired while drawing nothing.
+  const inRenderer = consumerFiles.some(f => !/App\.jsx$/.test(f) && new RegExp(`\\b${k}\\b`).test(read(f)));
+  const appLines = appNoShop.split('\n');
+  const asJsxProp = appLines.some(l => /<[A-Z]\w*/.test(l) && new RegExp(`\\w+=\\{[^}]{0,120}(cosmetics\\.)?${k}\\b`).test(l));
+  const asArgOrStyle = appLines.some(l =>
+    new RegExp(`\\(\\s*cosmetics\\.${k}\\s*[,)]`).test(l) ||
+    new RegExp(`\\[\\s*cosmetics\\.${k}\\s*\\]`).test(l) ||
+    (new RegExp(`cosmetics\\.${k}\\b`).test(l) && /(style=|animation|className|filter:|background)/.test(l)));
+  const rendered = inRenderer || asJsxProp || asArgOrStyle;
+  let tag = n ? 'WIRED  ' : 'INERT  ';
+  let note = how ? `  [${how}]` : '';
+  if (n && !rendered) {
+    tag = 'NAME-ONLY';
+    note += '  <- referenced but never reaches a renderer: nothing on screen changes';
+    nameOnly.push(k);
+  }
+  console.log(`${tag.padEnd(9)} ${k.padEnd(14)} ${n} consumer(s)${note}`);
+}
+if (nameOnly.length) {
+  console.log(`\n!! ${nameOnly.length} category(ies) are sellable and NAME-ONLY: ${nameOnly.join(', ')}`);
 }
 
 // 1b. rotation items (mythic/daily/weekly) — a separate id-space from `cosmetics`,
