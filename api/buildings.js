@@ -45,23 +45,48 @@ export default async function handler(req, res) {
 
   const query = `[out:json][timeout:15];way["building"](${south},${west},${north},${east});out geom;`;
 
-  try {
-    const upstream = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      body: query,
-      headers: { "Content-Type": "text/plain" },
-    });
-    if (!upstream.ok) {
-      return res.status(502).json({ error: "overpass_error", status: upstream.status });
+  // overpass-api.de is the reference instance and the one every existing
+  // deploy has hit exclusively — it is also the most rate-limited under
+  // real (non-test) traffic, which is exactly what a live 502 from it looks
+  // like. The FOSS Overpass mirrors below run the same query language
+  // against the same underlying OSM data, so a failure on one is a mirror
+  // problem, not a "this bbox has no buildings" problem. Tried in order,
+  // first success wins; only failing all three is reported upstream.
+  const MIRRORS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.openstreetmap.ru/api/interpreter",
+  ];
+
+  let lastErr = null;
+  for (const url of MIRRORS) {
+    try {
+      // AbortController rather than relying on the platform's own function
+      // timeout: a hung upstream would otherwise burn the whole serverless
+      // invocation on one mirror instead of leaving time to try the next.
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 12_000);
+      const upstream = await fetch(url, {
+        method: "POST",
+        body: query,
+        headers: { "Content-Type": "text/plain" },
+        signal: ac.signal,
+      });
+      clearTimeout(timer);
+      if (!upstream.ok) {
+        lastErr = { error: "overpass_error", status: upstream.status, mirror: url };
+        continue;
+      }
+      const data = await upstream.json();
+      // Building footprints don't change minute to minute — a short shared
+      // cache means two people looking at the same block don't each cost a
+      // fresh Overpass query.
+      res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
+      return res.status(200).json(data);
+    } catch (err) {
+      console.error("buildings: overpass fetch failed", url, err?.name, err?.message);
+      lastErr = { error: "overpass_unreachable", message: err?.message || String(err), mirror: url };
     }
-    const data = await upstream.json();
-    // Building footprints don't change minute to minute — a short shared
-    // cache means two people looking at the same block don't each cost a
-    // fresh Overpass query.
-    res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
-    return res.status(200).json(data);
-  } catch (err) {
-    console.error("buildings: overpass fetch failed", err?.name, err?.message);
-    return res.status(502).json({ error: "overpass_unreachable", message: err?.message || String(err) });
   }
+  return res.status(502).json(lastErr || { error: "overpass_unreachable" });
 }

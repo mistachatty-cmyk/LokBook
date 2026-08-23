@@ -1053,12 +1053,16 @@ export const ownsCosmetic = (owned, cat, id) => ownedIds(owned, cat).includes(id
 
 // Globe.gl configuration for world map visualization
 export const GLOBE_CONFIG = {
-  tileLayer: 'USGS',
+  tileLayer: 'OSM',
+  // OpenStreetMap first: it's WorldMapViewer's default `tileSource` and the
+  // one building extrusion / Street View are built against, so it should
+  // also be the first thing offered in the Map chip row, not buried after
+  // imagery options that don't carry building footprints at all.
   tileLayerOptions: [
-    { id: 'USGS', name: 'USGS Imagery', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
     { id: 'OSM', name: 'OpenStreetMap', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
     { id: 'satellite', name: 'Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
     { id: 'terrain', name: 'Terrain', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}' },
+    { id: 'USGS', name: 'USGS Imagery', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
   ],
   defaultGlobeRadius: 100,
   autoRotate: true,

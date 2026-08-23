@@ -37,6 +37,16 @@ const check = (label, cond) => {
 // prove is that OUR code makes the real request and handles the real
 // response shape either way, not that a third party's public server has
 // perfect uptime at the moment CI happens to run.
+//
+// The handler now tries three mirrors in order before giving up (see
+// api/buildings.js), so a 502 here can carry either error code depending on
+// which failure mode struck last: `overpass_error` if a mirror answered with
+// a bad HTTP status, `overpass_unreachable` if the request itself couldn't
+// complete (network error, or our own abort on a slow mirror). Both are the
+// same "we tried, upstream/network isn't cooperating right now" outcome this
+// check exists to allow — an environment whose fetch() can't reach any of
+// the three (e.g. a sandboxed dev box with proxy-only egress) should not
+// fail this test over that.
 {
   const res = mockRes();
   await handler({ method: 'POST', body: { south: 42.354, west: -71.067, north: 42.356, east: -71.065 } }, res);
@@ -45,7 +55,10 @@ const check = (label, cond) => {
     check('real bbox: at least one building way returned', (res._body?.elements || []).some(e => e.type === 'way' && e.tags?.building));
   } else {
     console.log(`(Overpass returned non-200 right now: ${JSON.stringify(res._body)} — treating as upstream flakiness, not a proxy bug, since the proxy correctly relayed it)`);
-    check('real bbox: clean relay of a real upstream response (200 or 502)', res._status === 502 && res._body?.error === 'overpass_error');
+    check(
+      'real bbox: clean relay of a real upstream response (200 or 502)',
+      res._status === 502 && (res._body?.error === 'overpass_error' || res._body?.error === 'overpass_unreachable'),
+    );
   }
 }
 

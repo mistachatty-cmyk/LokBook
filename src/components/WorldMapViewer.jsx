@@ -452,6 +452,10 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
   useEffect(() => { loadBuildingsRef.current = loadBuildings; }, [loadBuildings]);
   const buildingsOnRef = useRef(buildingsOn);
   useEffect(() => { buildingsOnRef.current = buildingsOn; }, [buildingsOn]);
+  // Timestamp of the user's last manual drag/pinch/wheel on the globe. The
+  // gyro-follow effect below reads this to back off for a few seconds after
+  // any real interaction — see that effect's comment for why this exists.
+  const lastManualInteractionRef = useRef(0);
 
   useEffect(() => {
     if (!buildingsOn) { clearBuildings(); return; }
@@ -474,7 +478,14 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
 
   // null = the stylised skin texture (default). Anything else streams real
   // slippy-map tiles at increasing detail as you zoom in.
-  const [tileSource, setTileSource] = useState(null);
+  // Defaults to real OpenStreetMap tiles, not the decorative Skin texture.
+  // Skin is a flat, non-geographic globe wrap — it has no street-level
+  // detail at any zoom and no way to derive lat/lng for buildings, so
+  // opening on it made the whole point of LokWorld (zoom in, see streets,
+  // extrude buildings) invisible by default. A first-time visitor landing
+  // on Skin has no way to discover that OpenStreetMap exists one tap away
+  // in the Map row below.
+  const [tileSource, setTileSource] = useState('OSM');
   // Border frame around the whole view: hairline -> glow -> off. Themed, so it
   // recolours whenever the app theme changes.
   const [frameMode, setFrameMode] = useState('line'); // 'line' | 'glow' | 'off'
@@ -620,6 +631,12 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           }, 900);
         };
         if (controls) controls.addEventListener('end', onControlsSettled);
+        // 'start' fires on the first pointer/wheel movement of a drag, pinch
+        // or scroll — the earliest, cheapest signal that the user is
+        // steering the camera themselves, which the gyro-follow effect
+        // below needs to yield to. See that effect's comment.
+        const onControlsStart = () => { lastManualInteractionRef.current = Date.now(); };
+        if (controls) controls.addEventListener('start', onControlsStart);
 
         // Dev-only: reposition the user's own pin by tapping the globe.
         // Reads devMode from a ref rather than the effect's own deps, so
@@ -670,6 +687,7 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
         window.removeEventListener('resize', handleResize);
         clearTimeout(buildingsDebounce);
         if (controls) controls.removeEventListener('end', onControlsSettled);
+        if (controls) controls.removeEventListener('start', onControlsStart);
         // A theme/skin/tile change tears down and rebuilds the whole scene
         // (Effect 1's own deps) — if Street View was active, its camera hack
         // (disabled controls, retargeted at a ground point) belongs to the
@@ -1010,6 +1028,17 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     // update, which on a phone arrives ~60x/sec.
     const gx = gyroMotion.gamma || 0, gy = gyroMotion.beta || 0;
     if (gx === 0 && gy === 0) return;
+    // Street View re-derives the camera from svEyePosRef every frame and
+    // has no `baseLatitude`/`baseLongitude` concept at all — pointOfView()
+    // here would yank the camera back to orbiting the globe centre out from
+    // under it. And a recent manual drag/pinch/wheel (tracked via the
+    // OrbitControls 'start' listener above) means the user is actively
+    // steering; snapping lat/lng back toward this effect's fixed anchor a
+    // moment later reads as "the map won't let me navigate," which is
+    // exactly the bug the altitude-preserving fix above already solved for
+    // zoom specifically — this is the same fight over position instead.
+    if (streetViewOnRef.current) return;
+    if (Date.now() - lastManualInteractionRef.current < 2500) return;
     const baseLongitude = 0;
     const baseLatitude = 20;
     cameraRotationRef.current = {
@@ -1495,7 +1524,12 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'rgba(255,255,255,.5)', width: 56, flexShrink: 0 }}>Map</span>
               <div className="lok-chip-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
-                {[{ id: null, name: '✨ Skin' }, ...GLOBE_CONFIG.tileLayerOptions.map(o => ({ id: o.id, name: o.name }))]
+                {/* Real map sources first — they're what makes street level,
+                    zoom detail and building extrusion possible at all.
+                    Skin (a flat decorative texture with no geographic tiles)
+                    goes last, since picking it opts OUT of all of that
+                    rather than being the "main" choice. */}
+                {[...GLOBE_CONFIG.tileLayerOptions.map(o => ({ id: o.id, name: o.name })), { id: null, name: '✨ Skin' }]
                   .map(opt => {
                     const active = tileSource === opt.id;
                     return (
