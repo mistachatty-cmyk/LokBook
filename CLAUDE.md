@@ -121,3 +121,52 @@ driven from the real ✦ button) before any commit touching these. Neither subst
   React passes the PointerEvent as the first argument; it is truthy, has no `lat`/`lng`, and
   produced a NaN bbox on every ↻ reload. A stub that answers regardless of the bbox it is asked
   for will hide this — `verify:buildings` now inspects the request body.
+
+## Street mode is a separate scene, in metres
+
+`engine/streetScene.js` is its own Three.js scene, camera and renderer, built on entry and
+disposed on exit. The globe keeps orbit duty and is simply covered.
+
+- **Street level is unreachable on the globe. This is arithmetic, not tuning.** three-globe's
+  sphere is radius 100 for 6,371 km, so 1 unit = 63,710 m and a person is `2.7e-5` units tall —
+  below any workable near plane. The old street mode "solved" this with a 0.054-unit eye height
+  (3,440 m) balanced against a 0.09-unit storey (5,734 m), which is self-consistent nonsense and
+  is exactly the reported "hovers above the street, nothing extrudes".
+- **`verify:streetscene` reads metres, from the button a user taps.** It clicks the real
+  `🏙 3D City` chip over a real baked city and asserts eye height is 1.6–1.8 m, the nearest
+  building is within 100 m, nothing is taller than 900 m, the horizon projects on screen, walking
+  50 m moves you 50 m, and pitch cannot pass the floor. Every previous gate passed on the 3.4 km
+  camera because none of them ever asked how high it was.
+- **OrbitControls damping is inertia, and inertia is a bug near the ground.** After auto-rotate
+  is switched off the camera keeps coasting: measured 1.25° of longitude (105 km) after arriving
+  over Times Square, so "walk here" looked for a city 105 km away and correctly found none.
+  `nearGround` now disables damping, and it is maintained from the controls' `change` event — the
+  `end` event only fires for human drags, so every programmatic fly-to used to leave the planet
+  spinning underneath you.
+- **Before any programmatic `pointOfView()`, call `stillTheCamera()`.** OrbitControls holds a
+  pending rotation delta between frames; without consuming it first, one frame of it (0.085°,
+  7 km) lands the camera outside the city bbox it was aimed at.
+- **Each building is its own mesh on purpose.** Merging them would be faster and would make
+  painting impossible — Stage 3 raycasts to one building and keys art to its OSM way id.
+- **`engine/mapQuality.js` budgets rendering, never access.** Same rule as `deviceTier.js`:
+  every tier enters street mode and sees real buildings; a low tier draws less of the city and
+  defaults ambience off. `verify:mapquality` fails if the tiers are not strictly increasing, if
+  the low tier casts shadows, or if it drops so low it becomes a lockout.
+
+## Baking region packs (`scripts/bake-pmtiles.mjs`)
+
+Runs offline, reads an OSM-derived PMTiles archive by HTTP range request, writes
+`public/regions/<id>.json`. The shipped app never contacts that host. Adding a city is a bake
+plus flipping `status` to `live` in `LOK_REGIONS`.
+
+- **Overpass cannot back this feature.** Measured: a query that succeeded once returned
+  503/500/timeout from all three mirrors within minutes of repeated use. The hardening in
+  `api/buildings.js` helps and it remains the fallback outside a baked region, but it cannot be
+  the primary path.
+- **Varints in a planet-scale archive exceed 32 bits.** `<<` is 32-bit in JS, so large tile
+  offsets wrap to small ones, range requests land on unrelated bytes, and tiles "decode" into
+  protobuf wire-type errors. Multiply by `2**shift` instead.
+- **OSM carries buildings tagged under 15 cm tall.** They round to zero storeys and extrude to
+  invisible flat meshes; `levelsFrom` clamps to [1, 200]. `verify:regions` caught this on real
+  data in two cities — it has never needed sabotaging to prove it can fail.
+- Packs are **not** precached by the service worker. They load on demand, per region.

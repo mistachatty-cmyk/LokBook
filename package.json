@@ -19,7 +19,6 @@
     "verify:world": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-world.mjs",
     "verify:buildings": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-buildings.mjs",
     "verify:buildings-api": "node scripts/verify-buildings-api.mjs",
-    "verify:streetview": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-streetview.mjs",
     "verify:cosmetics": "node scripts/verify-cosmetics.mjs",
     "verify:strokes": "node scripts/verify-strokes.mjs",
     "verify:lok": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-lok.mjs",
@@ -36,7 +35,9 @@
     "verify:brushengine": "LOK_TEST_HARNESS=1 vite build && node scripts/verify-brushengine.mjs",
     "verify:worldstore": "node scripts/verify-worldstore.mjs",
     "verify:regions": "node scripts/verify-regions.mjs",
-    "bake:region": "node scripts/bake-region.mjs"
+    "bake:region": "node scripts/bake-region.mjs",
+    "verify:streetscene": "LOK_TEST_HARNESS=1 npm run build && node scripts/verify-streetscene.mjs",
+    "verify:mapquality": "node scripts/verify-mapquality.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",

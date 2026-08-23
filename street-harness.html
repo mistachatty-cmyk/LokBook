@@ -1,0 +1,41 @@
+<!doctype html>
+<html><body style="margin:0">
+<div id="root"></div>
+<script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import WorldMapViewer from '/src/components/WorldMapViewer.jsx';
+
+// Drives the REAL WorldMapViewer, then reaches street mode through the REAL
+// button a user taps. Nothing here constructs a street scene directly — that
+// is the whole point: verify:brushengine and verify:export both exist because
+// a feature can be perfect in isolation and completely unwired in the app.
+window.__h = { ready: false, error: null };
+window.addEventListener('error', e => { window.__h.error = e.message; });
+
+const root = createRoot(document.getElementById('root'));
+root.render(React.createElement(WorldMapViewer, {
+  posts: [],
+  userLocation: { lat: 40.758, lng: -73.9855 },
+  viewerId: 'me', theme: 'riso', skin: 'none',
+  gyroMotion: { gamma: 0, beta: 0, alpha: 0 },
+  onPostClick: () => {}, onClose: () => {},
+  onGlobeReady: g => { window.__globe = g; window.__h.ready = true; },
+  onThreeReady: THREE => { window.__THREE = THREE; },
+}));
+
+// Put the orbit camera over Times Square so street mode has a live region to
+// find. This is what the user does by flying there; the gate then clicks the
+// same chip they would.
+// Mirrors what flyToRegion() does in the app: stop the camera dead before
+// moving it. Without this the harness measures OrbitControls' pending
+// rotation delta rather than the feature under test.
+window.__goto = (lat, lng) => {
+  const g = window.__globe;
+  if (!g) return;
+  const c = g.controls();
+  if (c) { c.autoRotate = false; c.enableDamping = false; try { c.update(); } catch {} }
+  g.pointOfView({ lat, lng, altitude: 0.1 });
+};
+</script>
+</body></html>

@@ -90,6 +90,7 @@ export function decodePack(pack) {
 // --- Loading ----------------------------------------------------------------
 
 const cache = new Map();
+const rawCache = new Map();
 const inflight = new Map();
 
 /** Fetch and decode a region pack, memoised. Returns null if it can't load —
@@ -103,7 +104,9 @@ export async function loadRegion(region) {
     try {
       const res = await fetch(region.pack);
       if (!res.ok) throw new Error(`pack ${res.status}`);
-      const decoded = decodePack(await res.json());
+      const raw = await res.json();
+      rawCache.set(region.id, raw);
+      const decoded = decodePack(raw);
       cache.set(region.id, decoded);
       return decoded;
     } catch (err) {
@@ -116,6 +119,29 @@ export async function loadRegion(region) {
   })();
   inflight.set(region.id, p);
   return p;
+}
+
+/** Road centrelines for an already-loaded region, decoded on first ask.
+ *  Kept separate from loadRegion() on purpose: `roads` is an ADDITIVE field
+ *  that packs baked before it existed simply do not carry, and every caller of
+ *  loadRegion() expects an array of buildings back. Changing that return shape
+ *  to a { buildings, roads } object would have broken verify:regions and the
+ *  extruder alike for a field most callers never want. Returns [] for a region
+ *  that has not been loaded yet, or a pack with no roads. */
+export function roadsFor(region) {
+  const raw = rawCache.get(region?.id);
+  if (!raw?.roads?.length) return [];
+  const [oLat, oLng] = raw.origin;
+  const q = raw.q || 1e7;
+  return raw.roads.map(row => {
+    const points = [];
+    let lat = 0, lng = 0;
+    for (let i = 1; i < row.length; i += 2) {
+      lat += row[i]; lng += row[i + 1];
+      points.push({ lat: oLat + lat / q, lng: oLng + lng / q });
+    }
+    return { kind: row[0], points };
+  });
 }
 
 /** The live region containing this point, if any. */

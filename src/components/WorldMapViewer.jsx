@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { GLOBE_CONFIG, WORLD_SKINS, LOK_REGIONS, OSM_ATTRIBUTION } from '../constants.jsx';
-import { loadRegion, regionAt, buildingsNear } from '../engine/regions.js';
+import { loadRegion, regionAt, buildingsNear, roadsFor } from '../engine/regions.js';
+import { createStreetScene } from '../engine/streetScene.js';
+import { mapQuality } from '../engine/mapQuality.js';
 import { THEMES } from '../theme/theme.js';
 import { postsInBounds, putPost, capabilities } from '../engine/worldStore.js';
 
@@ -145,21 +147,10 @@ function buildMarkerMesh(THREE, kind, style, color) {
 const BUILDING_UNITS_PER_LEVEL = 0.09;
 const DEFAULT_BUILDING_LEVELS = 3;
 
-// Eye height for Street View mode, at the same deliberately-exaggerated
-// scale as buildings — a person is roughly 0.6 storeys tall.
-const EYE_HEIGHT_UNITS = BUILDING_UNITS_PER_LEVEL * 0.6;
-
-// Orthonormal (up, north, east) tangent basis at a point on the globe
-// surface — the same construction buildBuildingGeometry uses per-building,
-// factored out here since Street View needs it standalone (for the
-// camera's own position) rather than per-footprint.
-function localTangentBasis(THREE, point) {
-  const up = point.clone().normalize();
-  const seed = Math.abs(up.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-  const east = new THREE.Vector3().crossVectors(seed, up).normalize();
-  const north = new THREE.Vector3().crossVectors(up, east).normalize();
-  return { up, north, east };
-}
+// (There is deliberately no eye-height constant at globe scale any more. A
+// person is 2.7e-5 units tall on a radius-100 sphere; the old one claimed
+// 0.054 units — 3,440 m — and was "consistent" only with an equally wrong
+// building height. Street level lives in engine/streetScene.js, in metres.)
 
 // A building's OSM `levels`/`height` tags, normalised to a level count.
 function levelsForBuilding(tags = {}) {
@@ -444,6 +435,41 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       if (myReqId === buildingsReqIdRef.current) setBuildingsLoading(false);
     }
   }, [clearBuildings]);
+  // nearGround used to be maintained ONLY by OrbitControls' 'end' event, which
+  // fires when a human finishes a drag or pinch — and never for a programmatic
+  // camera move. So "Fly to me" and "fly to this city" both landed at street
+  // altitude with auto-rotation still running, and the planet slid out from
+  // under you: verify:streetscene measured the camera 2.8 degrees of longitude
+  // (~240 km) outside Midtown Manhattan a second and a half after arriving,
+  // which is why tapping "3D City" over Times Square found no city there.
+  // Polling altitude covers every way the camera can move, human or not.
+  // A 300ms poll was not fast enough: OrbitControls' 'change' fires on every
+  // frame the camera actually moves — autoRotate frames and damping-decay
+  // frames included — so the transition is caught on the first frame instead
+  // of up to 300ms and a degree of longitude later. setState is guarded by the
+  // ref, so this is one render on transition, not one per frame. The interval
+  // stays as a backstop for camera moves that somehow emit no event.
+  useEffect(() => {
+    if (!globeReady) return;
+    const check = () => {
+      const pv = globeRef.current?.pointOfView?.();
+      const low = !!pv && pv.altitude <= 0.35;
+      if (low !== nearGroundRef.current) {
+        nearGroundRef.current = low;
+        setNearGround(low);
+        // Kill the coast in the same frame we notice, rather than waiting for
+        // React to re-render and the autoRotate effect to run.
+        const c = globeRef.current?.controls?.();
+        if (c && low) { c.autoRotate = false; c.enableDamping = false; }
+      }
+    };
+    const controls = globeRef.current?.controls?.();
+    controls?.addEventListener?.('change', check);
+    const id = setInterval(check, 300);
+    check();
+    return () => { clearInterval(id); controls?.removeEventListener?.('change', check); };
+  }, [globeReady]);
+
   // Refs so the OrbitControls 'end' listener (added once, inside Effect 1's
   // one-time setup) always calls the current version of these without
   // needing to be in that effect's deps — the same pattern as
@@ -597,7 +623,10 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
           // to 1.5 units above three-globe's 100-unit default radius, close
           // enough that street-level tiles (tileMaxLevel:19) and building
           // extrusions actually read as something rather than a flat wash.
-          controls.minDistance = 101.5;
+          // 101.5 held the camera 95 km up at 1 unit = 63.7 km. Street level
+          // is streetScene.js's job now, but orbit should still get close
+          // enough to pick out a block.
+          controls.minDistance = 100.15;
           controls.maxDistance = 800;
           controls.enableDamping = true;
           controls.dampingFactor = 0.08;
@@ -777,6 +806,14 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     // must hold still regardless of what the rotation control says.
     controls.autoRotate = rotating && !flying && !nearGround && rotateSpeed > 0;
     controls.autoRotateSpeed = rotateSpeed;
+    // Damping is inertia: after autoRotate is switched off the camera keeps
+    // coasting as the residual velocity decays. Spinning a whole planet, that
+    // reads as weight and is the right call. At street altitude it is a bug —
+    // measured 1.25 degrees of longitude of coast after arriving over Times
+    // Square, which is 105 km, so "walk here" looked for a city 105 km away
+    // and correctly reported there wasn't one. Near the ground, stop means
+    // stop.
+    controls.enableDamping = !nearGround;
   }, [rotateSpeed, rotating, flying, nearGround, globeReady]);
 
   // "Fly to me" — animates the camera to the user's own marker via globe.gl's
@@ -827,150 +864,156 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
     setTiltLabel(preset.label);
   }, []);
 
-  // Street View: stand at a fixed point near the ground and look freely
-  // around, including up at buildings — the actual ask, and a genuinely
-  // different camera mode from "orbit the whole planet," not a relabelled
-  // version of it.
-  //
-  // OrbitControls always computes camera.position from `target + spherical
-  // offset` and then does `camera.lookAt(target)` on every update() call
-  // (verified by reading node_modules/three's OrbitControls source directly
-  // rather than assuming) — so there is no way to hold the camera fixed and
-  // freely vary its look direction while `target` stays at the globe's
-  // centre. The fix is to stop treating `target` as the globe centre at all
-  // while in this mode: keep the camera position fixed at a point just
-  // above the ground (`svEyePosRef`), and on every drag, move `target` to
-  // (eyePos + currentLookDirection). OrbitControls' own update() then
-  // re-derives its internal spherical state from (position - target) =
-  // -lookDirection, recomputes position = target + offset = eyePos
-  // (unchanged) and calls lookAt(target) = looking along lookDirection —
-  // exactly what's wanted, and stable under repeated update() calls (three-
-  // globe's own render loop calls it every frame) since the round-trip is
-  // idempotent when no new drag delta is being fed in. `controls.enabled =
-  // false` stops OrbitControls' own pointer listeners from also trying to
-  // orbit the globe centre at the same time as our drag handler runs.
+  // Street mode: stand on the ground at human height and look around, at a
+  // scale where a building is a building. The state flag lives here; the
+  // machinery is below, next to enterStreetView().
   const [streetViewOn, setStreetViewOn] = useState(false);
-  const svEyePosRef = useRef(null);
-  const svUpRef = useRef(null);
-  const svNorthRef = useRef(null);
-  const svEastRef = useRef(null);
-  const svYawRef = useRef(0);
-  const svPitchRef = useRef(0);
+
+  // ---- Street mode ------------------------------------------------------
+  // This used to be a camera trick ON the globe: pin the camera 0.054 units
+  // above the sphere and call that "eye height". At 1 unit = 63,710 m that is
+  // 3,440 m up, which is precisely the "hovers above the street, nothing is
+  // extruded" report. There is no pair of constants that fixes it — a person
+  // is 2.7e-5 units tall on this sphere, far below any usable near plane.
+  //
+  // So street mode now hands off to a SEPARATE scene measured in metres
+  // (engine/streetScene.js). The globe keeps orbiting duty and is simply
+  // hidden underneath; entering builds the metre scene from the region pack
+  // for wherever you are standing, exiting disposes it.
+  const streetRef = useRef(null);
+  const [streetError, setStreetError] = useState('');
+  const [streetInfo, setStreetInfo] = useState(null);
+  const [ambientMotion, setAmbientMotion] = useState(() => mapQuality().ambientMotion);
   const svExitPovRef = useRef(null);
   const svDraggingRef = useRef(false);
   const svLastPtrRef = useRef({ x: 0, y: 0 });
 
-  const applyStreetViewLook = useCallback(() => {
+  const exitStreetView = useCallback(() => {
+    try { streetRef.current?.dispose(); } catch {}
+    streetRef.current = null;
+    setStreetViewOn(false);
+    setStreetInfo(null);
+    setStreetError('');
     const globe = globeRef.current;
-    if (!globe || !svEyePosRef.current) return;
-    const camera = globe.camera?.(), controls = globe.controls?.();
-    if (!camera || !controls) return;
-    const north = svNorthRef.current, east = svEastRef.current, up = svUpRef.current;
-    const horiz = north.clone().multiplyScalar(Math.cos(svYawRef.current))
-      .add(east.clone().multiplyScalar(Math.sin(svYawRef.current)));
-    const lookDir = horiz.multiplyScalar(Math.cos(svPitchRef.current))
-      .add(up.clone().multiplyScalar(Math.sin(svPitchRef.current)));
-    camera.position.copy(svEyePosRef.current);
-    camera.up.copy(up);
-    controls.target.copy(svEyePosRef.current).add(lookDir);
-    controls.update();
+    if (globe && svExitPovRef.current) {
+      const c = globe.controls?.();
+      if (c) c.enabled = true;
+      globe.pointOfView({ lat: svExitPovRef.current.lat, lng: svExitPovRef.current.lng, altitude: 0.25 }, 700);
+    }
   }, []);
 
-  // OrbitControls.update() clamps the camera-to-target OFFSET length to
-  // [minDistance, maxDistance] on every single call, unconditionally —
-  // verified by reading the same update() implementation cited above. The
-  // street-view trick above deliberately makes that offset tiny (the unit
-  // lookDir vector, length 1), since target sits right next to the camera
-  // — but the globe's normal 101.5–800 clamp range was silently inflating
-  // that length-1 offset back up to 101.5 every frame, dragging the camera
-  // ~100 units away from the eye point it was supposed to be pinned to.
-  // First attempt at this feature shipped with that bug; caught by
-  // verify-streetview.mjs actually reading the resulting camera distance
-  // instead of trusting the code by inspection. Fixed by relaxing the
-  // clamp for the duration of street view and restoring the globe's normal
-  // range on exit.
-  const svPrevDistanceRef = useRef(null);
-
-  const enterStreetView = useCallback(() => {
+  const enterStreetView = useCallback(async () => {
     const globe = globeRef.current, THREE = threeRef.current;
     if (!globe || !THREE) return;
     const pov = globe.pointOfView();
     if (!pov) return;
-    const controls = globe.controls();
-    const R = globe.getGlobeRadius ? globe.getGlobeRadius() : 100;
-    const c = globe.getCoords(pov.lat, pov.lng, 0);
-    const groundPoint = new THREE.Vector3(c.x, c.y, c.z).normalize().multiplyScalar(R);
-    const { up, north, east } = localTangentBasis(THREE, groundPoint);
-    svUpRef.current = up;
-    svNorthRef.current = north;
-    svEastRef.current = east;
-    svEyePosRef.current = groundPoint.clone().add(up.clone().multiplyScalar(EYE_HEIGHT_UNITS));
-    svYawRef.current = 0;
-    svPitchRef.current = 0;
     svExitPovRef.current = { lat: pov.lat, lng: pov.lng };
-    setRotating(false);
-    if (controls) {
-      svPrevDistanceRef.current = { min: controls.minDistance, max: controls.maxDistance };
-      controls.minDistance = 0.01;
-      controls.maxDistance = 10;
-      controls.enabled = false;
-    }
-    applyStreetViewLook();
-    setStreetViewOn(true);
-    loadBuildingsRef.current?.({ lat: pov.lat, lng: pov.lng });
-  }, [applyStreetViewLook]);
 
-  const exitStreetView = useCallback(() => {
-    const globe = globeRef.current;
-    if (!globe) return;
-    const controls = globe.controls();
-    if (controls) {
-      controls.enabled = true;
-      controls.target.set(0, 0, 0);
-      if (svPrevDistanceRef.current) {
-        controls.minDistance = svPrevDistanceRef.current.min;
-        controls.maxDistance = svPrevDistanceRef.current.max;
-        svPrevDistanceRef.current = null;
+    const region = regionAt(LOK_REGIONS, pov.lat, pov.lng);
+    if (!region) {
+      // Nearest live city, so "not here" is actionable rather than a dead end.
+      const live = LOK_REGIONS.filter(r => r.status === 'live' && !r.synthetic);
+      let best = null, bestD = Infinity;
+      for (const r of live) {
+        const cl = (r.bbox[0] + r.bbox[2]) / 2, cg = (r.bbox[1] + r.bbox[3]) / 2;
+        const d = Math.hypot(cl - pov.lat, cg - pov.lng);
+        if (d < bestD) { bestD = d; best = r; }
       }
+      setStreetError(best
+        ? `No 3D city here yet. Nearest is ${best.name} — tap to fly there.`
+        : 'No 3D city here yet.');
+      setStreetInfo(best ? { nearest: best } : null);
+      return;
     }
-    setStreetViewOn(false);
-    if (svExitPovRef.current) {
-      globe.pointOfView({ lat: svExitPovRef.current.lat, lng: svExitPovRef.current.lng, altitude: 0.3 }, 700);
+
+    setStreetError('');
+    let decoded = null;
+    try { decoded = await loadRegion(region); }
+    catch (err) { setStreetError(`Could not load ${region.name} — ${err?.name || 'Error'}: ${err?.message || String(err)}`); return; }
+    if (!decoded || !decoded.length) {
+      setStreetError(`${region.name} has no baked buildings yet.`);
+      return;
     }
+
+    const q = mapQuality();
+    // A generous working set: the scene's own budget does the real cutting,
+    // nearest-first, so the block you stand in survives a low tier.
+    const near = buildingsNear(decoded, pov.lat, pov.lng, 0.012, q.maxBuildings * 2);
+    const packRoads = roadsFor(region) || [];
+
+    try { globe.controls().enabled = false; } catch {}
+    setRotating(false);
+
+    try {
+      streetRef.current = createStreetScene({
+        THREE,
+        container: containerRef.current,
+        origin: { lat: pov.lat, lng: pov.lng },
+        buildings: near,
+        roads: packRoads,
+        quality: q,
+        ambient: ambientMotion,
+        palette: {
+          skyTop: T.accent, skyBottom: T.paper, ground: T.alt,
+          road: T.ink, wall: T.card,
+        },
+      });
+    } catch (err) {
+      setStreetError(`Street mode failed — ${err?.name || 'Error'}: ${err?.message || String(err)}`);
+      try { globe.controls().enabled = true; } catch {}
+      return;
+    }
+    setStreetInfo({ region, quality: q, buildings: streetRef.current.state().buildingCount });
+    setStreetViewOn(true);
+  }, [ambientMotion, T]);
+
+  /** Stop the camera dead before a programmatic move. OrbitControls holds a
+   *  pending rotation delta between frames; if auto-rotate was running when
+   *  pointOfView() fires, that delta is applied on the very next frame and
+   *  drags the camera off target. Measured 0.085 degrees of longitude — 7 km —
+   *  which is enough to land outside a city bbox and report "no 3D city here".
+   *  Calling update() with the drivers off consumes and zeroes the delta. */
+  const stillTheCamera = useCallback(() => {
+    const c = globeRef.current?.controls?.();
+    if (!c) return;
+    c.autoRotate = false;
+    c.enableDamping = false;
+    try { c.update(); } catch {}
   }, []);
 
-  // Walk forward/back along the current horizontal look direction (yaw
-  // only — pitch doesn't affect where your feet go). Re-projects onto the
-  // sphere surface after each step (a straight tangent-plane offset drifts
-  // very slightly above the true curvature) and recomputes the local basis
-  // at the new spot, then reloads buildings for wherever you've walked to.
-  const stepStreetView = useCallback((dir) => {
-    const globe = globeRef.current, THREE = threeRef.current;
-    if (!globe || !THREE || !svUpRef.current) return;
-    const STEP = 0.1;
-    const R = globe.getGlobeRadius ? globe.getGlobeRadius() : 100;
-    const horiz = svNorthRef.current.clone().multiplyScalar(Math.cos(svYawRef.current))
-      .add(svEastRef.current.clone().multiplyScalar(Math.sin(svYawRef.current)));
-    const oldGround = svEyePosRef.current.clone().sub(svUpRef.current.clone().multiplyScalar(EYE_HEIGHT_UNITS));
-    const newGround = oldGround.add(horiz.multiplyScalar(STEP * dir)).normalize().multiplyScalar(R);
-    const { up, north, east } = localTangentBasis(THREE, newGround);
-    svUpRef.current = up;
-    svNorthRef.current = north;
-    svEastRef.current = east;
-    svEyePosRef.current = newGround.clone().add(up.clone().multiplyScalar(EYE_HEIGHT_UNITS));
-    applyStreetViewLook();
-    const geo = globe.toGeoCoords(newGround);
-    if (geo) loadBuildingsRef.current?.({ lat: geo.lat, lng: geo.lng });
-  }, [applyStreetViewLook]);
+  /** Fly the orbit camera to a region's landmark, then walk it. The landmark
+   *  is a data row on the region (`LOK_REGIONS`), so "take me to Times Square"
+   *  needs no special case for Times Square. */
+  const flyToRegion = useCallback((region) => {
+    const globe = globeRef.current;
+    if (!globe || !region) return;
+    const to = region.landmark || { lat: (region.bbox[0] + region.bbox[2]) / 2, lng: (region.bbox[1] + region.bbox[3]) / 2 };
+    setStreetError('');
+    setStreetInfo(null);
+    setRotating(false);
+    stillTheCamera();
+    globe.pointOfView({ lat: to.lat, lng: to.lng, altitude: 0.16 }, 1200);
+    // Enter after the tween lands — entering mid-flight would build the scene
+    // around wherever the camera happened to be passing over.
+    setTimeout(() => { enterStreetViewRef.current?.(); }, 1300);
+  }, [stillTheCamera]);
 
-  // Drag-to-look, mouse and touch alike (pointer events unify both). Only
-  // attached while Street View is actually on.
+  const enterStreetViewRef = useRef(enterStreetView);
+  useEffect(() => { enterStreetViewRef.current = enterStreetView; }, [enterStreetView]);
+
+  const stepStreetView = useCallback((dir) => {
+    streetRef.current?.walk(6 * dir);
+  }, []);
+
+  useEffect(() => { streetRef.current?.setAmbient(ambientMotion); }, [ambientMotion]);
+  useEffect(() => () => { try { streetRef.current?.dispose(); } catch {} }, []);
+
+  // Drag-to-look, mouse and touch alike. Only attached while street mode is on.
   useEffect(() => {
     if (!streetViewOn) return;
     const el = containerRef.current;
     if (!el) return;
-    const SENS = 0.006;
-    const MAX_PITCH = Math.PI / 2 - 0.05;
+    const SENS = 0.005;
     const onDown = e => {
       svDraggingRef.current = true;
       svLastPtrRef.current = { x: e.clientX, y: e.clientY };
@@ -980,25 +1023,29 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
       if (!svDraggingRef.current) return;
       const dx = e.clientX - svLastPtrRef.current.x, dy = e.clientY - svLastPtrRef.current.y;
       svLastPtrRef.current = { x: e.clientX, y: e.clientY };
-      svYawRef.current -= dx * SENS;
-      svPitchRef.current = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, svPitchRef.current - dy * SENS));
-      applyStreetViewLook();
+      // Pitch is clamped inside the scene, not here — one place, so a second
+      // caller can never look through the pavement.
+      streetRef.current?.look(-dx * SENS, -dy * SENS);
     };
     const onUp = e => {
       svDraggingRef.current = false;
       try { el.releasePointerCapture(e.pointerId); } catch {}
     };
+    const onResize = () => streetRef.current?.resize();
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
     el.addEventListener('pointercancel', onUp);
+    window.addEventListener('resize', onResize);
     return () => {
       el.removeEventListener('pointerdown', onDown);
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', onUp);
       el.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('resize', onResize);
     };
-  }, [streetViewOn, applyStreetViewLook]);
+  }, [streetViewOn]);
+
   const streetViewOnRef = useRef(streetViewOn);
   useEffect(() => { streetViewOnRef.current = streetViewOn; }, [streetViewOn]);
 
@@ -1192,6 +1239,23 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
               {buildingsLoading ? '🏢 loading buildings…' : buildingsError ? `🏢 ${buildingsError}` : `🏢 ${buildingsCount} building${buildingsCount === 1 ? '' : 's'} loaded`}
             </div>
           )}
+          {/* "No 3D city here yet" is a dead end unless it says where the
+              nearest one is and offers to take you. Tapping flies straight to
+              the region's landmark and re-enters street mode there. */}
+          {streetError && !streetViewOn && (
+            <button
+              onClick={() => { if (streetInfo?.nearest) flyToRegion(streetInfo.nearest); }}
+              disabled={!streetInfo?.nearest}
+              style={{
+                textAlign: 'left', padding: '7px 12px', borderRadius: 12, maxWidth: 250,
+                background: 'rgba(0,0,0,.55)', border: `1px solid ${T.accent}`,
+                color: '#fff', fontSize: 10.5, fontWeight: 700, lineHeight: 1.45,
+                backdropFilter: 'blur(6px)', cursor: streetInfo?.nearest ? 'pointer' : 'default',
+              }}
+            >
+              🏙 {streetError}
+            </button>
+          )}
           {devMode && (
             <div style={{
               padding: '6px 11px', borderRadius: 10, width: 'fit-content', maxWidth: 200,
@@ -1380,8 +1444,25 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
             >
               ▶
             </button>
-            <span style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, opacity: 0.8, flex: 1 }}>
-              drag to look around
+            <button
+              className="lok-glass-btn"
+              onClick={() => setAmbientMotion(v => !v)}
+              aria-pressed={ambientMotion}
+              aria-label={ambientMotion ? 'Turn ambient motion off' : 'Turn ambient motion on'}
+              title={ambientMotion ? 'Traffic and clouds: on' : 'Traffic and clouds: off'}
+              style={{
+                height: 32, borderRadius: 999, flexShrink: 0, padding: '0 11px',
+                background: ambientMotion ? 'rgba(255,255,255,.34)' : 'rgba(255,255,255,.14)',
+                border: '1px solid rgba(255,255,255,.5)',
+                color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              {ambientMotion ? '🚗 Live' : '🚗 Still'}
+            </button>
+            <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, opacity: 0.8, flex: 1, minWidth: 0 }}>
+              {streetInfo?.region
+                ? `${streetInfo.region.name} · ${streetInfo.buildings} buildings · ${streetInfo.quality.label}`
+                : 'drag to look around'}
             </span>
           </div>
         ) : (<>
@@ -1433,8 +1514,12 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
             </button>
           </div>
 
+          {/* "Speed" used to label this whole row, which also contained the
+              tilt control, the buildings toggle and the buildings reload — the
+              label described only its first child. Split into Look (camera)
+              and City (what is on the ground). */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'rgba(255,255,255,.5)', width: 64, flexShrink: 0 }}>Speed</span>
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'rgba(255,255,255,.5)', width: 64, flexShrink: 0 }}>Look</span>
             <input
               type="range" min="0" max="3" step="0.1" value={rotateSpeed}
               onChange={e => setRotateSpeed(+e.target.value)}
@@ -1454,6 +1539,25 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
               }}
             >
               📐 {tiltLabel}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'rgba(255,255,255,.5)', width: 64, flexShrink: 0 }}>City</span>
+            <button
+              className="lok-glass-btn"
+              onClick={enterStreetView}
+              aria-label="Walk the streets in 3D"
+              title="Walk the streets in 3D"
+              style={{
+                flex: 1, height: 36, borderRadius: 999,
+                background: T.accent, border: `1px solid ${T.accent}`,
+                color: T.onAccent, fontSize: 12, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                cursor: 'pointer',
+              }}
+            >
+              🏙 Walk here
             </button>
             <button
               className="lok-glass-btn"
@@ -1495,13 +1599,21 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'rgba(255,255,255,.5)', width: 56, flexShrink: 0 }}>Map</span>
               <div className="lok-chip-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
-                {[{ id: null, name: '✨ Skin' }, ...GLOBE_CONFIG.tileLayerOptions.map(o => ({ id: o.id, name: o.name }))]
+                {/* 3D City leads. It is the thing this screen is actually for;
+                    the decorative globe skin was first for no better reason
+                    than that it was added first. Skin now sits last. */}
+                {[{ id: '__3d', name: '🏙 3D City' },
+                  ...GLOBE_CONFIG.tileLayerOptions.map(o => ({ id: o.id, name: o.name })),
+                  { id: null, name: '✨ Skin' }]
                   .map(opt => {
-                    const active = tileSource === opt.id;
+                    const active = opt.id === '__3d' ? streetViewOn : tileSource === opt.id;
                     return (
                       <button
                         key={opt.id || 'skin'}
-                        onClick={() => setTileSource(opt.id)}
+                        onClick={() => {
+                          if (opt.id === '__3d') { enterStreetView(); return; }
+                          setTileSource(opt.id);
+                        }}
                         style={{
                           flexShrink: 0,
                           background: active ? T.alt || T.accent : 'rgba(255,255,255,0.14)',
