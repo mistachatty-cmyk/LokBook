@@ -43,50 +43,58 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "bbox_too_large" });
   }
 
-  const query = `[out:json][timeout:15];way["building"](${south},${west},${north},${east});out geom;`;
+  // 10s, not 15s: on Vercel's Hobby plan the function itself is killed at 10s,
+  // so telling Overpass we'd wait 15 meant a slow-but-successful query died on
+  // our side before it could answer.
+  const query = `[out:json][timeout:10];way["building"](${south},${west},${north},${east});out geom;`;
 
-  // overpass-api.de is the reference instance and the one every existing
-  // deploy has hit exclusively — it is also the most rate-limited under
-  // real (non-test) traffic, which is exactly what a live 502 from it looks
-  // like. The FOSS Overpass mirrors below run the same query language
-  // against the same underlying OSM data, so a failure on one is a mirror
-  // problem, not a "this bbox has no buildings" problem. Tried in order,
-  // first success wins; only failing all three is reported upstream.
+  // Mirrors, tried in order. overpass-api.de rate-limits hard on shared
+  // serverless egress IPs (every Vercel lambda shares a pool with thousands of
+  // other tenants), which is the single likeliest source of the 502s seen in
+  // production.
   const MIRRORS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
-    "https://overpass.openstreetmap.ru/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
   ];
 
-  let lastErr = null;
+  let lastStatus = 0, lastMessage = "";
   for (const url of MIRRORS) {
+    // Own timeout, below the function ceiling, so a hanging mirror costs us one
+    // slot rather than the whole request.
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 8000);
     try {
-      // AbortController rather than relying on the platform's own function
-      // timeout: a hung upstream would otherwise burn the whole serverless
-      // invocation on one mirror instead of leaving time to try the next.
-      const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), 12_000);
       const upstream = await fetch(url, {
         method: "POST",
         body: query,
-        headers: { "Content-Type": "text/plain" },
+        headers: {
+          "Content-Type": "text/plain",
+          // Overpass operators block requests with an absent or generic
+          // User-Agent, and Node's fetch sends none at all. This header being
+          // missing is the most likely reason production has been getting 502s.
+          "User-Agent": "LokBook/1.0 (+https://lok-book.vercel.app; buildings layer)",
+          "Accept": "application/json",
+        },
         signal: ac.signal,
       });
-      clearTimeout(timer);
-      if (!upstream.ok) {
-        lastErr = { error: "overpass_error", status: upstream.status, mirror: url };
-        continue;
-      }
+      if (!upstream.ok) { lastStatus = upstream.status; continue; }
       const data = await upstream.json();
-      // Building footprints don't change minute to minute — a short shared
-      // cache means two people looking at the same block don't each cost a
-      // fresh Overpass query.
-      res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
+      res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=604800");
+      res.setHeader("X-Buildings-Source", new URL(url).host);
       return res.status(200).json(data);
     } catch (err) {
-      console.error("buildings: overpass fetch failed", url, err?.name, err?.message);
-      lastErr = { error: "overpass_unreachable", message: err?.message || String(err), mirror: url };
+      lastMessage = err?.name === "AbortError" ? "timeout" : (err?.message || String(err));
+    } finally {
+      clearTimeout(timer);
     }
   }
-  return res.status(502).json(lastErr || { error: "overpass_unreachable" });
+
+  console.error("buildings: every Overpass mirror failed", lastStatus, lastMessage);
+  return res.status(502).json({
+    error: "overpass_unavailable",
+    status: lastStatus || undefined,
+    message: lastMessage || "all mirrors refused",
+    tried: MIRRORS.length,
+  });
 }

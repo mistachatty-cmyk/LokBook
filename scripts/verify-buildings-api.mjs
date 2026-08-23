@@ -38,15 +38,14 @@ const check = (label, cond) => {
 // response shape either way, not that a third party's public server has
 // perfect uptime at the moment CI happens to run.
 //
-// The handler now tries three mirrors in order before giving up (see
-// api/buildings.js), so a 502 here can carry either error code depending on
-// which failure mode struck last: `overpass_error` if a mirror answered with
-// a bad HTTP status, `overpass_unreachable` if the request itself couldn't
-// complete (network error, or our own abort on a slow mirror). Both are the
-// same "we tried, upstream/network isn't cooperating right now" outcome this
-// check exists to allow — an environment whose fetch() can't reach any of
-// the three (e.g. a sandboxed dev box with proxy-only egress) should not
-// fail this test over that.
+// The handler tries three mirrors in order before giving up (see
+// api/buildings.js), reporting a single `overpass_unavailable` if every one
+// of them refused, timed out, or errored — one shape regardless of which
+// mirror or failure mode struck last, since from the caller's side "all
+// three failed" is one outcome. An environment whose fetch() can't reach
+// any of the three at all (e.g. a sandboxed dev box with proxy-only egress,
+// confirmed separately via curl against the mirrors directly) should not
+// fail this test over that — it's exercising the same code path either way.
 {
   const res = mockRes();
   await handler({ method: 'POST', body: { south: 42.354, west: -71.067, north: 42.356, east: -71.065 } }, res);
@@ -57,7 +56,7 @@ const check = (label, cond) => {
     console.log(`(Overpass returned non-200 right now: ${JSON.stringify(res._body)} — treating as upstream flakiness, not a proxy bug, since the proxy correctly relayed it)`);
     check(
       'real bbox: clean relay of a real upstream response (200 or 502)',
-      res._status === 502 && (res._body?.error === 'overpass_error' || res._body?.error === 'overpass_unreachable'),
+      res._status === 502 && res._body?.error === 'overpass_unavailable',
     );
   }
 }
