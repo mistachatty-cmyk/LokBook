@@ -63,11 +63,30 @@ export default defineConfig({
           // shell then reaches for, so a cold offline launch renders rather than
           // showing the browser's error page.
           globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+          // Keep the 3D stack OUT of the precache. globe.gl (1.3 MB) plus three
+          // (735 KB) is roughly two thirds of a 3.3 MB precache, downloaded on
+          // every install by every user — including the majority who never open
+          // World. On iOS that makes the install slow and quota-fragile, and
+          // it makes `cleanupOutdatedCaches` maximally destructive when a new
+          // worker takes over mid-session. They are runtime-cached below
+          // instead: first open of World pays for them, every later open is
+          // still instant, and offline still works once visited.
+          globIgnores: ['**/globe.gl-*.js', '**/three.module-*.js'],
+          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
           navigateFallback: '/index.html',
           // /flip/:id is server-rendered for crawlers — never answer it from the
           // SPA shell cache, or a shared link loses its OpenGraph tags.
           navigateFallbackDenylist: [/^\/api\//, /^\/flip\//],
           runtimeCaching: [
+            {
+              // The 3D chunks excluded from the precache above.
+              urlPattern: /\/assets\/(globe\.gl|three\.module)-[^/]+\.js$/,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'lok-3d',
+                expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              },
+            },
             {
               urlPattern: ({ request }) => request.destination === 'image',
               handler: 'CacheFirst',

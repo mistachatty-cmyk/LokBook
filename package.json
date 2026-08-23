@@ -37,7 +37,9 @@
     "verify:regions": "node scripts/verify-regions.mjs",
     "bake:region": "node scripts/bake-region.mjs",
     "verify:streetscene": "LOK_TEST_HARNESS=1 npm run build && node scripts/verify-streetscene.mjs",
-    "verify:mapquality": "node scripts/verify-mapquality.mjs"
+    "verify:mapquality": "node scripts/verify-mapquality.mjs",
+    "verify:chunkrecovery": "vite build && node scripts/verify-chunkrecovery.mjs",
+    "audit:inert": "node scripts/audit-inert.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",

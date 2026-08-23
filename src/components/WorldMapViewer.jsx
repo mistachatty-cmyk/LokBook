@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { GLOBE_CONFIG, WORLD_SKINS, LOK_REGIONS, OSM_ATTRIBUTION } from '../constants.jsx';
 import { loadRegion, regionAt, buildingsNear, roadsFor } from '../engine/regions.js';
 import { createStreetScene } from '../engine/streetScene.js';
+import { isChunkLoadError, reloadForNewBuild } from '../appRecovery.js';
 import { mapQuality } from '../engine/mapQuality.js';
 import { THEMES } from '../theme/theme.js';
 import { postsInBounds, putPost, capabilities } from '../engine/worldStore.js';
@@ -1193,7 +1194,15 @@ export default function WorldMapViewer({ posts = [], userLocation, theme = 'riso
               </div>
               <div style={{ fontSize: 11, opacity: 0.6 }}>tap the message to copy it</div>
               <button
-                onClick={() => setRetryKey(k => k + 1)}
+                onClick={() => {
+                  // Retrying the import is pointless when the chunk 404s
+                  // because a new deploy replaced it — the URL is dead, and
+                  // every retry fails identically. Reload onto the current
+                  // build instead. Falls through to a plain retry for genuine
+                  // transient failures (a dropped connection mid-download).
+                  if (isChunkLoadError({ message: errorMsg }) && reloadForNewBuild('World retry')) return;
+                  setRetryKey(k => k + 1);
+                }}
                 style={{
                   background: '#fff', color: '#111', border: 'none', borderRadius: 8,
                   padding: '8px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer',
