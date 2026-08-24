@@ -511,12 +511,16 @@ export const BLENDS = ["source-over", "multiply", "screen", "overlay", "darken",
 export const TIERS=[{layers:10,label:"10 · Sketch",price:0},{layers:25,label:"25 · Studio",price:40},{layers:50,label:"50 · Pro",price:80},{layers:100,label:"100 · Marathon",price:150}];
 
 export const STUDIO_MODULES = [
+  // PARKED (except the free base). These double-sold against TIERS, which is the
+  // real control on layer count. They were dropped from the Shop's module tabs
+  // but left priced in the catalogue, so `modTab==="all"` would put them back on
+  // sale. Ids stay for old saves; the sale is refused. See docs/PARKED.md.
   { id: "layers_10", type: "layers", name: "Layer Pack S", desc: "Up to 10 layers", price: 0, layers: 10 },
-  { id: "layers_25", type: "layers", name: "Layer Pack M", desc: "Up to 25 layers", price: 40, layers: 25 },
-  { id: "layers_50", type: "layers", name: "Layer Pack L", desc: "Up to 50 layers", price: 80, layers: 50 },
-  { id: "layers_100", type: "layers", name: "Layer Pack XL", desc: "Up to 100 layers", price: 150, layers: 100 },
-  { id: "layers_200", type: "layers", name: "Layer Pack XXL", desc: "Up to 200 layers", price: 250, layers: 200 },
-  { id: "layers_500", type: "layers", name: "Layer Pack LGD", desc: "Up to 500 layers", price: 500, layers: 500 },
+  { id: "layers_25", type: "layers", name: "Layer Pack M", desc: "Up to 25 layers", price: 40, layers: 25, parked: "Superseded by TIERS, which is the single source of layer count and is sold in the Shop's Layer packs section." },
+  { id: "layers_50", type: "layers", name: "Layer Pack L", desc: "Up to 50 layers", price: 80, layers: 50, parked: "Superseded by TIERS, which is the single source of layer count and is sold in the Shop's Layer packs section." },
+  { id: "layers_100", type: "layers", name: "Layer Pack XL", desc: "Up to 100 layers", price: 150, layers: 100, parked: "Superseded by TIERS, which is the single source of layer count and is sold in the Shop's Layer packs section." },
+  { id: "layers_200", type: "layers", name: "Layer Pack XXL", desc: "Up to 200 layers", price: 250, layers: 200, parked: "Superseded by TIERS, which is the single source of layer count and is sold in the Shop's Layer packs section." },
+  { id: "layers_500", type: "layers", name: "Layer Pack LGD", desc: "Up to 500 layers", price: 500, layers: 500, parked: "Superseded by TIERS, which is the single source of layer count and is sold in the Shop's Layer packs section." },
   { id: "brush_ink", type: "brush", name: "Ink", desc: "Standard solid brush", price: 0 },
   { id: "brush_marker", type: "brush", name: "Marker", desc: "Translucent marker stroke", price: 30 },
   { id: "brush_chalk", type: "brush", name: "Chalk", desc: "Textured grain brush", price: 30 },
@@ -551,10 +555,15 @@ export const STUDIO_MODULES = [
   { id: "brush_crayon", type: "brush", name: "Crayon Wax", desc: "Thick textured wax crayon", price: 120 },
   { id: "brush_wash", type: "brush", name: "Ink Wash", desc: "Broad semi-transparent wash", price: 160 },
   { id: "brush_galaxy", type: "brush", name: "Galaxy Brush", desc: "Star field colors in every stroke", price: 500 },
-  { id: "canvas_infinite", type: "canvas", name: "Infinite Scroll", desc: "Vertical endless canvas", price: 300 },
-  { id: "canvas_circular", type: "canvas", name: "Circular Canvas", desc: "Draw in a circular format", price: 250 },
-  { id: "canvas_panorama", type: "canvas", name: "Panorama", desc: "Extra-wide cinematic ratio", price: 280 },
-  { id: "canvas_xl", type: "canvas", name: "Canvas XL", desc: "Double resolution canvas", price: 350 },
+  // PARKED. All four change the Easel's coordinate system and canvas geometry —
+  // comparable in scope to the Rooms infinite-canvas work, not a wiring job.
+  // They were sellable at full price with no warning: 1,180 Loks of stock that
+  // does nothing. `parked` keeps them visible and refuses the sale, the same
+  // shape as ARCHIVED_ROTATION_TYPES. See docs/PARKED.md.
+  { id: "canvas_infinite", type: "canvas", name: "Infinite Scroll", desc: "Vertical endless canvas", price: 300, parked: "Needs a rebuilt Easel coordinate system — the canvas is fixed-size today." },
+  { id: "canvas_circular", type: "canvas", name: "Circular Canvas", desc: "Draw in a circular format", price: 250, parked: "Needs polar canvas geometry in the Easel." },
+  { id: "canvas_panorama", type: "canvas", name: "Panorama", desc: "Extra-wide cinematic ratio", price: 280, parked: "Needs the Easel to accept a canvas wider than the viewport." },
+  { id: "canvas_xl", type: "canvas", name: "Canvas XL", desc: "Double resolution canvas", price: 350, parked: "Needs a resolution-independent stroke pipeline." },
   { id: "achieve_onion", type: "achievement", name: "Onion Skinning", desc: "Multi-frame onion skin preview", price: 0, unlock: "Studio Master badge" },
   { id: "achieve_persp", type: "achievement", name: "Perspective Grid", desc: "3-point perspective grid overlay", price: 0, unlock: "3 battle streak" },
   { id: "achieve_swatch", type: "achievement", name: "Custom Swatches", desc: "Save custom color swatches", price: 0, unlock: "25 published flips" },
@@ -857,8 +866,17 @@ export const FONT_PACKS = [{ id:"default", name:"System font", price:0, font:"in
 export const MUSIC_PACKS = [{ id:"none", name:"No music", price:0, giftReward: "heart" }, { id:"lo-fi", name:"Lo-Fi Study", price:100, giftReward: "sparkle" }, { id:"synth", name:"Synth Wave", price:120, giftReward: "star" }, { id:"rain", name:"Rain Ambience", price:80, giftReward: "flower" }, { id:"jazz", name:"Coffee Jazz", price:110, giftReward: "treasure" }, { id:"nature", name:"Forest Nature", price:90, giftReward: "flower" }, { id:"retro", name:"Retro Arcade", price:130, giftReward: "star" }, { id:"piano", name:"Piano Moods", price:95, giftReward: "sparkle" }];
 export const STICKER_PACKS = [{ id:"emoji", name:"Emoji Pack", price:0, stickers:["😎","🔥","🎨","💀","👾","✨","🌈","🍕"], giftReward:"star" }, { id:"nature", name:"Nature Pack", price:30, stickers:["🌸","🌿","🦋","🍀","🌻","🐚","🍄","🌙"], giftReward:"flower" }, { id:"food", name:"Snack Pack", price:25, stickers:["🍕","🍔","🌮","🍩","🍦","🥨","🧋","🍪"], giftReward:"heart" }, { id:"animals", name:"Animal Pack", price:35, stickers:["🐱","🐶","🦊","🐸","🐼","🐧","🦉","🐝"], giftReward:"sparkle" }, { id:"space", name:"Space Pack", price:40, stickers:["🚀","🛸","🌍","⭐","🌑","☄️","👽","🪐"], giftReward:"meteor" }, { id:"retro", name:"Retro Pack", price:30, stickers:["📟","📼","🕹️","💾","📺","📻","🎮","📸"], giftReward:"star" }, { id:"magic", name:"Magic Pack", price:45, stickers:["🔮","🪄","🧙","🐉","🦄","🧚","⚡","🌟"], giftReward:"rainbow" }, { id:"music", name:"Music Pack", price:25, stickers:["🎵","🎸","🥁","🎹","🎤","🎧","🎼","🎷"], giftReward:"sparkle" },
   { id:"garden", name:"Garden Pack", price:30, stickers:["🌻","🐝","🍄","🌿","🐌","🦋","🌾","🪴"], giftReward:"flower" },
-  { id:"space", name:"Space Pack", price:35, stickers:["🚀","🪐","👽","🌠","🛸","☄️","🌌","🔭"], giftReward:"star" }];
-export const POST_EXPORTS = [{ id:"png", name:"PNG frames", desc:"Export frames as transparent PNGs", price:0 }, { id:"gif", name:"Animated GIF", desc:"Export as looping GIF", price:80 }, { id:"webp", name:"WebP anim", desc:"Export as animated WebP", price:50 }, { id:"spritesheet", name:"Spritesheet", desc:"All frames in one grid", price:60 }, { id:"apng", name:"APNG", desc:"Animated PNG format", price:100 }, { id:"pdf", name:"PDF flip", desc:"Export as PDF flipbook", price:120 }, { id:"mp4", name:"MP4 video", desc:"Export as MP4 (soon)", price:150, soon:true }];
+  // Was a SECOND row with id "space", colliding with the 40-Lok pack above. The
+  // Shop rendered two identical-looking cards (and a duplicate React key), and
+  // since every lookup is `.find(p=>p.id===id)` the 40-Lok one always won — so
+  // this set could be bought and never equipped. It is a genuinely different
+  // eight stickers, so it gets its own id rather than being deleted.
+  { id:"cosmos", name:"Cosmos Pack", price:35, stickers:["🚀","🪐","👽","🌠","🛸","☄️","🌌","🔭"], giftReward:"star" }];
+// Four of the seven have no encoder anywhere in src/. GIF (engine/gif.js) and
+// spritesheet (a tiled canvas toDataURL) are real; png is the free default.
+// `parked` refuses the sale and says why — previously only the whole CATEGORY
+// could be flagged, which is too coarse for a list that is part-working.
+export const POST_EXPORTS = [{ id:"png", name:"PNG frames", desc:"Export frames as transparent PNGs", price:0 }, { id:"gif", name:"Animated GIF", desc:"Export as looping GIF", price:80 }, { id:"webp", name:"WebP anim", desc:"Export as animated WebP", price:50 , parked:"No WebP encoder. Only GIF and spritesheet are implemented." }, { id:"spritesheet", name:"Spritesheet", desc:"All frames in one grid", price:60 }, { id:"apng", name:"APNG", desc:"Animated PNG format", price:100 , parked:"No APNG encoder. Only GIF and spritesheet are implemented." }, { id:"pdf", name:"PDF flip", desc:"Export as PDF flipbook", price:120 , parked:"No PDF writer. Only GIF and spritesheet are implemented." }, { id:"mp4", name:"MP4 video", desc:"Export as MP4 (soon)", price:150, soon:true , parked:"No MP4 encoder. The working exporter writes .webm and is sold as the anim_export_video module." }];
 
 
 

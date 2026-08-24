@@ -40,7 +40,8 @@
     "verify:mapquality": "node scripts/verify-mapquality.mjs",
     "verify:chunkrecovery": "vite build && node scripts/verify-chunkrecovery.mjs",
     "audit:inert": "node scripts/audit-inert.mjs",
-    "verify:gallery": "vite build && node scripts/verify-gallery.mjs"
+    "verify:gallery": "vite build && node scripts/verify-gallery.mjs",
+    "verify:shop": "vite build && node scripts/verify-shop.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",
