@@ -141,8 +141,24 @@ const browser = await chromium.launch({
   executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
 });
+
+// Stage 2 split today's Shop into two components picked by the same
+// localStorage toggle that used to just unhide two tabs: LegacyShop (frozen,
+// integrity fixes only) and NewShop (the default, gets all the UX work). The
+// shared buy/guard modules (ShopItem/buyEquip/refuseParked) live in
+// shop/shared.jsx so a fix applies to both — but that is a claim, not a
+// guarantee, unless this gate actually drives both entry points. Run twice.
+for (const legacy of [false, true]) {
+  await runShopChecks(legacy);
+}
+
+async function runShopChecks(legacy) {
 const page = await browser.newPage({ viewport: { width: 414, height: 896 } });
-await page.addInitScript(() => { try { localStorage.clear(); } catch {} });
+await page.addInitScript((isLegacy) => {
+  try { localStorage.clear(); localStorage.setItem('lok:shop:legacy', isLegacy ? '1' : '0'); } catch {}
+}, legacy);
+const tag = legacy ? 'LEGACY' : 'NEW';
+const push = msg => problems.push(`[${tag}] ${msg}`);
 
 const balance = () => page.evaluate(() => {
   const m = (document.body.innerText || '').match(/Balance:\s*([\d,]+)\s*Loks/);
@@ -184,7 +200,7 @@ async function tap(locator, label) {
     try { await locator.click({ timeout: 4000 }); return true; } catch {}
     await page.waitForTimeout(400);
   }
-  problems.push(`could not tap ${label} — something kept covering it`);
+  push(`could not tap ${label} — something kept covering it`);
   return false;
 }
 
@@ -226,7 +242,7 @@ try {
 
   const priced = page.locator('button:has-text("Loks")').filter({ hasNotText: 'LokPass' });
   if (!(await priced.count())) {
-    problems.push('no priced cosmetic card found — the gate never reached its subject');
+    push('no priced cosmetic card found — the gate never reached its subject');
   } else {
     // Pin the ELEMENT, not a text locator. The first tap replaces the price
     // label with "Tap to confirm", so a `:has-text("Loks")` locator silently
@@ -239,25 +255,25 @@ try {
 
     await dismissAds(); await card.click(); await page.waitForTimeout(500);   // arm
     const armed = (await card.innerText()).replace(/\s+/g, ' ');
-    if (!/confirm/i.test(armed)) problems.push(`first tap on a priced card did not arm a confirm step (card reads "${armed}")`);
+    if (!/confirm/i.test(armed)) push(`first tap on a priced card did not arm a confirm step (card reads "${armed}")`);
     await card.click(); await page.waitForTimeout(1200);                      // buy
 
     const bought = await balance();
-    if (bought === null || before === null) { problems.push('lost the balance readout mid-purchase'); }
+    if (bought === null || before === null) { push('lost the balance readout mid-purchase'); }
     else if (bought !== before - cost) {
-      problems.push(`buying "${label}" (${cost} Loks) moved the balance ${before} -> ${bought}, expected ${before - cost}`);
+      push(`buying "${label}" (${cost} Loks) moved the balance ${before} -> ${bought}, expected ${before - cost}`);
     }
 
     // Now it is owned. Tapping it again must equip, never charge.
     await dismissAds(); await card.click(); await page.waitForTimeout(1200);
     const reEquipped = await balance();
     if (reEquipped !== null && bought !== null && reEquipped < bought) {
-      problems.push(`re-equipping an item you already own charged ${bought - reEquipped} Loks (${bought} -> ${reEquipped}) — the card says "Equip" and bills you`);
+      push(`re-equipping an item you already own charged ${bought - reEquipped} Loks (${bought} -> ${reEquipped}) — the card says "Equip" and bills you`);
     }
     await dismissAds(); await card.click(); await page.waitForTimeout(1200);
     const reEquipped2 = await balance();
     if (reEquipped2 !== null && bought !== null && reEquipped2 < bought) {
-      problems.push(`re-equipping repeatedly cost ${bought - reEquipped2} Loks in total — it charges per tap`);
+      push(`re-equipping repeatedly cost ${bought - reEquipped2} Loks in total — it charges per tap`);
     }
     console.log(`RE-EQUIP: bought "${label}" for ${cost} · ${before} -> ${bought}, then two re-equips -> ${reEquipped} -> ${reEquipped2}`);
   }
@@ -268,7 +284,7 @@ try {
   await dismissAds();
   const canvasTab = page.locator('button:has-text("Canvas")').first();
   if (!(await canvasTab.count())) {
-    problems.push('no Canvas sub-tab in the Studio section — cannot reach the parked modules');
+    push('no Canvas sub-tab in the Studio section — cannot reach the parked modules');
   } else {
     await tap(canvasTab, 'the Canvas sub-tab');
     await page.waitForTimeout(800);
@@ -277,10 +293,10 @@ try {
     // a >0 check cannot see an item quietly going back on sale.
     const expectParked = (C.STUDIO_MODULES || []).filter(m => m.type === 'canvas' && m.parked).length;
     if (badges !== expectParked) {
-      problems.push(`the Canvas tab shows ${badges} "Not active yet" badge(s) but ${expectParked} canvas module(s) are parked in the catalogue — one is on sale that should not be`);
+      push(`the Canvas tab shows ${badges} "Not active yet" badge(s) but ${expectParked} canvas module(s) are parked in the catalogue — one is on sale that should not be`);
     }
     if (!badges) {
-      problems.push('the parked canvas modules show no "Not active yet" badge — they look like ordinary stock');
+      push('the parked canvas modules show no "Not active yet" badge — they look like ordinary stock');
     } else {
       const before = await balance();
       await tap(page.locator('button:has-text("Infinite Scroll")').first(), 'a parked module');
@@ -289,13 +305,62 @@ try {
       await page.waitForTimeout(900);
       const after = await balance();
       if (after !== null && before !== null && after < before) {
-        problems.push(`a PARKED item still charged ${before - after} Loks`);
+        push(`a PARKED item still charged ${before - after} Loks`);
       }
       console.log(`PARKED: ${badges} badged card(s) · balance held at ${after} after two taps`);
     }
   }
+
+  // The jump menu and the 3-way Skins sub-tab split only exist on the new
+  // default Shop — LegacyShop is frozen at its pre-redesign shape on purpose.
+  if (!legacy) {
+    // Jump menu: tapping "Expressions" in Blot Shop should scroll straight to
+    // that section instead of leaving the reader to hunt through 6 stacked
+    // sections by hand.
+    await tap(shopBtn('Blot Shop'), 'the Blot Shop tab');
+    await page.waitForTimeout(800);
+    await dismissAds();
+    const jumpLink = page.locator('a:has-text("Expressions")').first();
+    if (!(await jumpLink.count())) {
+      push('Blot Shop has no jump-menu link to "Expressions"');
+    } else {
+      await jumpLink.click();
+      await page.waitForTimeout(500);
+      const inView = await page.evaluate(() => {
+        const el = document.getElementById('shop-expressions');
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return r.top >= -10 && r.top < window.innerHeight * 0.6;
+      });
+      if (inView === null) push('jump menu target #shop-expressions does not exist in the DOM');
+      else if (!inView) push('tapping the "Expressions" jump link did not scroll that section into view');
+    }
+
+    // Skins sub-tabs: Themes / Live Skins / Gyro Skins must each show their
+    // own distinct set, and a Gyro Skin card must explain itself when
+    // gyroscope is off rather than just looking broken.
+    await tap(shopBtn('Skins'), 'the Skins tab');
+    await page.waitForTimeout(800);
+    await dismissAds();
+    for (const label of ['Themes', 'Live Skins', 'Gyro Skins']) {
+      const pill = page.locator(`button:has-text("${label}")`).first();
+      if (!(await pill.count())) { push(`Skins tab has no "${label}" sub-tab`); continue; }
+      await tap(pill, `the "${label}" skins sub-tab`);
+      await page.waitForTimeout(500);
+    }
+    // Landing on Gyro Skins with no dynamic-driver themes shipped yet (Stage
+    // 3/4 not built), the empty state must say so rather than show nothing.
+    const gyroEmpty = await page.locator('text=Coming with the next drop').count();
+    const gyroCards = await page.locator('button[aria-label^="Theme "]').count();
+    if (!gyroEmpty && gyroCards === 0) {
+      push('Gyro Skins sub-tab shows neither a theme nor the "coming soon" empty state');
+    }
+  }
 } catch (err) {
-  problems.push(err.message);
+  push(err.message);
+}
+
+await page.close();
 }
 
 await browser.close();
@@ -305,4 +370,4 @@ if (problems.length) {
   console.error('SHOP BROKEN:\n  ' + problems.join('\n  '));
   process.exit(1);
 }
-console.log('SHOP OK — no duplicate ids, every parked item is registered and refuses, and re-equipping something you own is free.');
+console.log('SHOP OK — Legacy and New both checked: no duplicate ids, every parked item is registered and refuses, re-equipping something you own is free, and the new navigation (jump menu, Skins sub-tabs) actually works.');
