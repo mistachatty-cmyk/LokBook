@@ -77,7 +77,124 @@ export const THEMES = {
   hollowpress:    { name:"The Hollow Press",    desc:"A printworks nobody runs anymore. Wave 3.", price:120, wave:3, paper:"#150F1E", ink:"#E7DCF2", accent:"#8B4FD8", alt:"#5E4A7A", shadow:"rgba(0,0,0,.55)", card:"#1E1729", onAccent:"#fff" },
   windward:       { name:"Windward Steps",      desc:"High stairs, clean air, a long view.",      price:55, paper:"#EAF4FA", ink:"#1D3E52", accent:"#2E9BD6", alt:"#8FCBE6", shadow:"#CFE3EE", card:"#F7FCFE", onAccent:"#000" },
   ferrousyard:    { name:"Ferrous Yard",        desc:"Rust and rivets, the old iron works.",      price:55, paper:"#241C18", ink:"#EDDCC9", accent:"#D98456", alt:"#7A6152", shadow:"#170F0C", card:"#302620", onAccent:"#000" },
+
+  // ---- Hybrid themes · Wave 4+, resolved live by resolveTheme() ----------
+  // Every entry above is a static object — THEMES[id] IS its own token set.
+  // These carry a `dynamic` spec instead: a base token set (used verbatim if
+  // resolveTheme is never called, e.g. an old cached uiTheme lookup) plus a
+  // driver resolveTheme() uses to deviate from it. Never required — a theme
+  // with no `dynamic` field takes the identity path in resolveTheme and costs
+  // nothing extra to render.
+
+  // Context-shifting (3): palette resolves against a real day-cycle/weather
+  // signal, always falling back to the base tokens above with no ctx.
+  tideglass: { name:"Tideglass", desc:"Cool glass at noon, rose at midnight — the ink actually re-hues, not just dims. Wave 4.", price:150, wave:4,
+    paper:"#EAF3F5", ink:"#173A44", accent:"#2E8FA6", alt:"#6FBFCF", shadow:"#CFE2E6", card:"#F7FBFC", onAccent:"#fff",
+    dynamic:{ driver:"nightshift", night:{ paper:"#2B1620", ink:"#F5DCE3", accent:"#E0577B", alt:"#B98CA0", shadow:"rgba(0,0,0,.5)", card:"#39202B", onAccent:"#fff" } } },
+  weatherboard: { name:"Weatherboard", desc:"Palette follows today's Ink Weather — the same rain/fog/aurora/dust roll everyone already sees as particles. Wave 4.", price:150, wave:4,
+    paper:"#EDEFEF", ink:"#2A2E33", accent:"#5B7A99", alt:"#8F9BA6", shadow:"#D6D9DB", card:"#F7F8F8", onAccent:"#000",
+    dynamic:{ driver:"weather", variants:{
+      rain:{ paper:"#1E262E", ink:"#DCE6EC", accent:"#4E8FBF", alt:"#7B95A6", shadow:"rgba(0,0,0,.5)", card:"#28323C", onAccent:"#fff" },
+      fog:{ paper:"#E7E7E3", ink:"#3A3A38", accent:"#9A9A92", alt:"#B7B7AE", shadow:"#D4D4CE", card:"#F2F2EE", onAccent:"#000" },
+      aurora:{ paper:"#0B0C10", ink:"#E0FBFC", accent:"#00FFAA", alt:"#7F5AF0", shadow:"rgba(0,0,0,.6)", card:"#1F2029", onAccent:"#0B0C10" },
+      dust:{ paper:"#F1E4CE", ink:"#4A3B26", accent:"#C2884A", alt:"#A68A5E", shadow:"#DDCBAA", card:"#F8EFE0", onAccent:"#000" },
+    } } },
+  deskswap: { name:"Deskswap", desc:"Flat surfaces by day; an inset glow finds you after sundown. Same id, a genuinely different surface language. Wave 4.", price:140, wave:4,
+    paper:"#F2EFE8", ink:"#2C2A24", accent:"#C2551A", alt:"#8C6239", shadow:"#DCD5C4", card:"#FBF8F2", onAccent:"#fff",
+    dynamic:{ driver:"suncycle", day:{}, night:{ paper:"#161410", ink:"#EDE7D8", card:"#201D17", shadow:"rgba(0,0,0,.55)", glow:"radial-gradient(circle at 50% 0%, rgba(194,85,26,.35), transparent 70%)", onAccent:"#fff" } } },
+
+  // Blended (3): two named token sets, crossfaded live by a slow driver, not
+  // a one-time snapshot.
+  duskline: { name:"Duskline", desc:"Paper and accent slowly crossfade between two named palettes on a multi-minute loop. Wave 4.", price:170, wave:4, animated:true,
+    paper:"#F4EFE3", ink:"#2A2E3D", accent:"#C4487A", alt:"#2FA9A0", shadow:"#DFD8C8", card:"#FFFDF7", onAccent:"#fff",
+    dynamic:{ driver:"blend", periodMs:360000,
+      a:{ paper:"#F4EFE3", accent:"#C4487A", card:"#FFFDF7", onAccent:"#fff" },
+      b:{ paper:"#1B1E2B", accent:"#5AC8D8", card:"#232838", onAccent:"#fff" } } },
+  marbledink: { name:"Marbled Ink", desc:"Two inks bleed through a slow moving gradient mask; tempo follows your pace setting — SNAP marbles fast, CINEMA is near-static. Wave 4.", price:170, wave:4, animated:true,
+    paper:"#F1EEE6", ink:"#2E2A3D", accent:"#7A5FB8", alt:"#B9A6E0", shadow:"#DCD7CC", card:"#FAF8F3", onAccent:"#fff",
+    dynamic:{ driver:"blend", periodMs:240000, paceScaled:true,
+      a:{ ink:"#2E2A3D", accent:"#7A5FB8" },
+      b:{ ink:"#5C2E3D", accent:"#D86F8C" } } },
+  splitpress: { name:"Split Press", desc:"A literal two-tone split with a slowly drifting seam — riso-registration flavoured. Wave 4.", price:170, wave:4, animated:true, backdrop:"splitpress",
+    paper:"#EFEAE0", ink:"#26221C", accent:"#2E7D8F", alt:"#D6215F", shadow:"#DAD3C4", card:"#F9F6EE", onAccent:"#fff",
+    dynamic:{ driver:"blend", periodMs:300000,
+      a:{ card:"#F9F6EE" },
+      b:{ card:"#EDE7D9" } } },
+
+  // Reactive backdrop, gyroscope-aware (3): tokens stay static — the motion
+  // lives entirely in ThemeBackdrop, gated by featureFlags.enableGyroscope
+  // and prefersReducedMotion() same as every other tilt effect in the app.
+  // `dynamic.driver==="gyro"` is what NewShop's Skins > Gyro Skins sub-tab
+  // filters on.
+  parallaxink: { name:"Parallax Ink", desc:"The ink-wash backdrop parallaxes opposite your phone's tilt. Static on desktop or with gyroscope off — never required. Wave 5.", price:210, wave:5, animated:true, backdrop:"parallaxink",
+    paper:"#101425", ink:"#E4E8F5", accent:"#5A8CFF", alt:"#8B7BD8", shadow:"rgba(0,0,0,.6)", card:"#171C31", onAccent:"#fff",
+    dynamic:{ driver:"gyro" } },
+  compassbloom: { name:"Compassbloom", desc:"A drawn bloom slowly turns to match your phone's compass heading as you turn. Wave 5.", price:210, wave:5, animated:true, backdrop:"compassbloom",
+    paper:"#F6F1E4", ink:"#2E2A1E", accent:"#B8862E", alt:"#6E8C63", shadow:"#DFD6BC", card:"#FCF8ED", onAccent:"#000",
+    dynamic:{ driver:"gyro" } },
+  winstreak: { name:"Winstreak", desc:"Backdrop intensity ramps after a battle win or a claimed streak, then decays back over about 30s. Wave 5.", price:200, wave:5, animated:true, backdrop:"winstreak",
+    paper:"#171313", ink:"#F2E9DD", accent:"#E8622C", alt:"#E0B84D", shadow:"rgba(0,0,0,.6)", card:"#211B1A", onAccent:"#000",
+    dynamic:{ driver:"events" } },
 };
+
+// --- resolveTheme(): the only place a `dynamic` spec is interpreted --------
+// Every static theme (no `dynamic` field) takes the identity branch below and
+// costs nothing extra. `ctx` is deliberately a plain object of independent
+// signals — nightShift/weather/isNight/paceMultiplier/now — rather than
+// coupling this module to App.jsx's state shape; callers build whatever
+// subset of ctx their driver needs from signals they already compute
+// (nightShiftAmount(), inkWeatherToday(), PACE_PRESETS).
+const TOKEN_KEYS = ["paper", "ink", "accent", "alt", "shadow", "card"];
+const clamp01 = v => Math.max(0, Math.min(1, v));
+function hexToRgb(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+// Falls back to a hard swap at the midpoint for anything not a plain 6-digit
+// hex (rgba shadows, "transparent") — those can't be linearly interpolated,
+// and a swap is still a real, defined value at every t rather than a crash.
+function hexLerp(a, b, t) {
+  const pa = hexToRgb(a), pb = hexToRgb(b);
+  if (!pa || !pb) return t < 0.5 ? a : b;
+  const r = Math.round(pa.r + (pb.r - pa.r) * t);
+  const g = Math.round(pa.g + (pb.g - pa.g) * t);
+  const bl = Math.round(pa.b + (pb.b - pa.b) * t);
+  return `#${[r, g, bl].map(v => v.toString(16).padStart(2, "0")).join("")}`;
+}
+export function resolveTheme(theme, ctx = {}) {
+  const d = theme?.dynamic;
+  if (!d) return theme;
+  if (d.driver === "nightshift") {
+    const t = clamp01(ctx.nightShift ?? 0);
+    const out = { ...theme };
+    for (const k of TOKEN_KEYS) if (d.night?.[k] && theme[k]) out[k] = hexLerp(theme[k], d.night[k], t);
+    if (t > 0.5 && d.night?.onAccent) out.onAccent = d.night.onAccent;
+    return out;
+  }
+  if (d.driver === "weather") {
+    const variant = d.variants?.[ctx.weather];
+    return variant ? { ...theme, ...variant } : theme;
+  }
+  if (d.driver === "suncycle") {
+    const variant = ctx.isNight ? d.night : d.day;
+    return variant ? { ...theme, ...variant } : theme;
+  }
+  if (d.driver === "blend") {
+    const period = (d.periodMs || 240000) * (d.paceScaled ? (ctx.paceMultiplier || 1) : 1);
+    const now = ctx.now ?? Date.now();
+    const phase = (now % period) / period;
+    const t = phase < 0.5 ? phase * 2 : (1 - phase) * 2; // triangle: 0 -> 1 -> 0
+    const out = { ...theme };
+    for (const k of TOKEN_KEYS) if (d.a?.[k] != null && d.b?.[k] != null) out[k] = hexLerp(d.a[k], d.b[k], t);
+    if (d.a?.onAccent || d.b?.onAccent) out.onAccent = t < 0.5 ? (d.a?.onAccent ?? theme.onAccent) : (d.b?.onAccent ?? theme.onAccent);
+    return out;
+  }
+  // "gyro" and "events" drivers change the backdrop only, in ThemeBackdrop —
+  // the palette itself is unaffected, so this is the identity path too.
+  return theme;
+}
 export const SKIN_WAVE_GATE = 2;
 export const SKIN_WAVE_3_GATE = 5;
 export const SKIN_WAVE_4_GATE = 10;

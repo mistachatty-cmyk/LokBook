@@ -26,7 +26,8 @@ const entry = `
   import * as C from "./src/constants.jsx";
   import * as R from "./src/engine/rotation.js";
   import * as B from "./src/engine/blotLook.js";
-  export { C, R, B };
+  import * as Th from "./src/theme/theme.js";
+  export { C, R, B, Th };
 `;
 
 const readSrc = p => readFileSync(join(root, p), "utf8");
@@ -41,7 +42,7 @@ try {
       "import.meta.env.DEV": "false", "import.meta.env.PROD": "true",
     },
   });
-  const { C, R, B } = await import(pathToFileURL(out).href);
+  const { C, R, B, Th } = await import(pathToFileURL(out).href);
 
   const art = readSrc("src/art.jsx");
   const easel = readSrc("src/Easel.jsx");
@@ -179,6 +180,68 @@ try {
       if (!iconTypes.has(ic))
         problems.push(`FAKE ICON  reaction "${pack}" — "${ic}" is not a ReactionIcon type (renders as a generic splat)`);
     }
+  }
+
+  // --- 4. hybrid themes: every `dynamic` spec must resolve to a complete,
+  // valid token set at the extremes of its own driver, including with
+  // gyroMotion entirely absent — a theme's colours must never depend on the
+  // sensor being present, only its backdrop's motion may.
+  const TOKEN_KEYS = ["paper", "ink", "accent", "alt", "shadow", "card", "onAccent"];
+  const isHexOrCss = v => typeof v === "string" && v.length > 0;
+  const assertComplete = (label, resolved) => {
+    for (const k of TOKEN_KEYS) if (!isHexOrCss(resolved?.[k]))
+      problems.push(`DYNAMIC THEME  ${label}: resolved token "${k}" is missing or empty`);
+  };
+  let dynCount = 0;
+  for (const [id, th] of Object.entries(Th.THEMES)) {
+    const d = th.dynamic;
+    if (!d) continue;
+    dynCount++;
+    // Every driver, with NO ctx at all — the identity/default path every
+    // consumer falls back to before any signal is computed.
+    assertComplete(`${id} (no ctx)`, Th.resolveTheme(th, {}));
+    if (d.driver === "nightshift") {
+      const day = Th.resolveTheme(th, { nightShift: 0 });
+      const night = Th.resolveTheme(th, { nightShift: 1 });
+      assertComplete(`${id} (nightShift:0)`, day);
+      assertComplete(`${id} (nightShift:1)`, night);
+      if (day.paper === night.paper) problems.push(`DYNAMIC THEME  ${id}: nightshift driver produces the same paper at both extremes — it never actually re-hues`);
+    } else if (d.driver === "weather") {
+      for (const w of ["rain", "fog", "aurora", "dust"]) assertComplete(`${id} (weather:${w})`, Th.resolveTheme(th, { weather: w }));
+      assertComplete(`${id} (weather: unknown)`, Th.resolveTheme(th, { weather: "not-a-real-weather" }));
+    } else if (d.driver === "suncycle") {
+      assertComplete(`${id} (isNight:false)`, Th.resolveTheme(th, { isNight: false }));
+      assertComplete(`${id} (isNight:true)`, Th.resolveTheme(th, { isNight: true }));
+    } else if (d.driver === "blend") {
+      const period = d.periodMs || 240000;
+      const start = Th.resolveTheme(th, { now: 0 });
+      const mid = Th.resolveTheme(th, { now: period / 2 });
+      assertComplete(`${id} (blend t=0)`, start);
+      assertComplete(`${id} (blend t=mid)`, mid);
+      if (JSON.stringify(start) === JSON.stringify(mid)) problems.push(`DYNAMIC THEME  ${id}: blend driver produces identical tokens at both ends of its loop — it never actually crossfades`);
+    } else if (d.driver === "gyro" || d.driver === "events") {
+      // Reactive backdrops move; the palette itself must still resolve fully
+      // with no gyroMotion/event signal present at all.
+      assertComplete(`${id} (${d.driver}, no signal)`, Th.resolveTheme(th, {}));
+      if (d.driver === "gyro" && !th.backdrop) problems.push(`DYNAMIC THEME  ${id}: gyro-driven theme names no backdrop — nothing will actually move`);
+    } else {
+      problems.push(`DYNAMIC THEME  ${id}: unknown dynamic.driver "${d.driver}"`);
+    }
+  }
+  console.log(`THEMES: ${Object.keys(Th.THEMES).length} total · ${dynCount} dynamic (resolveTheme checked at driver extremes)`);
+
+  // --- 4b. every reactive backdrop's `animation:` must name a @keyframes
+  // actually declared in ThemeBackdrop.jsx. Same failure mode as DEAD ANIM
+  // above (a keyframe declared somewhere it never renders), applied to the
+  // theme backdrops rather than the rotation particle effects.
+  const backdropSrc = readSrc("src/theme/ThemeBackdrop.jsx");
+  const declaredKeyframes = new Set([...backdropSrc.matchAll(/@keyframes\s+([\w-]+)/g)].map(m => m[1]));
+  const referencedKeyframes = new Set(
+    [...backdropSrc.matchAll(/animation:\s*[`"']?\$?\{?[`"']?([\w-]+)\s+[\d.]+s/g)].map(m => m[1])
+  );
+  for (const name of referencedKeyframes) {
+    if (!declaredKeyframes.has(name))
+      problems.push(`DEAD ANIM  ThemeBackdrop references @keyframes ${name} but never declares it — that backdrop will render frozen`);
   }
 
   console.log(`COSMETICS: ${total} sellable items checked across 11 catalogues`);

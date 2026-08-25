@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
 import { THEMES } from "./theme.js";
 import { PACE_PRESETS } from "../constants.jsx";
+import { GYRO_ZERO } from "../hooks/useGyroscope.js";
 
 const reduceMotion = typeof window !== "undefined" && window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -106,7 +107,7 @@ function LiveDrawBackdrop({ ink, accent, alt, paper }) {
 // sit at zIndex 0, under SkyEffect(1) and all content; `livedraw` is a canvas.
 // New themes select one via a `backdrop` field; the original four (ocean,
 // glitch, aurora, vapor) predate that and still match on their theme id.
-export default function ThemeBackdrop({ themeId, pace = "sweep" }) {
+export default function ThemeBackdrop({ themeId, pace = "sweep", gyroMotion = GYRO_ZERO, enableGyroscope = true, winIntensity = 0 }) {
   const th = THEMES[themeId];
   if (!th?.animated || reduceMotion || PACE_PRESETS[pace]?.kill) return null;
   const wrap = { position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden" };
@@ -163,6 +164,48 @@ export default function ThemeBackdrop({ themeId, pace = "sweep" }) {
     <div style={{ position: "absolute", left: "50%", top: "16%", width: "34vmin", height: "34vmin", transform: "translateX(-50%)", borderRadius: "50%", background: "linear-gradient(180deg, #FF2E97, #FF8C42 55%, transparent 56%)", opacity: 0.35, filter: "blur(2px)", animation: "lokvaporsun 9s ease-in-out infinite" }} />
     <div style={{ position: "absolute", left: "-30%", right: "-30%", bottom: 0, height: "42%", transform: "perspective(340px) rotateX(58deg)", transformOrigin: "bottom", backgroundImage: "repeating-linear-gradient(0deg, rgba(0,212,255,.28) 0 2px, transparent 2px 44px), repeating-linear-gradient(90deg, rgba(255,46,151,.24) 0 2px, transparent 2px 52px)", animation: "lokvaporgrid 3.6s linear infinite" }} />
   </div>);
+
+  // Split Press: a literal two-tone split (top/bottom) with a slowly
+  // drifting seam — the seam position is the only thing that moves.
+  if (kind === "splitpress") return (<div style={wrap} aria-hidden="true">
+    <style>{`@keyframes lokseamdrift{0%,100%{background-position:0 38%}50%{background-position:0 62%}}`}</style>
+    <div style={{ position: "absolute", inset: 0, backgroundImage: `linear-gradient(${th.accent}14, ${th.accent}14 50%, ${th.alt}14 50%, ${th.alt}14)`, backgroundSize: "100% 220%", animation: "lokseamdrift 46s ease-in-out infinite" }} />
+  </div>);
+
+  // Parallax Ink: the ink-wash layer tilts opposite the phone. Clamp+small-
+  // multiply, same idiom as gyroMotion.beta*0.12 elsewhere in the app — never
+  // a raw unclamped angle, and a flat 0/0 tilt (desktop, gyro off) renders the
+  // same wash perfectly still, so nothing about this requires the sensor.
+  if (kind === "parallaxink") {
+    const gx = enableGyroscope ? Math.max(-14, Math.min(14, gyroMotion.gamma * 0.6)) : 0;
+    const gy = enableGyroscope ? Math.max(-14, Math.min(14, gyroMotion.beta * 0.4)) : 0;
+    return (<div style={wrap} aria-hidden="true">
+      <div style={{ position: "absolute", inset: "-8%", background: `radial-gradient(60% 50% at 50% 40%, ${th.accent}33, transparent 70%), radial-gradient(50% 40% at 55% 65%, ${th.alt}2a, transparent 70%)`, transform: `translate(${-gx}px, ${-gy}px)`, transition: "transform 0.15s ease-out" }} />
+    </div>);
+  }
+
+  // Compassbloom: a drawn bloom shape rotates toward the phone's compass
+  // heading (alpha). Off-gyro, it simply doesn't rotate — never required.
+  if (kind === "compassbloom") {
+    const heading = enableGyroscope ? (gyroMotion.alpha || 0) : 0;
+    return (<div style={wrap} aria-hidden="true">
+      <div style={{ position: "absolute", left: "50%", top: "50%", width: "70vmin", height: "70vmin", marginLeft: "-35vmin", marginTop: "-35vmin", transform: `rotate(${heading}deg)`, transition: "transform 0.4s ease-out", opacity: 0.25 }}>
+        {Array.from({ length: 8 }).map((_, i) => (<div key={i} style={{ position: "absolute", left: "50%", top: "50%", width: "4px", height: "35vmin", background: i % 2 ? th.accent : th.alt, transformOrigin: "top", transform: `translateX(-50%) rotate(${i * 45}deg)` }} />))}
+      </div>
+    </div>);
+  }
+
+  // Winstreak: intensity ramps after a battle win and decays back over ~30s
+  // (winIntensity is computed from that decay by the caller); reuses the
+  // wellrise particle shape rather than inventing a second rising-ember look.
+  if (kind === "winstreak") {
+    if (winIntensity <= 0.02) return null;
+    return (<div style={wrap} aria-hidden="true">
+      <style>{`@keyframes lokwellrise{0%{transform:translateY(0) scale(1);opacity:0}12%{opacity:.55}100%{transform:translateY(-105vh) scale(1.7);opacity:0}}`}</style>
+      <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 50% 100%, ${th.accent}${Math.round(winIntensity * 68).toString(16).padStart(2, "0")}, transparent 60%)`, transition: "opacity 1s linear" }} />
+      {Array.from({ length: Math.round(6 + winIntensity * 14) }).map((_, i) => (<div key={i} style={{ position: "absolute", left: `${(i * 6.5 + 4) % 100}%`, bottom: "-6vh", width: 4 + (i % 4) * 3, height: 4 + (i % 4) * 3, borderRadius: "50%", background: i % 3 ? `${th.accent}66` : `${th.alt}55`, opacity: winIntensity, animation: `lokwellrise ${9 + (i % 6) * 3}s linear infinite`, animationDelay: `-${i * 1.2}s` }} />))}
+    </div>);
+  }
 
   return null;
 }
