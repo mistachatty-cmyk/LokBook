@@ -26,7 +26,7 @@
 // the local one is reported to the caller rather than applied, and the caller
 // asks. Last-write-wins is only used when the user says so.
 
-import { supabase } from "../supabaseClient.js";
+import { supabase as defaultSupabase } from "../supabaseClient.js";
 import { mergeLokBookBlob, extractLokBookBlob } from "./cloudBlob.js";
 
 const TABLE = "auth_saves";
@@ -39,14 +39,28 @@ const TABLE = "auth_saves";
  * still lose one side's update, which is what per-app `app_saves` rows with a
  * revision check will fix. Doing better here would need a JSONB-merge RPC, and
  * this containment fix deliberately changes no database schema.
+ *
+ * Fails closed on a read error. `.maybeSingle()` returns `{ data: null, error:
+ * null }` for a genuine "no row yet" (the normal first-sync case) but
+ * `{ data: null, error }` for a real failure (network, RLS, transient) — and
+ * those must not be treated the same. Proceeding on a failed read would mean
+ * "couldn't check what's there" silently becomes "there's nothing to
+ * preserve," recreating the exact bug this module exists to fix, on every
+ * blip instead of only on a genuine first sync.
+ *
+ * `client` defaults to the real Supabase singleton; it exists as a seam so
+ * tests can drive this against a fake without touching a network or adding a
+ * mocking dependency. Every existing caller passes 3 args and gets the real
+ * client, unchanged.
  */
-export async function pushSave(userId, blob, gallery) {
-  if (!supabase || !userId || !blob) return false;
+export async function pushSave(userId, blob, gallery, client = defaultSupabase) {
+  if (!client || !userId || !blob) return false;
 
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await client
     .from(TABLE).select("save_blob").eq("user_id", userId).maybeSingle();
+  if (readError) return false;
 
-  const { error } = await supabase.from(TABLE).upsert({
+  const { error } = await client.from(TABLE).upsert({
     user_id: userId,
     save_blob: mergeLokBookBlob(existing?.save_blob, blob, gallery),
     updated_at: new Date().toISOString(),
@@ -57,11 +71,12 @@ export async function pushSave(userId, blob, gallery) {
 /**
  * Fetch the remote save. Returns { blob, gallery, savedAt } or null when there
  * is none (a first sign-in on a fresh account is the common case, not an
- * error).
+ * error) or the read failed. Read-only, so a failure here already fails
+ * closed — there is nothing to write.
  */
-export async function pullSave(userId) {
-  if (!supabase || !userId) return null;
-  const { data, error } = await supabase
+export async function pullSave(userId, client = defaultSupabase) {
+  if (!client || !userId) return null;
+  const { data, error } = await client
     .from(TABLE).select("save_blob,updated_at").eq("user_id", userId).maybeSingle();
   if (error || !data?.save_blob) return null;
   const mine = extractLokBookBlob(data.save_blob);
