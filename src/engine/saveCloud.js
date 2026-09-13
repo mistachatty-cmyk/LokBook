@@ -14,22 +14,55 @@
 // `save_blob` embeds the gallery under `_gallery`, matching the existing manual
 // shape exactly — so a manual restore and an automatic one read identical data.
 //
+// The row is SHARED with the other Lok apps (auth_saves is keyed by user_id
+// alone), so every read and write here goes through cloudBlob.js: LokBook
+// writes only the keys it owns and preserves everything else, and reads only
+// the keys it owns. See that file for why, and for the app_saves plan that
+// replaces this arrangement.
+//
 // Conflict handling is deliberately simple and deliberately not silent. Two
 // devices editing the same save is a real possibility, and quietly picking one
 // loses work the user can never get back — so a remote save that is newer than
 // the local one is reported to the caller rather than applied, and the caller
 // asks. Last-write-wins is only used when the user says so.
 
-import { supabase } from "../supabaseClient.js";
+import { supabase as defaultSupabase } from "../supabaseClient.js";
+import { mergeLokBookBlob, extractLokBookBlob } from "./cloudBlob.js";
 
 const TABLE = "auth_saves";
 
-/** Push the local blob (plus gallery) up. Returns true on success. */
-export async function pushSave(userId, blob, gallery) {
-  if (!supabase || !userId || !blob) return false;
-  const { error } = await supabase.from(TABLE).upsert({
+/**
+ * Push the local blob (plus gallery) up. Returns true on success.
+ *
+ * Reads the current row first so unrelated apps' keys survive the write. That
+ * read-modify-write is not atomic — two devices saving at the same moment can
+ * still lose one side's update, which is what per-app `app_saves` rows with a
+ * revision check will fix. Doing better here would need a JSONB-merge RPC, and
+ * this containment fix deliberately changes no database schema.
+ *
+ * Fails closed on a read error. `.maybeSingle()` returns `{ data: null, error:
+ * null }` for a genuine "no row yet" (the normal first-sync case) but
+ * `{ data: null, error }` for a real failure (network, RLS, transient) — and
+ * those must not be treated the same. Proceeding on a failed read would mean
+ * "couldn't check what's there" silently becomes "there's nothing to
+ * preserve," recreating the exact bug this module exists to fix, on every
+ * blip instead of only on a genuine first sync.
+ *
+ * `client` defaults to the real Supabase singleton; it exists as a seam so
+ * tests can drive this against a fake without touching a network or adding a
+ * mocking dependency. Every existing caller passes 3 args and gets the real
+ * client, unchanged.
+ */
+export async function pushSave(userId, blob, gallery, client = defaultSupabase) {
+  if (!client || !userId || !blob) return false;
+
+  const { data: existing, error: readError } = await client
+    .from(TABLE).select("save_blob").eq("user_id", userId).maybeSingle();
+  if (readError) return false;
+
+  const { error } = await client.from(TABLE).upsert({
     user_id: userId,
-    save_blob: { ...blob, _gallery: gallery },
+    save_blob: mergeLokBookBlob(existing?.save_blob, blob, gallery),
     updated_at: new Date().toISOString(),
   });
   return !error;
@@ -38,15 +71,17 @@ export async function pushSave(userId, blob, gallery) {
 /**
  * Fetch the remote save. Returns { blob, gallery, savedAt } or null when there
  * is none (a first sign-in on a fresh account is the common case, not an
- * error).
+ * error) or the read failed. Read-only, so a failure here already fails
+ * closed — there is nothing to write.
  */
-export async function pullSave(userId) {
-  if (!supabase || !userId) return null;
-  const { data, error } = await supabase
+export async function pullSave(userId, client = defaultSupabase) {
+  if (!client || !userId) return null;
+  const { data, error } = await client
     .from(TABLE).select("save_blob,updated_at").eq("user_id", userId).maybeSingle();
   if (error || !data?.save_blob) return null;
-  const { _gallery, ...blob } = data.save_blob;
-  return { blob, gallery: _gallery, savedAt: Date.parse(data.updated_at) || 0 };
+  const mine = extractLokBookBlob(data.save_blob);
+  if (!mine) return null;
+  return { blob: mine.blob, gallery: mine.gallery, savedAt: Date.parse(data.updated_at) || 0 };
 }
 
 /**

@@ -518,6 +518,7 @@ export const BADGE_CATEGORIES = [
 
 // --- Lok party API — accounts + shared feed on LokServices (Supabase REST) ---
 import { getApiToken } from "./auth/auth.js";
+import { mergeLokBookBlob } from "./engine/cloudBlob.js";
 
 function getHeaders() {
   const token = getApiToken();
@@ -582,13 +583,34 @@ export const lokApi = {
   },
   async pushSave(handle, blob, userId) {
     if (userId) {
-      try { await fetch(`${SUPA_URL}/rest/v1/auth_saves`, { method: "POST", headers: { ...getHeaders(), Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ user_id: userId, save_blob: blob, updated_at: new Date().toISOString() }) }); } catch {}
+      // auth_saves is one shared row per user, so read the current blob and
+      // merge rather than POSTing a replacement — a bare upsert here deleted
+      // sibling apps' keys (e.g. 616_survivor). See engine/cloudBlob.js.
+      //
+      // Fails closed: fetchAuthSave throws on a genuine read failure (a
+      // non-OK response or a network exception) and returns null only for a
+      // real "no row yet". The catch below means a failed read skips the
+      // write entirely, rather than treating "couldn't check" as "nothing to
+      // preserve" and overwriting whatever's actually there.
+      try {
+        const existing = await lokApi.fetchAuthSave(userId);
+        const save_blob = mergeLokBookBlob(existing, blob, undefined);
+        const r = await fetch(`${SUPA_URL}/rest/v1/auth_saves`, { method: "POST", headers: { ...getHeaders(), Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ user_id: userId, save_blob, updated_at: new Date().toISOString() }) });
+        return r.ok;
+      } catch { return false; }
     } else {
       try { await fetch(`${SUPA_URL}/rest/v1/lok_accounts?handle=eq.${encodeURIComponent(handle)}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify({ save_blob: blob, updated_at: new Date().toISOString() }) }); } catch {}
     }
   },
+  // Throws on a genuine read failure (non-OK response, or the fetch itself
+  // rejects) rather than swallowing it to null. null means specifically "the
+  // row exists but there is no save yet" — the two must stay distinguishable
+  // so pushSave (above) can fail closed instead of overwriting on a blip.
   async fetchAuthSave(userId) {
-    try { const r = await fetch(`${SUPA_URL}/rest/v1/auth_saves?user_id=eq.${userId}&select=save_blob`, { headers: getHeaders() }); if (!r.ok) return null; const rows = await r.json(); return rows[0]?.save_blob || null; } catch { return null; }
+    const r = await fetch(`${SUPA_URL}/rest/v1/auth_saves?user_id=eq.${userId}&select=save_blob`, { headers: getHeaders() });
+    if (!r.ok) throw new Error(`fetchAuthSave failed: ${r.status}`);
+    const rows = await r.json();
+    return rows[0]?.save_blob || null;
   },
   async publishPost(dbPost) {
     try { const r = await fetch(`${SUPA_URL}/rest/v1/lok_posts`, { method: "POST", headers: { ...getHeaders(), Prefer: "resolution=merge-duplicates" }, body: JSON.stringify(dbPost) }); return r.ok; } catch { return false; }

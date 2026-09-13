@@ -1050,8 +1050,14 @@ function Profile({posts,profile,setProfile,wins,lokPass,kids,cosmetics={},level,
   const acctPanelRef=useRef(null);
   useEffect(()=>{if(showSettings&&acctPanelRef.current)gsap.fromTo(acctPanelRef.current,{opacity:0,y:10},{opacity:1,y:0,duration:0.35,ease:"power2.out",delay:0.05});},[showSettings,authSent]);
   const tapBtn=e=>gsap.fromTo(e.currentTarget,{scale:0.95},{scale:1,duration:0.25,ease:"back.out(3)"});
-  const cloudSyncNow=async()=>{if(!supabase||!auth.getUserId())return;setCloudBusy(true);try{const localSave=await store.get(SAVE_KEY);const localGallery=await store.get(GALLERY_KEY);const{error}=await supabase.from("auth_saves").upsert({user_id:auth.getUserId(),save_blob:{...localSave,_gallery:localGallery},updated_at:new Date().toISOString()});if(error)throw error;say("Backed up to the cloud","success");}catch{say("Cloud sync failed — try again","error");}setCloudBusy(false);};
-  const cloudRestoreNow=async()=>{if(!supabase||!auth.getUserId())return;if(!window.confirm("Replace this device's data with your cloud backup? This device will reload."))return;setCloudBusy(true);try{const{data,error}=await supabase.from("auth_saves").select("save_blob").eq("user_id",auth.getUserId()).single();if(error)throw error;if(!data?.save_blob){say("No cloud backup found yet","error");setCloudBusy(false);return;}const{_gallery,...saveRest}=data.save_blob;await store.set(SAVE_KEY,saveRest);if(_gallery)await store.set(GALLERY_KEY,_gallery);window.location.reload();}catch{say("Restore failed — try again","error");setCloudBusy(false);}};
+  // Manual "Back up now". Routed through pushSave rather than its own upsert so
+  // it obeys the same save_blob ownership rules as the automatic sync — the
+  // inline version here replaced the whole blob and deleted sibling apps' keys.
+  const cloudSyncNow=async()=>{if(!supabase||!auth.getUserId())return;setCloudBusy(true);try{const localSave=await store.get(SAVE_KEY);const localGallery=await store.get(GALLERY_KEY);const ok=await pushSave(auth.getUserId(),localSave,localGallery);if(!ok)throw new Error("push failed");say("Backed up to the cloud","success");}catch{say("Cloud sync failed — try again","error");}setCloudBusy(false);};
+  // Manual "Restore". Routed through pullSave so only LokBook's own keys reach
+  // local state; the inline version spread the entire shared blob into
+  // SAVE_KEY, importing whatever a sibling app had stored in the same row.
+  const cloudRestoreNow=async()=>{if(!supabase||!auth.getUserId())return;if(!window.confirm("Replace this device's data with your cloud backup? This device will reload."))return;setCloudBusy(true);try{const remote=await pullSave(auth.getUserId());if(!remote||!Object.keys(remote.blob).length){say("No cloud backup found yet","error");setCloudBusy(false);return;}await store.set(SAVE_KEY,remote.blob);if(remote.gallery)await store.set(GALLERY_KEY,remote.gallery);window.location.reload();}catch{say("Restore failed — try again","error");setCloudBusy(false);}};
   const isIOS=typeof navigator!=="undefined"&&/iPad|iPhone|iPod/.test(navigator.userAgent);
   const targetArtist=viewingArtist||profile.name;
   const botPersona=viewingArtist?BOT_PERSONAS[viewingArtist]:null;
