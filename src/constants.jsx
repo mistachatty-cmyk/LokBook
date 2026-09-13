@@ -518,6 +518,7 @@ export const BADGE_CATEGORIES = [
 
 // --- Lok party API — accounts + shared feed on LokServices (Supabase REST) ---
 import { getApiToken } from "./auth/auth.js";
+import { mergeLokBookBlob } from "./engine/cloudBlob.js";
 
 function getHeaders() {
   const token = getApiToken();
@@ -582,7 +583,14 @@ export const lokApi = {
   },
   async pushSave(handle, blob, userId) {
     if (userId) {
-      try { await fetch(`${SUPA_URL}/rest/v1/auth_saves`, { method: "POST", headers: { ...getHeaders(), Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ user_id: userId, save_blob: blob, updated_at: new Date().toISOString() }) }); } catch {}
+      // auth_saves is one shared row per user, so read the current blob and
+      // merge rather than POSTing a replacement — a bare upsert here deleted
+      // sibling apps' keys (e.g. 616_survivor). See engine/cloudBlob.js.
+      try {
+        const existing = await lokApi.fetchAuthSave(userId);
+        const save_blob = mergeLokBookBlob(existing, blob, undefined);
+        await fetch(`${SUPA_URL}/rest/v1/auth_saves`, { method: "POST", headers: { ...getHeaders(), Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ user_id: userId, save_blob, updated_at: new Date().toISOString() }) });
+      } catch {}
     } else {
       try { await fetch(`${SUPA_URL}/rest/v1/lok_accounts?handle=eq.${encodeURIComponent(handle)}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify({ save_blob: blob, updated_at: new Date().toISOString() }) }); } catch {}
     }

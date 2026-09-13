@@ -14,6 +14,12 @@
 // `save_blob` embeds the gallery under `_gallery`, matching the existing manual
 // shape exactly — so a manual restore and an automatic one read identical data.
 //
+// The row is SHARED with the other Lok apps (auth_saves is keyed by user_id
+// alone), so every read and write here goes through cloudBlob.js: LokBook
+// writes only the keys it owns and preserves everything else, and reads only
+// the keys it owns. See that file for why, and for the app_saves plan that
+// replaces this arrangement.
+//
 // Conflict handling is deliberately simple and deliberately not silent. Two
 // devices editing the same save is a real possibility, and quietly picking one
 // loses work the user can never get back — so a remote save that is newer than
@@ -21,15 +27,28 @@
 // asks. Last-write-wins is only used when the user says so.
 
 import { supabase } from "../supabaseClient.js";
+import { mergeLokBookBlob, extractLokBookBlob } from "./cloudBlob.js";
 
 const TABLE = "auth_saves";
 
-/** Push the local blob (plus gallery) up. Returns true on success. */
+/**
+ * Push the local blob (plus gallery) up. Returns true on success.
+ *
+ * Reads the current row first so unrelated apps' keys survive the write. That
+ * read-modify-write is not atomic — two devices saving at the same moment can
+ * still lose one side's update, which is what per-app `app_saves` rows with a
+ * revision check will fix. Doing better here would need a JSONB-merge RPC, and
+ * this containment fix deliberately changes no database schema.
+ */
 export async function pushSave(userId, blob, gallery) {
   if (!supabase || !userId || !blob) return false;
+
+  const { data: existing } = await supabase
+    .from(TABLE).select("save_blob").eq("user_id", userId).maybeSingle();
+
   const { error } = await supabase.from(TABLE).upsert({
     user_id: userId,
-    save_blob: { ...blob, _gallery: gallery },
+    save_blob: mergeLokBookBlob(existing?.save_blob, blob, gallery),
     updated_at: new Date().toISOString(),
   });
   return !error;
@@ -45,8 +64,9 @@ export async function pullSave(userId) {
   const { data, error } = await supabase
     .from(TABLE).select("save_blob,updated_at").eq("user_id", userId).maybeSingle();
   if (error || !data?.save_blob) return null;
-  const { _gallery, ...blob } = data.save_blob;
-  return { blob, gallery: _gallery, savedAt: Date.parse(data.updated_at) || 0 };
+  const mine = extractLokBookBlob(data.save_blob);
+  if (!mine) return null;
+  return { blob: mine.blob, gallery: mine.gallery, savedAt: Date.parse(data.updated_at) || 0 };
 }
 
 /**
