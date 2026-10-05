@@ -59,7 +59,7 @@ function withTimeout(promise, message) {
 export async function signInWithEmail(email) {
   if (!supabase) throw new Error("Supabase not configured");
   const { error } = await withTimeout(
-    supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } }),
+    supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: window.location.origin } }),
     "Sign-in timed out — check your connection and try again"
   );
   if (error) throw error;
