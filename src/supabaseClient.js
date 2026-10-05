@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { lokSessionStorage } from "./lokSession.js";
 
 // ---- Connection config -------------------------------------------------
 // Vite exposes env vars prefixed with VITE_ via import.meta.env (.env.local).
@@ -24,7 +25,9 @@ export const SUPA_KEY = envKey || FALLBACK_KEY;
 /** "env" = configured via .env, "fallback" = built-in public key, "off" = unusable. */
 export const SUPA_SOURCE = envUrl && envKey ? "env" : (SUPA_URL && SUPA_KEY ? "fallback" : "off");
 
-export const supabase = SUPA_URL && SUPA_KEY ? createClient(SUPA_URL, SUPA_KEY) : null;
+export const supabase = SUPA_URL && SUPA_KEY ? createClient(SUPA_URL, SUPA_KEY, {
+  auth: { storage: lokSessionStorage, persistSession: true, autoRefreshToken: true },
+}) : null;
 
 if (typeof console !== "undefined") {
   if (SUPA_SOURCE === "off") console.error("[Lok] Supabase is NOT configured — accounts, Rooms and duels are disabled.");
