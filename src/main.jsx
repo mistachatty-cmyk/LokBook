@@ -4,6 +4,9 @@ import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 import { AuthProvider } from './auth/AuthContext.jsx'
+import { startLokPlaytime } from './lokPlaytime.js'
+
+startLokPlaytime()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
